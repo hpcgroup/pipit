@@ -30,9 +30,9 @@ class ScorepReader:
         elif isinstance(data, tuple):
             return tuple([self.fieldToVal(dataElement) for dataElement in data])
         elif isinstance(data, dict):
-            return {self.fieldToVal(dataKey): self. fieldToVal(dataValue) for dataKey, dataValue in data.items()}
+            return {self.fieldToVal(dataKey): self.fieldToVal(dataValue) for dataKey, dataValue in data.items()}
         else:
-            return self. fieldToVal(data)
+            return self.fieldToVal(data)
 
 
     #converts the fields of a definition object to a dictionary
