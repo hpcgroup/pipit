@@ -1,40 +1,45 @@
 #import essential libraries
+import math
 import otf2
 import pandas as pd
+import multiprocessing as mp
+
 
 
 #reader for otf2 files
 class ScorepReader:
-    #directory of otf2 file being read
     def __init__(self, dir_name):
-        self.dir_name = dir_name
+        self.dir_name = dir_name #directory of otf2 file being read
 
 
-    #converts a single field to an appropriate value
     def fieldToVal(self, defField):
         fieldType = str(type(defField))
+        #handles otf2 and _otf2 objects
         if "otf2.definitions" in fieldType:
             return fieldType[25:-2] + " " + str(getattr(defField, "_ref")) #reference id of the nested object
+        elif "_otf2.Events" in fieldType:
+            return str(defField)
         else:
             return defField
 
-    #handles different data types and processes them accordingly
+
+    #handles different data types
     def handleData(self, data):
         if isinstance(data, list):
             return [self.fieldToVal(dataElement) for dataElement in data]
         elif isinstance(data, tuple):
             return tuple([self.fieldToVal(dataElement) for dataElement in data])
         elif isinstance(data, dict):
-            return {dataKey: self.fieldToVal(dataValue) for dataKey, dataValue in data.items()}
+            return {self.fieldToVal(dataKey): self. fieldToVal(dataValue) for dataKey, dataValue in data.items()}
         else:
-            return self.fieldToVal(data)
+            return self. fieldToVal(data)
 
 
     #converts the fields of a definition object to a dictionary
     def fieldsToDict(self, defObject):
         fieldsDict = {}
         for field in defObject._fields:
-            fieldName = str(field.name) 
+            fieldName = str(field.name)
             fieldsDict[fieldName] = self.handleData(getattr(defObject, fieldName))
                 
         if len(fieldsDict) == 1: #collapse single dictionaries to a string
@@ -43,7 +48,45 @@ class ScorepReader:
             return fieldsDict
 
 
-    #writes a trace's definitions to a Pandas DataFrame
+    #serial events reader
+    def events_reader(self, rank_size):
+        with otf2.reader.open(self.dir_name) as trace:
+            rank, size = rank_size[0], rank_size[1]
+            locations = list(trace.definitions._locations)
+            perProcess = math.floor(len(locations) / size)
+            beginInt, endInt = int(rank * perProcess), int((rank + 1) * perProcess)
+            locs, timestamps, eventTypes, eventAttributes, names = [], [], [], [], []
+
+            #selects locations based on the rank
+            if rank == size - 1:
+                loc_events = list(trace.events(locations[beginInt:]).__iter__())
+            else:
+                loc_events = list(trace.events(locations[beginInt: endInt]).__iter__())
+
+            #iterating through events and processing them
+            for loc_event in loc_events:
+                loc, event = loc_event[0], loc_event[1]
+                locs.append(self.fieldToVal(loc))
+                eventType = str(type(event))[20:-2]
+                eventTypes.append(eventType)
+
+                if eventType in ["Enter", "Leave"]:
+                    names.append(event.region.name)
+                else:
+                    names.append("N/A")
+
+                timestamps.append(event.time)
+
+                attributesDict =  {self.fieldToVal(key): self.handleData(value) for key, value in vars(event).items()}
+                eventAttributes.append(attributesDict)
+
+            trace.close() #close event files
+
+        #returns dictionary with all events and their fields
+        return {"Event": eventTypes, "Name": names, "Location": locs, "Timestamp": timestamps, "Attributes": eventAttributes}
+
+
+    #writes the definitions to a Pandas DataFrame
     def defToDF(self, trace):
         definitions, defIds, attributes = [], [], [] #ids are for objects stored in a reference registry
         for key in vars(trace.definitions).keys(): #iterating through definition registry attributes
@@ -66,35 +109,37 @@ class ScorepReader:
         return defDF
 
 
-    #writes a trace's events to a Pandas DataFrame
-    def eventsToDF(self, trace):
-            locations, timestamps, eventTypes, eventAttributes, names = [], [], [], [], []
-            for location, event in trace.events.__iter__(): #iterate through each event
-                locations.append(self.fieldToVal(location))
-                eventType = str(type(event))[20:-2]
-                eventTypes.append(eventType)
+    #writes the events to a Pandas DataFrame
+    def eventsToDF(self):
+        #parallelizes the reading of events
+        poolSize, pool = mp.cpu_count(), mp.Pool()
+        eventsDict = pool.map(self.events_reader, [(rank, poolSize) for rank in range(poolSize)])
 
-                if eventType in ["Enter", "Leave"]: #adds the name if a function enters and leaves a region
-                    names.append(event.region.name)
-                else:
-                    names.append("N/A")
+        #combines results from each process
+        for i in range(len(eventsDict) - 1):
+            for key, value in eventsDict[0].items():
+                value.extend(eventsDict[1][key])
+            del eventsDict[1]
+        eventsDict = eventsDict[0]
 
-                attributesDict =  {}
-                for key, value in vars(event).items(): #iterating through event attributes
-                    if key == "time":
-                        timestamps.append(value)
-                    else:
-                        attributesDict[key] = self.handleData(value)
+        #returns the events as a DataFrame
+        eventsDF = pd.DataFrame(eventsDict)
 
-                eventAttributes.append(attributesDict)
+        #cleaning up timestamps
+        clockProps = self.definitions.loc[self.definitions["Definition"] == "ClockProperties"]["Attributes"].values[0]
+        offset, resolution = clockProps["global_offset"], clockProps["timer_resolution"]
+        eventsDF["Timestamp"] -= offset
+        eventsDF["Timestamp"] *= ((10**9) / resolution)
 
-            #returns the events as a DataFrame
-            eventsDF = pd.DataFrame({"Event": eventTypes, "Name": names, "Location": locations, "Timestamp": timestamps, "Attributes": eventAttributes})
-            return eventsDF
+        #ensures the DataFrame is in order of increasing timestamp
+        eventsDF.sort_values(by = "Timestamp", axis = 0, ascending = True, inplace = True, ignore_index = True)
+        return eventsDF
+
 
     #returns a tuple containing definitions and events
     def read(self):
         with otf2.reader.open(self.dir_name) as trace:
             self.definitions = self.defToDF(trace)
-            self.events = self.eventsToDF(trace)
+            trace.close()
+        self.events = self.eventsToDF()
         return (self.definitions, self.events)
