@@ -7,7 +7,7 @@ import multiprocessing as mp
 
 
 #reader for otf2 files
-class ScorepReader:
+class OTF2Reader:
     def __init__(self, dir_name):
         self.dir_name = dir_name #directory of otf2 file being read
 
