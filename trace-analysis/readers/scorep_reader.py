@@ -12,9 +12,9 @@ class ScorepReader:
         self.dir_name = dir_name #directory of otf2 file being read
 
 
+    #handles otf2 and _otf2 objects
     def fieldToVal(self, defField):
         fieldType = str(type(defField))
-        #handles otf2 and _otf2 objects
         if "otf2.definitions" in fieldType:
             return fieldType[25:-2] + " " + str(getattr(defField, "_ref")) #reference id of the nested object
         elif "_otf2.Events" in fieldType:
@@ -66,7 +66,8 @@ class ScorepReader:
             #iterating through events and processing them
             for loc_event in loc_events:
                 loc, event = loc_event[0], loc_event[1]
-                locs.append(self.fieldToVal(loc))
+
+                locs.append(loc._ref)
                 eventType = str(type(event))[20:-2]
                 eventTypes.append(eventType)
 
@@ -77,13 +78,16 @@ class ScorepReader:
 
                 timestamps.append(event.time)
 
-                attributesDict =  {self.fieldToVal(key): self.handleData(value) for key, value in vars(event).items()}
+                attributesDict =  {}
+                for key, value in vars(event).items():
+                    if value is not None and key != "time":
+                        attributesDict[self.fieldToVal(key)] = self.handleData(value)
                 eventAttributes.append(attributesDict)
 
             trace.close() #close event files
 
         #returns dictionary with all events and their fields
-        return {"Event": eventTypes, "Name": names, "Location": locs, "Timestamp": timestamps, "Attributes": eventAttributes}
+        return {"Event": eventTypes, "Name": names, "Rank": locs, "Timestamp": timestamps, "Attributes": eventAttributes}
 
 
     #writes the definitions to a Pandas DataFrame
@@ -106,6 +110,7 @@ class ScorepReader:
 
         #return the definitions as a DataFrame
         defDF = pd.DataFrame({"Definition": definitions, "ID": defIds, "Attributes": attributes})
+        
         return defDF
 
 
@@ -133,6 +138,10 @@ class ScorepReader:
 
         #ensures the DataFrame is in order of increasing timestamp
         eventsDF.sort_values(by = "Timestamp", axis = 0, ascending = True, inplace = True, ignore_index = True)
+
+        #using categorical dtypes for memory optimization
+        eventsDF = eventsDF.astype({"Event": "category", "Name": "category", "Rank": "category"})
+
         return eventsDF
 
 
