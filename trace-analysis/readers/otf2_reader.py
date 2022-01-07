@@ -3,6 +3,7 @@ import math
 import otf2
 import pandas as pd
 import multiprocessing as mp
+import trace_analysis.traceframe
 
 
 
@@ -55,7 +56,8 @@ class OTF2Reader:
             locations = list(trace.definitions._locations)
             perProcess = math.floor(len(locations) / size)
             beginInt, endInt = int(rank * perProcess), int((rank + 1) * perProcess)
-            locs, timestamps, eventTypes, eventAttributes, names = [], [], [], [], []
+            timestamps, eventTypes, eventAttributes, names = [], [], [], []
+            locs, locTypes, locGroups, locGroupTypes = [], [], [], []
 
             #selects locations based on the rank
             if rank == size - 1:
@@ -68,6 +70,10 @@ class OTF2Reader:
                 loc, event = loc_event[0], loc_event[1]
 
                 locs.append(loc._ref)
+                locTypes.append(str(loc.type)[13:])
+                locGroups.append(loc.group._ref)
+                locGroupTypes.append(str(loc.group.location_group_type)[18:])
+
                 eventType = str(type(event))[20:-2]
                 eventTypes.append(eventType)
 
@@ -87,7 +93,8 @@ class OTF2Reader:
             trace.close() #close event files
 
         #returns dictionary with all events and their fields
-        return {"Event": eventTypes, "Name": names, "Rank": locs, "Timestamp": timestamps, "Attributes": eventAttributes}
+        return {"Event": eventTypes, "Name": names, "Location ID": locs, "Location Type": locTypes, "Location Group ID": locGroups,
+                "Location Group Type": locGroupTypes, "Timestamp (ns)": timestamps, "Attributes": eventAttributes}
 
 
     #writes the definitions to a Pandas DataFrame
@@ -133,14 +140,15 @@ class OTF2Reader:
         #cleaning up timestamps
         clockProps = self.definitions.loc[self.definitions["Definition"] == "ClockProperties"]["Attributes"].values[0]
         offset, resolution = clockProps["global_offset"], clockProps["timer_resolution"]
-        eventsDF["Timestamp"] -= offset
-        eventsDF["Timestamp"] *= ((10**9) / resolution)
+        eventsDF["Timestamp (ns)"] -= offset
+        eventsDF["Timestamp (ns)"] *= ((10**9) / resolution)
 
         #ensures the DataFrame is in order of increasing timestamp
-        eventsDF.sort_values(by = "Timestamp", axis = 0, ascending = True, inplace = True, ignore_index = True)
+        eventsDF.sort_values(by = "Timestamp (ns)", axis = 0, ascending = True, inplace = True, ignore_index = True)
 
         #using categorical dtypes for memory optimization
-        eventsDF = eventsDF.astype({"Event": "category", "Name": "category", "Rank": "category"})
+        eventsDF = eventsDF.astype({"Event": "category", "Name": "category", "Location ID": "category", "Location Type": "category",
+                                    "Location Group ID": "category", "Location Group Type": "category"})
 
         return eventsDF
 
@@ -151,4 +159,4 @@ class OTF2Reader:
             self.definitions = self.defToDF(trace)
             trace.close()
         self.events = self.eventsToDF()
-        return (self.definitions, self.events)
+        return trace_analysis.traceframe.TraceFrame(self.definitions, self.events)
