@@ -1,4 +1,8 @@
-#import essential libraries
+# Copyright 2022 Parallel Software and Systems Group, University of Maryland.
+# See the top-level LICENSE file for details.
+#
+# SPDX-License-Identifier: MIT
+
 import math
 import otf2
 import pandas as pd
@@ -7,13 +11,14 @@ import pipit.tracedata
 
 
 
-#reader for otf2 files
 class OTF2Reader:
+    """Reader for OTF2 trace files"""
+
     def __init__(self, dir_name):
         self.dir_name = dir_name #directory of otf2 file being read
 
 
-    #handles otf2 and _otf2 objects
+    # handles otf2 and _otf2 objects
     def fieldToVal(self, defField):
         fieldType = str(type(defField))
         if "otf2.definitions" in fieldType:
@@ -24,7 +29,7 @@ class OTF2Reader:
             return defField
 
 
-    #handles different data types
+    # handles different data types
     def handleData(self, data):
         if isinstance(data, list):
             return [self.fieldToVal(dataElement) for dataElement in data]
@@ -36,7 +41,7 @@ class OTF2Reader:
             return self.fieldToVal(data)
 
 
-    #converts the fields of a definition object to a dictionary
+    # converts the fields of a definition object to a dictionary
     def fieldsToDict(self, defObject):
         fieldsDict = {}
         for field in defObject._fields:
@@ -49,7 +54,7 @@ class OTF2Reader:
             return fieldsDict
 
 
-    #serial events reader
+    # serial events reader
     def events_reader(self, rank_size):
         with otf2.reader.open(self.dir_name) as trace:
             rank, size = rank_size[0], rank_size[1]
@@ -100,7 +105,7 @@ class OTF2Reader:
                 "Location Group ID": locGroups, "Location Group Type": locGroupTypes, "Attributes": eventAttributes}
 
 
-    #writes the definitions to a Pandas DataFrame
+    # writes the definitions to a Pandas DataFrame
     def defToDF(self, trace):
         definitions, defIds, attributes = [], [], [] #ids are for objects stored in a reference registry
         for key in vars(trace.definitions).keys(): #iterating through definition registry attributes
@@ -124,7 +129,7 @@ class OTF2Reader:
         return defDF
 
 
-    #writes the events to a Pandas DataFrame
+    # writes the events to a Pandas DataFrame
     def eventsToDF(self):
         #parallelizes the reading of events
         poolSize, pool = mp.cpu_count(), mp.Pool()
@@ -156,7 +161,7 @@ class OTF2Reader:
         return eventsDF
 
 
-    #returns a tuple containing definitions and events
+    # returns a tuple containing definitions and events
     def read(self):
         with otf2.reader.open(self.dir_name) as trace:
             self.definitions = self.defToDF(trace)
