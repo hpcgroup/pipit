@@ -38,7 +38,3 @@ jobs:
         run: |
           black --diff --check .
           flake8
-
-      - name: Test with pytest
-        run: |
-          pytest
