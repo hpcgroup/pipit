@@ -34,8 +34,10 @@ class OTF2Reader:
         elif isinstance(data, tuple):
             return tuple([self.fieldToVal(dataElement) for dataElement in data])
         elif isinstance(data, dict):
-            return {self.fieldToVal(dataKey): self.fieldToVal(dataValue)
-                    for dataKey, dataValue in data.items()}
+            return {
+                self.fieldToVal(dataKey): self.fieldToVal(dataValue)
+                for dataKey, dataValue in data.items()
+            }
         else:
             return self.fieldToVal(data)
 
@@ -67,7 +69,7 @@ class OTF2Reader:
             if rank == size - 1:
                 loc_events = list(trace.events(locations[beginInt:]).__iter__())
             elif len(locations[beginInt:endInt]) != 0:
-                loc_events = list(trace.events(locations[beginInt: endInt]).__iter__())
+                loc_events = list(trace.events(locations[beginInt:endInt]).__iter__())
 
             # iterating through events and processing them
             for loc_event in loc_events:
@@ -93,7 +95,8 @@ class OTF2Reader:
                     for key, value in vars(event).items():
                         if value is not None and key != "time":
                             attributesDict[self.fieldToVal(key)] = self.handleData(
-                                                                   value)
+                                value
+                            )
                     eventAttributes.append(attributesDict)
                 else:
                     # no need for duplicate attributes
@@ -102,10 +105,16 @@ class OTF2Reader:
             trace.close()  # close event files
 
         # returns dictionary with all events and their fields
-        return {"Event": eventTypes, "Timestamp (ns)": timestamps, "Name": names,
-                "Location ID": locs, "Location Type": locTypes,
-                "Location Group ID": locGroups, "Location Group Type": locGroupTypes,
-                "Attributes": eventAttributes}
+        return {
+            "Event": eventTypes,
+            "Timestamp (ns)": timestamps,
+            "Name": names,
+            "Location ID": locs,
+            "Location Type": locTypes,
+            "Location Group ID": locGroups,
+            "Location Group Type": locGroupTypes,
+            "Attributes": eventAttributes,
+        }
 
     # writes the definitions to a Pandas DataFrame
     def defToDF(self, trace):
@@ -131,8 +140,9 @@ class OTF2Reader:
                     attributes.append(self.fieldsToDict(defObject))
 
         # return the definitions as a DataFrame
-        defDF = pd.DataFrame({"Definition": definitions,
-                              "ID": defIds, "Attributes": attributes})
+        defDF = pd.DataFrame(
+            {"Definition": definitions, "ID": defIds, "Attributes": attributes}
+        )
 
         return defDF
 
@@ -140,8 +150,9 @@ class OTF2Reader:
     def eventsToDF(self):
         # parallelizes the reading of events
         poolSize, pool = mp.cpu_count(), mp.Pool()
-        eventsDict = pool.map(self.events_reader, [(
-                     rank, poolSize) for rank in range(poolSize)])
+        eventsDict = pool.map(
+            self.events_reader, [(rank, poolSize) for rank in range(poolSize)]
+        )
 
         # combines results from each process
         for i in range(len(eventsDict) - 1):
@@ -154,22 +165,29 @@ class OTF2Reader:
         eventsDF = pd.DataFrame(eventsDict)
 
         # cleaning up timestamps
-        clockProps = self.definitions.loc[self.definitions[
-                     "Definition"] == "ClockProperties"]["Attributes"].values[0]
+        clockProps = self.definitions.loc[
+            self.definitions["Definition"] == "ClockProperties"
+        ]["Attributes"].values[0]
         offset, resolution = clockProps["global_offset"], clockProps["timer_resolution"]
         eventsDF["Timestamp (ns)"] -= offset
-        eventsDF["Timestamp (ns)"] *= ((10**9) / resolution)
+        eventsDF["Timestamp (ns)"] *= (10 ** 9) / resolution
 
         # ensures the DataFrame is in order of increasing timestamp
-        eventsDF.sort_values(by="Timestamp (ns)", axis=0,
-                             ascending=True, inplace=True, ignore_index=True)
+        eventsDF.sort_values(
+            by="Timestamp (ns)", axis=0, ascending=True, inplace=True, ignore_index=True
+        )
 
         # using categorical dtypes for memory optimization
-        eventsDF = eventsDF.astype({"Event": "category", "Name": "category",
-                                    "Location ID": "category",
-                                    "Location Type": "category",
-                                    "Location Group ID": "category",
-                                    "Location Group Type": "category"})
+        eventsDF = eventsDF.astype(
+            {
+                "Event": "category",
+                "Name": "category",
+                "Location ID": "category",
+                "Location Type": "category",
+                "Location Group ID": "category",
+                "Location Group Type": "category",
+            }
+        )
 
         return eventsDF
 
