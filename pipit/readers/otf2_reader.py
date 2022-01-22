@@ -144,6 +144,7 @@ class OTF2Reader:
                 if eventType in ["Enter", "Leave"]:
                     names.append(event.region.name)
                 else:
+                    # names column is of categorical dtype
                     names.append("N/A")
 
                 timestamps.append(event.time)
@@ -165,7 +166,8 @@ class OTF2Reader:
                     eventAttributes.append(attributesDict)
                 else:
                     # nan attributes for leave rows
-                    eventAttributes.append(float("NaN"))
+                    # attributes column is of object dtype
+                    eventAttributes.append(None)
 
             trace.close()  # close event files
 
@@ -206,10 +208,11 @@ class OTF2Reader:
                 # (ex: iterating through all regions
                 # if region is the current definition)
                 for defObject in defAttr.__iter__():
-                    try:
+                    if hasattr(defObject, "_ref"):
                         # only add ids for those that have it
                         defIds.append(defObject._ref)
-                    except Exception:
+                    else:
+                        # ID column is of float64 dtype
                         defIds.append(float("NaN"))
 
                     # name of the definition
@@ -224,6 +227,9 @@ class OTF2Reader:
         defDF = pd.DataFrame(
             {"Definition": definitions, "ID": defIds, "Attributes": attributes}
         )
+
+        # Definition column is of categorical dtype
+        defDF = defDF.astype({"Definition": "category"})
 
         return defDF
 
@@ -283,12 +289,15 @@ class OTF2Reader:
 
         return eventsDF
 
-    # returns a tuple containing the definitions and events
     def read(self):
-        with otf2.reader.open(self.dir_name) as trace:
-            self.definitions = self.defToDF(trace)
-            trace.close()
-        self.events = self.eventsToDF()
+        """
+        Returns a TraceData object for the otf2 file
+        that has one definitions DataFrame and another
+        events DataFrame as its primary attributes
+        """
 
-        # returns a TraceData object
+        with otf2.reader.open(self.dir_name) as trace:
+            self.definitions = self.defToDF(trace)  # definitions
+            trace.close()
+        self.events = self.eventsToDF()  # events
         return pipit.tracedata.TraceData(self.definitions, self.events)
