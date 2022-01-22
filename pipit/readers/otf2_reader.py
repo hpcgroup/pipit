@@ -16,23 +16,51 @@ class OTF2Reader:
     def __init__(self, dir_name):
         self.dir_name = dir_name  # directory of otf2 file being read
 
-    # handles otf2 and _otf2 objects
-    def fieldToVal(self, defField):
-        fieldType = str(type(defField))
+    def fieldToVal(self, field):
+        """
+        Handles otf2 and _otf2 objects
+
+        Arguments:
+        field: an otf2 definition, _otf2 object, or any other field
+        that can have different data types such as strings, ints, etc
+
+        Returns:
+        if otf2, a string representation of the definition such as "Region 19"
+        that the user can use to refer back to the definitions dataframe
+        else if _otf2, a simple string representation of the object
+        else don't make any changes to the data frame
+
+        This function also ensures that there is no pickling of otf2 or _otf2
+        objects, which could cause errors
+        """
+
+        fieldType = str(type(field))
         if "otf2.definitions" in fieldType:
             # reference id of the nested object
-            return fieldType[25:-2] + " " + str(getattr(defField, "_ref"))
+            return fieldType[25:-2] + " " + str(getattr(field, "_ref"))
         elif "_otf2.Events" in fieldType:
-            return str(defField)
+            return str(field)
         else:
-            return defField
+            return field
 
-    # handles different data types
     def handleData(self, data):
+        """
+        Handles different data structures
+
+        Arguments:
+        data: could be a list, tuple, set, dict, or any other python data type
+
+        Returns:
+        the same data structure as the passed argument but fieldToVal is applied
+        to all of the values it contains
+        """
+
         if isinstance(data, list):
             return [self.fieldToVal(dataElement) for dataElement in data]
         elif isinstance(data, tuple):
             return tuple([self.fieldToVal(dataElement) for dataElement in data])
+        elif isinstance(data, set):
+            return set([self.fieldToVal(dataElement) for dataElement in data])
         elif isinstance(data, dict):
             return {
                 self.fieldToVal(dataKey): self.fieldToVal(dataValue)
@@ -41,48 +69,78 @@ class OTF2Reader:
         else:
             return self.fieldToVal(data)
 
-    # converts the fields of a definition object to a dictionary
     def fieldsToDict(self, defObject):
+        """
+        converts the fields of a definition
+        object to a dictionary
+        """
+
         fieldsDict = {}
+        # iterates through the fields of the definition
         for field in defObject._fields:
             fieldName = str(field.name)
             fieldsDict[fieldName] = self.handleData(getattr(defObject, fieldName))
 
-        if len(fieldsDict) == 1:  # collapse single dictionaries to a string
+        if len(fieldsDict) == 1:
+            # collapse single dictionaries to a string
             return list(fieldsDict.values())[0]
         else:
             return fieldsDict
 
-    # serial events reader
     def events_reader(self, rank_size):
+        """
+        Serial events reader
+
+        Arguments:
+        rank_size: a tuple containing the rank of the process
+        and the size/total number of processors that are being used
+
+        Returns:
+        a dictionary with a subset of the trace events that can be converted
+        to a dataframe
+        """
+
         with otf2.reader.open(self.dir_name) as trace:
+            # extracts the rank and size
+            # and gets all the locations
+            # of the trace
             rank, size = rank_size[0], rank_size[1]
             locations = list(trace.definitions._locations)
 
+            # calculates how many locations to read per process
+            # and determines starting and ending indices to select
+            # for the current process
             perProcess = math.floor(len(locations) / size)
             beginInt, endInt = int(rank * perProcess), int((rank + 1) * perProcess)
 
             timestamps, eventTypes, eventAttributes, names = [], [], [], []
             locs, locTypes, locGroups, locGroupTypes = [], [], [], []
 
-            # selects locations based on the rank
+            # selects a subset of all locations to
+            # read based on the current rank
+            loc_events = []
             if rank == size - 1:
                 loc_events = list(trace.events(locations[beginInt:]).__iter__())
             elif len(locations[beginInt:endInt]) != 0:
                 loc_events = list(trace.events(locations[beginInt:endInt]).__iter__())
 
-            # iterating through events and processing them
+            # iterates through the events and processes them
             for loc_event in loc_events:
+                # extracts the location and event
                 loc, event = loc_event[0], loc_event[1]
 
+                # information about the location
+                # that the event occurred on
                 locs.append(loc._ref)
                 locTypes.append(str(loc.type)[13:])
                 locGroups.append(loc.group._ref)
                 locGroupTypes.append(str(loc.group.location_group_type)[18:])
 
+                # type of event - enter, leave, or other types
                 eventType = str(type(event))[20:-2]
                 eventTypes.append(eventType)
 
+                # only enter/leave events have a name
                 if eventType in ["Enter", "Leave"]:
                     names.append(event.region.name)
                 else:
@@ -90,16 +148,23 @@ class OTF2Reader:
 
                 timestamps.append(event.time)
 
+                # only add attributes for non-leave rows so that
+                # there aren't duplicate attributes for a single event
                 if eventType != "Leave":
                     attributesDict = {}
+                    # iterates through the event's attributes
                     for key, value in vars(event).items():
+                        # only adds non-empty attributes
+                        # and ignores time so there isn't a duplicate time
                         if value is not None and key != "time":
+                            # uses fieldToVal to convert all data types appropriately
+                            # and ensure that there are no pickling errors
                             attributesDict[self.fieldToVal(key)] = self.handleData(
                                 value
                             )
                     eventAttributes.append(attributesDict)
                 else:
-                    # no need for duplicate attributes
+                    # nan attributes for leave rows
                     eventAttributes.append(float("NaN"))
 
             trace.close()  # close event files
@@ -116,27 +181,43 @@ class OTF2Reader:
             "Attributes": eventAttributes,
         }
 
-    # writes the definitions to a Pandas DataFrame
     def defToDF(self, trace):
-        # ids are for objects stored in a reference registry
+        """
+        Writes the definitions to a Pandas DataFrame
+        """
+
+        # ids are the _ref attribute of an object
+        # all objects stored in a reference registry
+        # (such as regions) have such an id
         definitions, defIds, attributes = [], [], []
 
         # iterating through definition registry attributes
+        # such as regions, strings, locations, etc
         for key in vars(trace.definitions).keys():
             defAttr = getattr(trace.definitions, str(key))
-            if key == "clock_properties":  # only definition type that is not a registry
-                defIds.append("")
+
+            # only definition type that is not a registry
+            if key == "clock_properties":
+                defIds.append(float("NaN"))
                 definitions.append(str(type(defAttr))[25:-2])
-                # converts a definition object to a dictionary of its attributes
                 attributes.append(self.fieldsToDict(defAttr))
-            elif "otf2" not in key:
+            elif "otf2" not in key:  # otf2 wrapper properties (not needed)
                 # iterate through registry elements
+                # (ex: iterating through all regions
+                # if region is the current definition)
                 for defObject in defAttr.__iter__():
                     try:
+                        # only add ids for those that have it
                         defIds.append(defObject._ref)
                     except Exception:
-                        defIds.append("")
+                        defIds.append(float("NaN"))
+
+                    # name of the definition
                     definitions.append(str(type(defObject))[25:-2])
+
+                    # converts a definition object to a dictionary of its attributes
+                    # this contains information that a user would have to access the
+                    # definitions DataFrame for
                     attributes.append(self.fieldsToDict(defObject))
 
         # return the definitions as a DataFrame
@@ -146,15 +227,22 @@ class OTF2Reader:
 
         return defDF
 
-    # writes the events to a Pandas DataFrame
     def eventsToDF(self):
+        """
+        Writes the events to a Pandas DataFrame
+        using the multiprocessing library and the events_reader
+        function
+        """
+
         # parallelizes the reading of events
+        # using the multiprocessing library
         poolSize, pool = mp.cpu_count(), mp.Pool()
         eventsDict = pool.map(
             self.events_reader, [(rank, poolSize) for rank in range(poolSize)]
         )
 
-        # combines results from each process
+        # combines the dictionaries returned from each
+        # process to generate a full trace
         for i in range(len(eventsDict) - 1):
             for key, value in eventsDict[0].items():
                 value.extend(eventsDict[1][key])
@@ -169,6 +257,9 @@ class OTF2Reader:
             self.definitions["Definition"] == "ClockProperties"
         ]["Attributes"].values[0]
         offset, resolution = clockProps["global_offset"], clockProps["timer_resolution"]
+
+        # shifting the timestamps by the offset and
+        # converting them to nanoseconds
         eventsDF["Timestamp (ns)"] -= offset
         eventsDF["Timestamp (ns)"] *= (10 ** 9) / resolution
 
@@ -178,6 +269,7 @@ class OTF2Reader:
         )
 
         # using categorical dtypes for memory optimization
+        # (only efficient when used for categorical data)
         eventsDF = eventsDF.astype(
             {
                 "Event": "category",
@@ -191,10 +283,12 @@ class OTF2Reader:
 
         return eventsDF
 
-    # returns a tuple containing definitions and events
+    # returns a tuple containing the definitions and events
     def read(self):
         with otf2.reader.open(self.dir_name) as trace:
             self.definitions = self.defToDF(trace)
             trace.close()
         self.events = self.eventsToDF()
+
+        # returns a TraceData object
         return pipit.tracedata.TraceData(self.definitions, self.events)
