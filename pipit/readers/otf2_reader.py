@@ -21,14 +21,15 @@ class OTF2Reader:
         Handles otf2 and _otf2 objects
 
         Arguments:
-        field: an otf2 definition, _otf2 object, or any other field
+        field: an otf2 object, _otf2 object, or any other field
         that can have different data types such as strings, ints, etc
 
         Returns:
-        if otf2, a string representation of the definition such as "Region 19"
-        that the user can use to refer back to the definitions dataframe
-        else if _otf2, a simple string representation of the object
-        else don't make any changes to the data frame
+        if otf2 definitions, a string representation of the definition and
+        its ID such as "Region 19" that the user can use to refer back
+        to the definitions dataframe
+        else if other otf2 or _otf2 objects, a simple string representation of
+        the object else don't make any changes
 
         This function also ensures that there is no pickling of otf2 or _otf2
         objects, which could cause errors
@@ -38,7 +39,7 @@ class OTF2Reader:
         if "otf2.definitions" in fieldType:
             # reference id of the nested object
             return fieldType[25:-2] + " " + str(getattr(field, "_ref"))
-        elif "_otf2.Events" in fieldType:
+        elif "_otf2" in fieldType or "otf2" in fieldType:
             return str(field)
         else:
             return field
@@ -56,16 +57,16 @@ class OTF2Reader:
         """
 
         if isinstance(data, list):
-            return [self.fieldToVal(dataElement) for dataElement in data]
-        elif isinstance(data, tuple):
-            return tuple([self.fieldToVal(dataElement) for dataElement in data])
-        elif isinstance(data, set):
-            return set([self.fieldToVal(dataElement) for dataElement in data])
+            return [self.handleData(dataElement) for dataElement in data]
         elif isinstance(data, dict):
             return {
-                self.fieldToVal(dataKey): self.fieldToVal(dataValue)
+                self.fieldToVal(dataKey): self.handleData(dataValue)
                 for dataKey, dataValue in data.items()
             }
+        elif isinstance(data, tuple):
+            return tuple([self.handleData(dataElement) for dataElement in data])
+        elif isinstance(data, set):
+            return set([self.handleData(dataElement) for dataElement in data])
         else:
             return self.fieldToVal(data)
 
@@ -82,7 +83,7 @@ class OTF2Reader:
             fieldsDict[fieldName] = self.handleData(getattr(defObject, fieldName))
 
         if len(fieldsDict) == 1:
-            # collapse single dictionaries to a string
+            # collapse single dictionaries to a value
             return list(fieldsDict.values())[0]
         else:
             return fieldsDict
@@ -147,7 +148,7 @@ class OTF2Reader:
                     # names column is of categorical dtype
                     names.append("N/A")
 
-                timestamps.append(event.time)
+                timestamps.append(int(event.time))
 
                 # only add attributes for non-leave rows so that
                 # there aren't duplicate attributes for a single event
