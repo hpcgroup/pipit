@@ -25,11 +25,12 @@ class OTF2Reader:
         that can have different data types such as strings, ints, etc
 
         Returns:
-        if otf2 definitions, a string representation of the definition and
+        if otf2 definition, a string representation of the definition and
         its ID such as "Region 19" that the user can use to refer back
         to the definitions dataframe
         else if other otf2 or _otf2 objects, a simple string representation of
-        the object else don't make any changes
+        the object
+        else don't make any changes
 
         This function also ensures that there is no pickling of otf2 or _otf2
         objects, which could cause errors
@@ -148,7 +149,7 @@ class OTF2Reader:
                     # names column is of categorical dtype
                     names.append("N/A")
 
-                timestamps.append(int(event.time))
+                timestamps.append(event.time)
 
                 # only add attributes for non-leave rows so that
                 # there aren't duplicate attributes for a single event
