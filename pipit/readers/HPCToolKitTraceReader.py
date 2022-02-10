@@ -1,4 +1,5 @@
 from xml.etree.ElementTree import ElementTree
+import pandas as pd
 
 
 class ExperimentReader:
@@ -7,10 +8,24 @@ class ExperimentReader:
     def __init__(self, file_location):
         self.tree = ElementTree(file = file_location)
 
-    def getName(self, metric_id):
-        search = './/Procedure[@i=\'' + str(metric_id) + '\']'
+    def get_function_name(self, metric_id):
+
+        #first get id in procedure table
+        search = './/S[@it=\"' + str(metric_id) + '\"]..'
         e = self.tree.find(search)
-        return e.get('n')
+        procedure_table_id = e.get('n')
+
+        #return function name
+        procedure_table_search = './/Procedure[@i=\'' + procedure_table_id + '\']'
+        procedure = self.tree.find(procedure_table_search)
+        return procedure.get('n')
+
+    def get_min_max_time(self):
+        search = './/TraceDB[@i=\"0\"]'
+        e = self.tree.find(search)
+        time = (int(e.get('db-min-time')), int(e.get('db-max-time')))
+        # print('min-max time::                                                        ', time)
+        return time
         
 
 
@@ -53,18 +68,17 @@ class ProfileReader:
 
         # Hierarchical Identifier Tuple
         file.seek(idt_ptr)
-        kind = int.from_bytes(file.read(2), byteorder=byte_order, signed=signed)
-        p_val = int.from_bytes(file.read(8), byteorder=byte_order, signed=signed)
-        l_val = int.from_bytes(file.read(8), byteorder=byte_order, signed=signed)
-        return (kind, p_val, l_val)
+        num_tuples = int.from_bytes(file.read(2), byteorder=byte_order, signed=signed)
+        tuples_list = []
+        for i in range(0, num_tuples, 1):
+            # not working --  I don't know why, but the second 2 tuples are just incorrect
+            kind = int.from_bytes(file.read(2), byteorder=byte_order, signed=signed)
+            p_val = int.from_bytes(file.read(8), byteorder=byte_order, signed=signed)
+            l_val = int.from_bytes(file.read(8), byteorder=byte_order, signed=signed)
+            tuples_list.append((kind, p_val, l_val))
+        return tuples_list
 
         
-
-
-    
-
-
-
 
 def read_header(dir_location):
 
@@ -88,28 +102,32 @@ def read_header(dir_location):
 
     # Number of trace lines (num_traces)
     num_traces = int.from_bytes(file.read(4), byteorder=byte_order, signed=signed)
-    print("num_traces", num_traces)
+    # print("num_traces", num_traces)
 
     # Number of sections (num_sec)
     num_sections = int.from_bytes(file.read(2), byteorder=byte_order, signed=signed)
-    print("num_sections", num_sections)
+    # print("num_sections", num_sections)
 
     # Trace Header section size (hdr_size)
     hdr_size = int.from_bytes(file.read(8), byteorder=byte_order, signed=signed)
     
     # Trace Header section offset (hdr_ptr)
     hdr_ptr = int.from_bytes(file.read(8), byteorder=byte_order, signed=signed)
-    print("hdr_size: ", hdr_size)
+    # print("hdr_size: ", hdr_size)
+
+    data = {'Function Name':[], 'Enter Time':[], 'Exit Time':[], 'ID':[], 'Process':[] }
+    min_max_time = experiment_reader.get_min_max_time()
 
     # cycle through trace headers/lines 
     for i in range(0, hdr_size, 22):
+        proc_num = int(i/22)
         file.seek(hdr_ptr + i)
         # prof_info_idx (in profile.db)
         prof_info_idx = int.from_bytes(file.read(4), byteorder=byte_order, signed=signed)
-        print("prof_info_idx: ", prof_info_idx)
+        # print("prof_info_idx: ", prof_info_idx)
 
         # printing data from profile.db (kind, physical_value, logical_value)
-        print(profile_reader.read_info(prof_info_idx))
+        # print(profile_reader.read_info(prof_info_idx))
 
         # Trace type
         trace_type = int.from_bytes(file.read(2), byteorder=byte_order, signed=signed)
@@ -120,24 +138,45 @@ def read_header(dir_location):
         # Offset of Trace Line one-after-end (line_end) 
         line_end = int.from_bytes(file.read(8), byteorder=byte_order, signed=signed)
 
-        print("pls", line_end - line_ptr)
+        # print("pls", line_end - line_ptr)
+        last_id = -1
 
         for j in range (line_ptr, line_end, 12):
             file.seek(j)
             # Timestamp (nanoseconds since epoch)
-            timestamp = int.from_bytes(file.read(8), byteorder=byte_order, signed=signed)
-            print("timestamp", timestamp)
-
+            timestamp = int.from_bytes(file.read(8), byteorder=byte_order, signed=signed) - min_max_time[0]
+            # print("timestamp", timestamp)
+            
             # Sample calling context id (in experiment.xml)
             calling_context_id = int.from_bytes(file.read(4), byteorder=byte_order, signed=signed)
-            print("calling_context_id", calling_context_id)
+            # print("calling_context_id", calling_context_id)
+            function_name = experiment_reader.get_function_name(calling_context_id)
+            # print(function_name)
             # can use this to get name of function from experiement.xml Procedure tab
 
+            if(last_id != calling_context_id):
+                
+                if(last_id != -1):
+                    # exited the last function
+                    data['Exit Time'].append(timestamp)
+                
+                #entered the new function
+                data['Enter Time'].append(timestamp)
+                data['Function Name'].append(function_name)
+                data['ID'].append(calling_context_id)
+                data['Process'].append(proc_num)
+            last_id = calling_context_id
+
+        data['Exit Time'].append(min_max_time[1])
+        df = pd.DataFrame(data)
+        return df
+
         
 
         
-file_loc = "../data/ping-pong-database-smaller/" # HPCToolKit database location 
-read_header(file_loc)
+file_loc = "../../../data/ping-pong-database/" # HPCToolKit database location 
+trace_data = read_header(file_loc)
+print(trace_data)
 
 
         
