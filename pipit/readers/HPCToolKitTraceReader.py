@@ -49,7 +49,7 @@ class ProfileReader:
 
     def read_info(self, prof_info_idx):
         byte_order = 'big'
-        signed = True
+        signed = False
         file = self.file
         
 
@@ -58,17 +58,17 @@ class ProfileReader:
         idt_ptr = int.from_bytes(file.read(8), byteorder=byte_order, signed=signed)
         
         #skipping because not in use 
-        file.read(24) 
+        # file.read(24) 
 
-        num_vals = int.from_bytes(file.read(8), byteorder=byte_order, signed=signed)
-        num_nzctxs = int.from_bytes(file.read(4), byteorder=byte_order, signed=signed)
-        prof_off = int.from_bytes(file.read(8), byteorder=byte_order, signed=signed)
-        print('num_vals', num_vals)
+        # num_vals = int.from_bytes(file.read(8), byteorder=byte_order, signed=signed)
+        # num_nzctxs = int.from_bytes(file.read(4), byteorder=byte_order, signed=signed)
+        # prof_off = int.from_bytes(file.read(8), byteorder=byte_order, signed=signed)
 
 
         # Hierarchical Identifier Tuple
         file.seek(idt_ptr)
         num_tuples = int.from_bytes(file.read(2), byteorder=byte_order, signed=signed)
+        # print('num_tuples', num_tuples)
         tuples_list = []
         for i in range(0, num_tuples, 1):
             # not working --  I don't know why, but the second 2 tuples are just incorrect
@@ -118,7 +118,7 @@ def read_header(dir_location):
     data = {'Function Name':[], 'Enter Time':[], 'Exit Time':[], 'ID':[], 'Process':[] }
     min_max_time = experiment_reader.get_min_max_time()
 
-    # cycle through trace headers/lines 
+    # cycle through trace headers/lines
     for i in range(0, hdr_size, 22):
         proc_num = int(i/22)
         file.seek(hdr_ptr + i)
@@ -138,7 +138,6 @@ def read_header(dir_location):
         # Offset of Trace Line one-after-end (line_end) 
         line_end = int.from_bytes(file.read(8), byteorder=byte_order, signed=signed)
 
-        # print("pls", line_end - line_ptr)
         last_id = -1
 
         for j in range (line_ptr, line_end, 12):
@@ -168,15 +167,15 @@ def read_header(dir_location):
             last_id = calling_context_id
 
         data['Exit Time'].append(min_max_time[1])
-        df = pd.DataFrame(data)
-        return df
+    df = pd.DataFrame(data)
+    return df
 
         
 
         
-file_loc = "../../../data/ping-pong-database/" # HPCToolKit database location 
+file_loc = "../../../data/ping-pong-database-smaller/" # HPCToolKit database location 
 trace_data = read_header(file_loc)
-print(trace_data)
+print(trace_data.to_string())
 
 
         
