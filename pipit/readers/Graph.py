@@ -50,6 +50,7 @@ class Node:
             + str(self.level)
         )
 
+    # private function to get depth of node
     def __calculate_level(self):
         if self.parent is None:
             return 0
