@@ -185,7 +185,7 @@ class OTF2Reader:
             "Attributes": eventAttributes,
         }
 
-    def defToDF(self, trace):
+    def read_definitions(self, trace):
         """
         Writes the definitions to a Pandas DataFrame
         """
@@ -235,7 +235,7 @@ class OTF2Reader:
 
         return defDF
 
-    def eventsToDF(self):
+    def read_events(self):
         """
         Writes the events to a Pandas DataFrame
         using the multiprocessing library and the events_reader
@@ -299,7 +299,7 @@ class OTF2Reader:
         """
 
         with otf2.reader.open(self.dir_name) as trace:
-            self.definitions = self.defToDF(trace)  # definitions
+            self.definitions = self.read_definitions(trace)  # definitions
             trace.close()
-        self.events = self.eventsToDF()  # events
+        self.events = self.read_events()  # events
         return pipit.tracedata.TraceData(self.definitions, self.events)
