@@ -73,7 +73,7 @@ class OTF2Reader:
 
     def fieldsToDict(self, defObject):
         """
-        converts the fields of a definition
+        converts the fields in the attribute column of a definition
         object to a dictionary
         """
 
@@ -187,23 +187,25 @@ class OTF2Reader:
 
     def read_definitions(self, trace):
         """
-        Writes the definitions to a Pandas DataFrame
-        """
+        Reads the definitions from the trace and converts them to a Pandas
+        DataFrame """
 
         # ids are the _ref attribute of an object
         # all objects stored in a reference registry
         # (such as regions) have such an id
-        definitions, defIds, attributes = [], [], []
+        def_name, def_id, attributes = [], [], []
 
         # iterating through definition registry attributes
         # such as regions, strings, locations, etc
         for key in vars(trace.definitions).keys():
+            # 
             defAttr = getattr(trace.definitions, str(key))
 
             # only definition type that is not a registry
             if key == "clock_properties":
-                defIds.append(float("NaN"))
-                definitions.append(str(type(defAttr))[25:-2])
+                def_id.append(float("NaN"))
+                # strip out "otf2.definitions."
+                def_name.append(str(type(defAttr))[25:-2])
                 attributes.append(self.fieldsToDict(defAttr))
             elif "otf2" not in key:  # otf2 wrapper properties (not needed)
                 # iterate through registry elements
@@ -212,13 +214,13 @@ class OTF2Reader:
                 for defObject in defAttr.__iter__():
                     if hasattr(defObject, "_ref"):
                         # only add ids for those that have it
-                        defIds.append(defObject._ref)
+                        def_id.append(defObject._ref)
                     else:
                         # ID column is of float64 dtype
-                        defIds.append(float("NaN"))
+                        def_id.append(float("NaN"))
 
                     # name of the definition
-                    definitions.append(str(type(defObject))[25:-2])
+                    def_name.append(str(type(defObject))[25:-2])
 
                     # converts a definition object to a dictionary of its attributes
                     # this contains information that a user would have to access the
@@ -227,7 +229,7 @@ class OTF2Reader:
 
         # return the definitions as a DataFrame
         defDF = pd.DataFrame(
-            {"Definition": definitions, "ID": defIds, "Attributes": attributes}
+            {"Definition": def_name, "ID": def_id, "Attributes": attributes}
         )
 
         # Definition column is of categorical dtype
@@ -300,6 +302,7 @@ class OTF2Reader:
 
         with otf2.reader.open(self.dir_name) as trace:
             self.definitions = self.read_definitions(trace)  # definitions
+            # close the trace and open it later per process
             trace.close()
         self.events = self.read_events()  # events
         return pipit.tracedata.TraceData(self.definitions, self.events)
