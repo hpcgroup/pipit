@@ -176,6 +176,8 @@ def read_header(dir_location):
 
 	data = {'Function Name':[], 'Enter Time':[], 'Exit Time':[], 'ID':[], 'Process':[], 'Graph_Node': [] }
 	min_max_time = experiment_reader.get_min_max_time()
+	trace_df = pd.DataFrame(columns=['Function Name', 'Time', 'Process', 'Graph Node', 'Level'])
+
 
 	# cycle through trace headers/lines
 	for i in range(0, hdr_size, 22):
@@ -183,10 +185,7 @@ def read_header(dir_location):
 		file.seek(hdr_ptr + i)
 		# prof_info_idx (in profile.db)
 		prof_info_idx = int.from_bytes(file.read(4), byteorder=byte_order, signed=signed)
-		# print("prof_info_idx: ", prof_info_idx)
-
-		# printing data from profile.db (kind, physical_value, logical_value)
-		# print(profile_reader.read_info(prof_info_idx))
+		
 
 		# Trace type
 		trace_type = int.from_bytes(file.read(2), byteorder=byte_order, signed=signed)
@@ -199,21 +198,24 @@ def read_header(dir_location):
 
 		last_id = -1
 
+		last_node = None
+
+
 		for j in range (line_ptr, line_end, 12):
 			file.seek(j)
+		
 			# Timestamp (nanoseconds since epoch)
 			timestamp = int.from_bytes(file.read(8), byteorder=byte_order, signed=signed) - min_max_time[0]
-			# print("timestamp", timestamp)
 			
 			# Sample calling context id (in experiment.xml)
-			calling_context_id = int.from_bytes(file.read(4), byteorder=byte_order, signed=signed)
-			# print("calling_context_id", calling_context_id)
-			function_name = experiment_reader.get_function_name(calling_context_id)
-			# print(function_name)
 			# can use this to get name of function from experiement.xml Procedure tab
+			calling_context_id = int.from_bytes(file.read(4), byteorder=byte_order, signed=signed)
+			function_name = experiment_reader.get_function_name(calling_context_id)
 
 			if(last_id != calling_context_id):
 				
+
+				# updating the primitive dataframe
 				if(last_id != -1):
 					# exited the last function
 					data['Exit Time'].append(timestamp)
@@ -224,18 +226,58 @@ def read_header(dir_location):
 				data['ID'].append(calling_context_id)
 				data['Process'].append(proc_num)
 				data['Graph_Node'].append(graph.get_node(calling_context_id))
+
+
+
+
+
+				# updating the trace_db
+
+				node = graph.get_node(calling_context_id)
+				
+				# closing functions exited
+				close_node = last_node
+				intersect_level = -1
+				intersect_node = node.get_intersection(last_node)
+				if(intersect_node != None):
+					intersect_level = intersect_node.get_level()	
+				while close_node != None and close_node.get_level() > intersect_level:
+					trace_df = trace_df.append({'Function Name': close_node.name, 'Time': ('Exit', timestamp), 'Process': proc_num, 'Graph Node': close_node, 'Level': close_node.get_level()}, ignore_index=True)
+					close_node = close_node.parent
+				
+
+				
+				# creating new rows for the new functions entered 
+				enter_list = node.get_node_list(intersect_level)
+				for enter_node in enter_list[::-1]:
+					trace_df = trace_df.append({'Function Name': enter_node.name, 'Time': ('Enter', timestamp), 'Process': proc_num, 'Graph Node': enter_node, 'Level': enter_node.get_level()}, ignore_index=True)
+				last_node = node
+					
 			last_id = calling_context_id
 
-		data['Exit Time'].append(min_max_time[1])
-	df = pd.DataFrame(data)
-	return df
+		# adding last data for primitive df
+		data['Exit Time'].append(min_max_time[1] - min_max_time[0])
+
+
+		# adding last data for trace df
+		close_node = last_node
+		while close_node != None:
+			trace_df = trace_df.append({'Function Name': close_node.name, 'Time': ('Exit', min_max_time[1] - min_max_time[0]), 'Process': proc_num, 'Graph Node': close_node, 'Level': close_node.get_level()}, ignore_index=True)
+			close_node = close_node.parent
+
+	# primitive_df doesn't have full trace, but has just the top level function at all times
+	primitive_df = pd.DataFrame(data) 
+
+	return (trace_df, primitive_df)
 
 		
 
 		
 file_loc = "../../../data/ping-pong-database-smaller/" # HPCToolKit database location 
 trace_data = read_header(file_loc)
-print(trace_data.to_string())
+print(trace_data[0].to_string())
+print(trace_data[1].to_string())
+
 
 # er = ExperimentReader(file_loc + "experiment.xml")
 # er.create_graph()
