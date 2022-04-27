@@ -340,7 +340,7 @@ class OTF2Reader:
         # and dividing by the resolution to convert to nanoseconds
         # as per OTF2's website
         events_dataframe["Timestamp (ns)"] -= offset
-        events_dataframe["Timestamp (ns)"] *= (10 ** 9) / resolution
+        events_dataframe["Timestamp (ns)"] *= (10**9) / resolution
 
         # ensures the DataFrame is in order of increasing timestamp
         events_dataframe.sort_values(
