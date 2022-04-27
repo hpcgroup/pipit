@@ -45,7 +45,7 @@ class TraceData:
             # are there any more p2p events (what are MPI_Recv_init and MPI_Sendrecv?)
             # that have to be accounted for?
             sendDF = self.events.loc[
-                self.events["Event"].isin(["MpiSend", "MpiIsend"]),
+                self.events["Event Type"].isin(["MpiSend", "MpiIsend"]),
                 ["Location Group ID", "Attributes"],
             ]
             senderRanks = sendDF["Location Group ID"].to_list()
