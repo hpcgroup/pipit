@@ -12,15 +12,13 @@ class Trace:
     """
 
     def __init__(self, definitions, events):
-        """Create a new Trace object.
-        """
+        """Create a new Trace object."""
         self.definitions = definitions
         self.events = events
 
     @staticmethod
     def from_otf2(dirname):
-        """Read a OTF2 trace into a new Trace object.
-        """
+        """Read a OTF2 trace into a new Trace object."""
         # import this lazily to avoid circular dependencies
         from .readers.otf2_reader import OTF2Reader
 
@@ -28,8 +26,7 @@ class Trace:
 
     @staticmethod
     def from_hpctoolkit(dirname):
-        """Read an HPCToolkit trace into a new Trace object.
-        """
+        """Read an HPCToolkit trace into a new Trace object."""
         # import this lazily to avoid circular dependencies
         from .readers.hpctoolkit_reader import HPCToolkitReader
 
