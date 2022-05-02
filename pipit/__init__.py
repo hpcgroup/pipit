@@ -3,4 +3,4 @@
 #
 # SPDX-License-Identifier: MIT
 
-from .trace import Trace
+from .trace import Trace  # noqa: F401

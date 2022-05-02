@@ -3,8 +3,6 @@
 #
 # SPDX-License-Identifier: MIT
 
-import pandas as pd
-
 
 class Trace:
     """A trace dataset is read into an object of this type, which includes one
