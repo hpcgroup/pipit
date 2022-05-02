@@ -31,4 +31,3 @@ class Trace:
         from .readers.hpctoolkit_reader import HPCToolkitReader
 
         return HPCToolkitReader(dirname).read()
-
