@@ -1,0 +1,324 @@
+<?xml version="1.0"?>
+<HPCToolkitExperiment version="4.0">
+<Header n="ping-pong">
+<Info/>
+</Header>
+<SecCallPathProfile i="0" n="ping-pong">
+<SecHeader>
+<IdentifierNameTable>
+<Identifier i="3" n="THREAD"/>
+<Identifier i="2" n="RANK"/>
+<Identifier i="1" n="NODE"/>
+<Identifier i="0" n="SUMMARY"/>
+<Identifier i="7" n="CORE"/>
+<Identifier i="6" n="GPUSTREAM"/>
+<Identifier i="5" n="GPUCONTEXT"/>
+<Identifier i="4" n="GPUDEVICE"/>
+</IdentifierNameTable>
+<MetricTable>
+<Metric i="512" o="512" n="CPUTIME (sec):PARTIAL:0 (I)" md="CPUTIME (sec)" v="derived-incr" t="inclusive" partner="256" show="4" show-percent="0">
+<MetricFormula t="combine" frm="sum($512, $512)"/>
+<Info><NV n="units" v="events"/></Info>
+</Metric>
+<Metric i="256" o="256" n="CPUTIME (sec):PARTIAL:0 (E)" md="CPUTIME (sec)" v="derived-incr" t="exclusive" partner="512" show="4" show-percent="0">
+<MetricFormula t="combine" frm="sum($256, $256)"/>
+<Info><NV n="units" v="events"/></Info>
+</Metric>
+<Metric i="767" o="767" n="CPUTIME (sec):Sum (I)" md="CPUTIME (sec)" v="derived-incr" t="inclusive" partner="511" show="1" show-percent="1">
+<MetricFormula t="view" frm="$512"/>
+<Info><NV n="units" v="events"/></Info>
+</Metric>
+<Metric i="511" o="511" n="CPUTIME (sec):Sum (E)" md="CPUTIME (sec)" v="derived-incr" t="exclusive" partner="767" show="1" show-percent="1">
+<MetricFormula t="view" frm="$256"/>
+<Info><NV n="units" v="events"/></Info>
+</Metric>
+</MetricTable>
+<MetricDBTable>
+<MetricDB i="2" n="CPUTIME (sec) (I)"/>
+<MetricDB i="1" n="CPUTIME (sec) (E)"/>
+</MetricDBTable>
+<TraceDBTable>
+<TraceDB i="0" db-min-time="1642362974325469000" db-max-time="1642362974570881000" u="1000000000"/>
+</TraceDBTable>
+<LoadModuleTable>
+<LoadModule i="0" n="unknown module"/>
+<LoadModule i="6" n="/usr/tce/packages/mvapich2/mvapich2-2.3-gcc-10.2.1/lib/libmpi.so.12.1.1"/>
+<LoadModule i="10" n="/usr/lib64/libc-2.17.so"/>
+<LoadModule i="1" n="ping-pong"/>
+<LoadModule i="20" n="/usr/lib64/libpsm2.so.2.2"/>
+</LoadModuleTable>
+<FileTable>
+<File i="2147483647" n="&lt;unknown file&gt;"/>
+<File i="0" n="./src/ping-pong.c"/>
+<File i="719" n="/builddir/build/BUILD/mvapich2-2.3/src/mpid/ch3/channels/psm/src/psm_recv.c"/>
+<File i="693" n="/builddir/build/BUILD/mvapich2-2.3/src/mpid/ch3/src/mpid_recv.c"/>
+<File i="425" n="/builddir/build/BUILD/mvapich2-2.3/src/mpi/pt2pt/send.c"/>
+<File i="721" n="/builddir/build/BUILD/mvapich2-2.3/src/mpid/ch3/channels/psm/src/psm_queue.c"/>
+<File i="419" n="/builddir/build/BUILD/mvapich2-2.3/src/mpi/pt2pt/recv.c"/>
+<File i="2147483636" n="&lt;unknown file&gt; [libc-2.17.so]"/>
+<File i="2147483626" n="&lt;unknown file&gt; [libpsm2.so.2.2]"/>
+</FileTable>
+<ProcedureTable>
+<Procedure i="134" n="&lt;unknown procedure&gt; 0xc8e8 [libpsm2.so.2.2]" v="0xc8e8" f="1"/>
+<Procedure i="132" n="&lt;unknown procedure&gt; 0x246fe [libpsm2.so.2.2]" v="0x246fe" f="1"/>
+<Procedure i="131" n="&lt;unknown procedure&gt; 0x24705 [libpsm2.so.2.2]" v="0x24705" f="1"/>
+<Procedure i="138" n="&lt;unknown procedure&gt; 0x245c0 [libpsm2.so.2.2]" v="0x245c0" f="1"/>
+<Procedure i="73" n="psm2_mq_irecv2" v="0x1d980"/>
+<Procedure i="67" n="__GI_process_vm_readv" v="0xff710"/>
+<Procedure i="64" n="&lt;unknown procedure&gt; 0x64d4 [libpsm2.so.2.2]" v="0x64d4" f="1"/>
+<Procedure i="63" n="&lt;unknown procedure&gt; 0xc91c [libpsm2.so.2.2]" v="0xc91c" f="1"/>
+<Procedure i="65" n="&lt;unknown procedure&gt; 0xda5d [libpsm2.so.2.2]" v="0xda5d" f="1"/>
+<Procedure i="20" n="psm_progress_wait" v="0x27cea0"/>
+<Procedure i="47" n="psm_recv" v="0x27c2e0"/>
+<Procedure i="66" n="&lt;unknown procedure&gt; 0xe087 [libpsm2.so.2.2]" v="0xe087" f="1"/>
+<Procedure i="3" n="&lt;no activity&gt;" v="0" f="1"/>
+<Procedure i="76" n="&lt;unknown procedure&gt; 0xd6a5 [libpsm2.so.2.2]" v="0xd6a5" f="1"/>
+<Procedure i="136" n="&lt;unknown procedure&gt; 0xc850 [libpsm2.so.2.2]" v="0xc850" f="1"/>
+<Procedure i="5" n="main" v="0x4011d2"/>
+<Procedure i="29" n="&lt;unknown procedure&gt; 0x246da [libpsm2.so.2.2]" v="0x246da" f="1"/>
+<Procedure i="4" n="&lt;program root&gt;" v="0" f="1"/>
+<Procedure i="43" n="MPID_Recv" v="0"/>
+<Procedure i="26" n="psm2_mq_ipeek2" v="0x1e280"/>
+<Procedure i="62" n="&lt;unknown procedure&gt; 0x246e7 [libpsm2.so.2.2]" v="0x246e7" f="1"/>
+<Procedure i="30" n="&lt;unknown procedure&gt; 0x246c7 [libpsm2.so.2.2]" v="0x246c7" f="1"/>
+<Procedure i="31" n="&lt;unknown procedure&gt; 0x24680 [libpsm2.so.2.2]" v="0x24680" f="1"/>
+<Procedure i="135" n="&lt;unknown procedure&gt; 0xc8dd [libpsm2.so.2.2]" v="0xc8dd" f="1"/>
+<Procedure i="16" n="PMPI_Send" v="0"/>
+<Procedure i="39" n="PMPI_Recv" v="0"/>
+<Procedure i="51" n="psm_try_complete" v="0x27d210"/>
+<Procedure i="1" n="&lt;partial call paths&gt;" v="0" f="1"/>
+</ProcedureTable>
+<Info/>
+</SecHeader>
+<SecCallPathProfileData>
+<PF i="2" n="4" s="4" f="2147483647" l="0">
+<C i="-2" s="4" v="0" l="0" it="2">
+<PF i="3" s="5" n="5" v="0x4011d2" f="0" l="6" lm="1">
+<L i="6" s="9" v="0" f="0" l="32">
+<L i="10" s="13" v="0" f="0" l="53">
+<S i="68" it="68" l="56" s="83" v="0"/>
+<C i="95" s="117" l="56" v="0x401329" it="95">
+<PF i="96" s="16" n="16" v="0x0" f="425" l="75" lm="6">
+<S i="97" it="97" l="165" s="18" v="0"/>
+<C i="98" s="19" l="165" v="0x1f461d" it="98">
+<PF i="99" s="20" n="20" v="0x27cea0" f="721" l="233" lm="6">
+<S i="100" it="100" l="249" s="24" v="0"/>
+<C i="101" s="25" l="249" v="0x27cef7" it="101">
+<PF i="102" s="26" n="26" v="0x1e280" f="2147483626" l="0" lm="20">
+<S i="116" s="34" l="0" v="0x1e280" it="116"/>
+<S i="103" s="128" l="0" v="0x1e320" it="103"/>
+<C i="104" s="28" l="0" v="0x1e308" it="104">
+<PF i="112" n="30" s="30" l="0" f="2147483626" lm="20">
+<C i="-112" s="30" l="0" v="0x246c7" it="112">
+<PF i="113" n="138" s="138" l="0" f="2147483626" lm="20">
+<S i="-113" s="138" l="0" v="0x245c0" it="113"/>
+</PF>
+</C>
+</PF>
+<PF i="105" n="31" s="31" l="0" f="2147483626" lm="20">
+<S i="-105" s="31" l="0" v="0x24680" it="105"/>
+</PF>
+<PF i="107" n="132" s="132" l="0" f="2147483626" lm="20">
+<S i="-107" s="132" l="0" v="0x246fe" it="107"/>
+</PF>
+<PF i="106" n="131" s="131" l="0" f="2147483626" lm="20">
+<S i="-106" s="131" l="0" v="0x24705" it="106"/>
+</PF>
+<PF i="108" n="62" s="62" l="0" f="2147483626" lm="20">
+<C i="-108" s="62" l="0" v="0x246e7" it="108">
+<PF i="111" n="136" s="136" l="0" f="2147483626" lm="20">
+<S i="-111" s="136" l="0" v="0xc850" it="111"/>
+</PF>
+<PF i="110" n="135" s="135" l="0" f="2147483626" lm="20">
+<S i="-110" s="135" l="0" v="0xc8dd" it="110"/>
+</PF>
+<PF i="109" n="134" s="134" l="0" f="2147483626" lm="20">
+<S i="-109" s="134" l="0" v="0xc8e8" it="109"/>
+</PF>
+</C>
+</PF>
+</C>
+<S i="114" s="32" l="0" v="0x1e2f6" it="114"/>
+<S i="115" s="140" l="0" v="0x1e2eb" it="115"/>
+</PF>
+</C>
+</PF>
+</C>
+</PF>
+</C>
+<C i="69" s="84" l="56" v="0x40135d" it="69">
+<PF i="70" s="39" n="39" v="0x0" f="419" l="67" lm="6">
+<S i="71" it="71" l="139" s="41" v="0"/>
+<C i="72" s="42" l="139" v="0x1f1e69" it="72">
+<PF i="73" s="43" n="43" v="0x0" f="693" l="25" lm="6">
+<S i="74" it="74" l="80" s="45" v="0"/>
+<C i="75" s="46" l="80" v="0x270889" it="75">
+<PF i="76" s="47" n="47" v="0x27c2e0" f="719" l="72" lm="6">
+<S i="77" it="77" l="136" s="49" v="0"/>
+<C i="78" s="50" l="136" v="0x27c3c1" it="78">
+<PF i="79" s="51" n="51" v="0x27d210" f="721" l="211" lm="6">
+<S i="80" it="80" l="215" s="53" v="0"/>
+<C i="81" s="54" l="215" v="0x27d22a" it="81">
+<PF i="82" s="20" n="20" v="0x27cea0" f="721" l="233" lm="6">
+<S i="83" it="83" l="249" s="24" v="0"/>
+<C i="84" s="25" l="249" v="0x27cef7" it="84">
+<PF i="85" s="26" n="26" v="0x1e280" f="2147483626" l="0" lm="20">
+<C i="86" s="28" l="0" v="0x1e308" it="86">
+<PF i="87" n="62" s="62" l="0" f="2147483626" lm="20">
+<C i="-87" s="62" l="0" v="0x246e7" it="87">
+<PF i="88" n="63" s="63" l="0" f="2147483626" lm="20">
+<C i="-88" s="63" l="0" v="0xc91c" it="88">
+<PF i="89" n="64" s="64" l="0" f="2147483626" lm="20">
+<C i="-89" s="64" l="0" v="0x64d4" it="89">
+<PF i="90" n="65" s="65" l="0" f="2147483626" lm="20">
+<C i="-90" s="65" l="0" v="0xda5d" it="90">
+<PF i="91" n="66" s="66" l="0" f="2147483626" lm="20">
+<C i="-91" s="66" l="0" v="0xe087" it="91">
+<PF i="92" s="67" n="67" v="0xff710" f="2147483636" l="0" lm="10">
+<S i="94" s="70" l="0" v="0xff710" it="94"/>
+<S i="93" s="69" l="0" v="0xff71a" it="93"/>
+</PF>
+</C>
+</PF>
+</C>
+</PF>
+</C>
+</PF>
+</C>
+</PF>
+</C>
+</PF>
+</C>
+</PF>
+</C>
+</PF>
+</C>
+</PF>
+</C>
+</PF>
+</C>
+</PF>
+</C>
+</PF>
+</C>
+<S i="31" it="31" l="59" s="37" v="0"/>
+<C i="32" s="38" l="59" v="0x40139f" it="32">
+<PF i="33" s="39" n="39" v="0x0" f="419" l="67" lm="6">
+<S i="34" it="34" l="139" s="41" v="0"/>
+<C i="35" s="42" l="139" v="0x1f1e69" it="35">
+<PF i="36" s="43" n="43" v="0x0" f="693" l="25" lm="6">
+<S i="37" it="37" l="80" s="45" v="0"/>
+<C i="38" s="46" l="80" v="0x270889" it="38">
+<PF i="39" s="47" n="47" v="0x27c2e0" f="719" l="72" lm="6">
+<S i="58" it="58" l="124" s="71" v="0"/>
+<C i="59" s="72" l="124" v="0x27c39d" it="59">
+<PF i="60" s="73" n="73" v="0x1d980" f="2147483626" l="0" lm="20">
+<C i="61" s="75" l="0" v="0x1dae3" it="61">
+<PF i="62" n="76" s="76" l="0" f="2147483626" lm="20">
+<C i="-62" s="76" l="0" v="0xd6a5" it="62">
+<PF i="63" n="66" s="66" l="0" f="2147483626" lm="20">
+<C i="-63" s="66" l="0" v="0xe087" it="63">
+<PF i="64" s="67" n="67" v="0xff710" f="2147483636" l="0" lm="10">
+<S i="66" s="70" l="0" v="0xff710" it="66"/>
+<S i="65" s="69" l="0" v="0xff71a" it="65"/>
+</PF>
+</C>
+</PF>
+</C>
+</PF>
+</C>
+</PF>
+</C>
+<S i="40" it="40" l="136" s="49" v="0"/>
+<C i="41" s="50" l="136" v="0x27c3c1" it="41">
+<PF i="42" s="51" n="51" v="0x27d210" f="721" l="211" lm="6">
+<S i="43" it="43" l="215" s="53" v="0"/>
+<C i="44" s="54" l="215" v="0x27d22a" it="44">
+<PF i="45" s="20" n="20" v="0x27cea0" f="721" l="233" lm="6">
+<S i="46" it="46" l="249" s="24" v="0"/>
+<C i="47" s="25" l="249" v="0x27cef7" it="47">
+<PF i="48" s="26" n="26" v="0x1e280" f="2147483626" l="0" lm="20">
+<C i="49" s="28" l="0" v="0x1e308" it="49">
+<PF i="50" n="62" s="62" l="0" f="2147483626" lm="20">
+<C i="-50" s="62" l="0" v="0x246e7" it="50">
+<PF i="51" n="63" s="63" l="0" f="2147483626" lm="20">
+<C i="-51" s="63" l="0" v="0xc91c" it="51">
+<PF i="52" n="64" s="64" l="0" f="2147483626" lm="20">
+<C i="-52" s="64" l="0" v="0x64d4" it="52">
+<PF i="53" n="65" s="65" l="0" f="2147483626" lm="20">
+<C i="-53" s="65" l="0" v="0xda5d" it="53">
+<PF i="54" n="66" s="66" l="0" f="2147483626" lm="20">
+<C i="-54" s="66" l="0" v="0xe087" it="54">
+<PF i="55" s="67" n="67" v="0xff710" f="2147483636" l="0" lm="10">
+<S i="57" s="70" l="0" v="0xff710" it="57"/>
+<S i="56" s="69" l="0" v="0xff71a" it="56"/>
+</PF>
+</C>
+</PF>
+</C>
+</PF>
+</C>
+</PF>
+</C>
+</PF>
+</C>
+</PF>
+</C>
+</PF>
+</C>
+</PF>
+</C>
+</PF>
+</C>
+</PF>
+</C>
+</PF>
+</C>
+</PF>
+</C>
+<S i="11" it="11" l="53" s="14" v="0"/>
+<C i="12" s="15" l="53" v="0x4013cb" it="12">
+<PF i="13" s="16" n="16" v="0x0" f="425" l="75" lm="6">
+<S i="14" it="14" l="165" s="18" v="0"/>
+<C i="15" s="19" l="165" v="0x1f461d" it="15">
+<PF i="16" s="20" n="20" v="0x27cea0" f="721" l="233" lm="6">
+<S i="29" it="29" l="234" s="35" v="0"/>
+<S i="19" it="19" l="249" s="24" v="0"/>
+<C i="20" s="25" l="249" v="0x27cef7" it="20">
+<PF i="21" s="26" n="26" v="0x1e280" f="2147483626" l="0" lm="20">
+<S i="27" s="33" l="0" v="0x1e2db" it="27"/>
+<S i="26" s="32" l="0" v="0x1e2f6" it="26"/>
+<S i="28" s="34" l="0" v="0x1e280" it="28"/>
+<C i="22" s="28" l="0" v="0x1e308" it="22">
+<PF i="25" n="31" s="31" l="0" f="2147483626" lm="20">
+<S i="-25" s="31" l="0" v="0x24680" it="25"/>
+</PF>
+<PF i="24" n="30" s="30" l="0" f="2147483626" lm="20">
+<S i="-24" s="30" l="0" v="0x246c7" it="24"/>
+</PF>
+<PF i="23" n="29" s="29" l="0" f="2147483626" lm="20">
+<S i="-23" s="29" l="0" v="0x246da" it="23"/>
+</PF>
+</C>
+</PF>
+</C>
+<S i="17" it="17" l="273" s="22" v="0"/>
+</PF>
+</C>
+</PF>
+</C>
+</L>
+<L i="7" s="10" v="0" f="0" l="40">
+<S i="8" it="8" l="41" s="11" v="0"/>
+</L>
+</L>
+<S i="4" it="4" l="6" s="7" v="0"/>
+</PF>
+</C>
+</PF>
+<PF i="1" n="3" s="3" f="2147483647" l="0">
+<S i="-1" s="3" v="0" l="0" it="1"/>
+</PF>
+</SecCallPathProfileData>
+</SecCallPathProfile>
+</HPCToolkitExperiment>
