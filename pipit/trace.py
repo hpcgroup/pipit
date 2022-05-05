@@ -32,68 +32,74 @@ class Trace:
 
         return HPCToolkitReader(dirname).read()
 
-    def p2p(self, mirrored=False, commType="bytes"):
+    def comm_matrix(self, comm_type="bytes"):
         """
         Communication Matrix for Peer-to-Peer (P2P) MPI messages
 
         Arguments:
-        1) mirrored:
-        boolean to indicate whether the generated communication
-        matrix will be mirrored or not (if mirrored, there will be no distinction
-        between the sender and receiver between the two axes)
 
-        2) commType:
+        1) comm_type -
         string to choose whether the communication volume should be measured
         by bytes transferred between two processes or the number of messages
         sent (two choices - "bytes" or "counts")
 
         Returns:
         A 2D Numpy Array that represents the communication matrix for all P2P
-        messages  of the given trace and can be used to plot a heatmap
+        messages of the given trace
         """
 
-        if not self.isNSight:  # have to look into MPI information for NSight
-            ranks = set(
-                self.events.loc[self.events["Location Group Type"] == "PROCESS"][
-                    "Location Group ID"
-                ]
-            )
-            commMatrix = np.zeros(shape=(len(ranks), len(ranks)))
-
-            # are there any more p2p events (what are MPI_Recv_init and MPI_Sendrecv?)
-            # that have to be accounted for?
-            sendDF = self.events.loc[
-                self.events["Event Type"].isin(["MpiSend", "MpiIsend"]),
-                ["Location Group ID", "Attributes"],
+        # get the list of ranks/process ids
+        # (mpi messages are sent between processes)
+        ranks = set(
+            self.events.loc[self.events["Location Group Type"] == "PROCESS"][
+                "Location Group ID"
             ]
-            senderRanks = sendDF["Location Group ID"].to_list()
-            receiverRanks = (
-                sendDF["Attributes"]
-                .apply(lambda attrDict: attrDict["receiver"])
+        )
+
+        # create a 2d numpy array that will be returned
+        # at the end of the function
+        communication_matrix = np.zeros(shape=(len(ranks), len(ranks)))
+
+        # filter the dataframe by MPI Send and Isend events
+        sender_dataframe = self.events.loc[
+            self.events["Event Type"].isin(["MpiSend", "MpiIsend"]),
+            ["Location Group ID", "Attributes"],
+        ]
+
+        # get the mpi ranks of all the sender processes
+        sender_ranks = sender_dataframe["Location Group ID"].to_list()
+
+        # get the corresponding mpi ranks of the receivers
+        receiver_ranks = (
+            sender_dataframe["Attributes"]
+            .apply(lambda attrDict: attrDict["receiver"])
+            .to_list()
+        )
+
+        # number of bytes communicated
+        if comm_type == "bytes":
+            # (1 communication is a single row in the sender dataframe)
+            message_volumes = (
+                sender_dataframe["Attributes"]
+                .apply(lambda attrDict: attrDict["msg_length"])
                 .to_list()
             )
+        elif comm_type == "counts":
+            # 1 message between the pairs of processes
+            # for each row in the sender dataframe
+            message_volumes = np.full(len(sender_dataframe), 1)
 
-            if commType == "bytes":
-                # bytes sent between processes
-                msgVolumes = (
-                    sendDF["Attributes"]
-                    .apply(lambda attrDict: attrDict["msg_length"])
-                    .to_list()
-                )
-            elif commType == "counts":
-                # 1 message between pairs of processes for each DataFrame row
-                msgVolumes = np.full(len(sendDF), 1)
+        for i in range(len(sender_ranks)):
+            """
+            loops through all the communication events and adds the
+            message volumes to the corresponding entry of the 2d array
+            using the sender and receiver ranks
 
-            for i in range(len(senderRanks)):
-                # if this matrix was plotted as a heatmap,
-                # y axis would be senders and x axis would be receivers
-                commMatrix[senderRanks[i], receiverRanks[i]] += msgVolumes[
-                    i
-                ]  # adding up all msg volumes
-            if mirrored is True:
-                # mirrors the message volumes if the user chooses to do so
-                # no distinction between sender and receiver
-                for i in range(len(senderRanks)):
-                    commMatrix[receiverRanks[i], senderRanks[i]] += msgVolumes[i]
+            Note: first dimension of the 2d array is senders
+                  and second dimension is receivers
+            """
+            communication_matrix[sender_ranks[i], receiver_ranks[i]] += message_volumes[
+                i
+            ]
 
-            return commMatrix
+        return communication_matrix
