@@ -1,7 +1,6 @@
 from xml.etree.ElementTree import Element, ElementTree
 import pandas as pd
-
-# import pipit.tracedata
+import pipit.tracedata
 from Graph import Graph, Node
 
 
