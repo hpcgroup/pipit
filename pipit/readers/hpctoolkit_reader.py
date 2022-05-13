@@ -1,6 +1,7 @@
 from xml.etree.ElementTree import Element, ElementTree
 import pandas as pd
 
+# import pipit.tracedata
 from Graph import Graph, Node
 
 
@@ -8,34 +9,28 @@ class ExperimentReader:
     def __init__(self, file_location):
         self.tree = ElementTree(file=file_location)
 
-    def get_function_name(self, metric_id):
+    def get_function_name(self, procedure_table_id):
+        # return function name, given a procedure_table_id
 
-        # first get id in procedure table
-        search = './/S[@it="' + str(metric_id) + '"]..'
-        e = self.tree.find(search)
-        procedure_table_id = e.get("n")
-        return self.get_function_name_helper(procedure_table_id)
-
-    def get_function_name_helper(self, procedure_table_id):
-        # return function name
         procedure_table_search = ".//Procedure[@i='" + procedure_table_id + "']"
         procedure = self.tree.find(procedure_table_search)
         return procedure.get("n")
 
     def get_min_max_time(self):
+        # gets the start and end time of the program
+
         search = './/TraceDB[@i="0"]'
         e = self.tree.find(search)
         time = (int(e.get("db-min-time")), int(e.get("db-max-time")))
         return time
 
     def create_graph(self):
+        # Traverses through the experiment.xml's SecCallPathProfileData tag, creating a
+        # Node for every PF tag and adding it to the Graph
         graph = Graph()
         call_path_data = list(list(self.tree.getroot())[-1])[-1]
         root_elems = list(call_path_data)
         for root_elem in root_elems:
-            # procedure_table_id = root_elem.attrib['n']
-            # function_name = self.get_function_name_helper(procedure_table_id)
-            # node = Node(procedure_table_id, function_name, None)
             node = self.graph_helper(None, root_elem, graph)
             if node is not None:
                 graph.add_root(node)
@@ -43,9 +38,12 @@ class ExperimentReader:
         return graph
 
     def graph_helper(self, parent_node: Node, curr_element: Element, graph: Graph):
+        # Recursive helper function for creating the graph - if the current item in the
+        # SecCallPathProfileData is 'PF' add a node, otherwise create an association
+        # between the id and the last node
         if curr_element.tag == "PF":
             procedure_table_id = curr_element.attrib["n"]
-            function_name = self.get_function_name_helper(procedure_table_id)
+            function_name = self.get_function_name(procedure_table_id)
             new_node = Node(procedure_table_id, function_name, parent_node)
             if parent_node is not None:
                 parent_node.add_child(new_node)
@@ -66,7 +64,11 @@ class ExperimentReader:
 
 
 class ProfileReader:
+    # class to read data from profile.db file
+
     def __init__(self, file_location):
+        # gets the pi_ptr variable to be able to read the identifier tuples
+
         self.file = open(file_location, "rb")
         file = self.file
         file.seek(32)
@@ -110,6 +112,8 @@ class ProfileReader:
         # print("End Testing")
 
     def read_info(self, prof_info_idx):
+        # Given a prof_info_id, returns the heirarchal identifier tuples associated
+        # with it - information such as thread id, mpi_rank, node_id, etc.
         print("prof_info_idx: ", prof_info_idx)
         byte_order = "big"
         signed = False
@@ -134,6 +138,8 @@ class ProfileReader:
 
 class HPCToolkitReader:
     def __init__(self, dir_name) -> None:
+        if dir_name[-1] != "/":
+            dir_name += "/"
         self.dir_name = dir_name  # directory of hpctoolkit trace files being read
 
     def read(self):
