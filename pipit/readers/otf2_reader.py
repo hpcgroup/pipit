@@ -7,7 +7,7 @@ import math
 import otf2
 import pandas as pd
 import multiprocessing as mp
-import pipit.tracedata
+import pipit.trace
 
 
 class OTF2Reader:
@@ -374,4 +374,4 @@ class OTF2Reader:
             # close the trace and open it later per process
             trace.close()
         self.events = self.read_events()  # events
-        return pipit.tracedata.TraceData(self.definitions, self.events)
+        return pipit.trace.Trace(self.definitions, self.events)
