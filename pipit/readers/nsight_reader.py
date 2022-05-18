@@ -12,6 +12,21 @@ class NsightReader:
     """Reader for NSight Trace Reports (NVTX, CUDA API, GPU)"""
 
     def __init__(self, nvtx_dir_name, cuda_dir_name, gpu_dir_name):
+        """
+        https://docs.nvidia.com/nsight-systems/UserGuide/index.html
+
+        The three input files below are CSV files. When a user utilizes
+        nsys to profile an application, they can use the -t option to trace
+        certain APIs. Once this is done and a qdrep is generated, they can export
+        it to a sqlite file if they choose to do so. Finally, they can use nsys stats
+        and the nvtxpptrace, cudaapitrace, and gputrace reports to generate the three
+        CSV input files for the reader respectively.
+
+        Note: The reader does not currently use thee kernexectrace report as it does not
+        seem to provide any new information regarding the trace. All the metrics can be
+        calculated using the other trace reports.
+        """
+
         self.nvtx_dir_name = nvtx_dir_name  # directory of nvtx trace report
         self.cuda_dir_name = cuda_dir_name  # directory of cuda trace report
         self.gpu_dir_name = gpu_dir_name  # directory of gpu trace report
@@ -106,6 +121,21 @@ class NsightReader:
 
         # merge the reports together to generate the final trace
         self.events = nvtx.filter(
+            items=[
+                "Start (ns)",
+                "End (ns)",
+                "Name",
+                "Location ID",
+                "Location Type",
+                "Location Group ID",
+                "Location Group Type",
+                "Attributes",
+            ]
+        )
+        del nvtx
+
+        self.events = self.events.append(
+            cuda.filter(
                 items=[
                     "Start (ns)",
                     "End (ns)",
@@ -116,41 +146,26 @@ class NsightReader:
                     "Location Group Type",
                     "Attributes",
                 ]
-            )
-        del nvtx
-
-        self.events = self.events.append(
-                cuda.filter(
-                    items=[
-                        "Start (ns)",
-                        "End (ns)",
-                        "Name",
-                        "Location ID",
-                        "Location Type",
-                        "Location Group ID",
-                        "Location Group Type",
-                        "Attributes",
-                    ]
-                ),
-                ignore_index=True,
-            )
+            ),
+            ignore_index=True,
+        )
         del cuda
 
         self.events = self.events.append(
-                gpu.filter(
-                    items=[
-                        "Start (ns)",
-                        "End (ns)",
-                        "Name",
-                        "Location ID",
-                        "Location Type",
-                        "Location Group ID",
-                        "Location Group Type",
-                        "Attributes",
-                    ]
-                ),
-                ignore_index=True,
-            )
+            gpu.filter(
+                items=[
+                    "Start (ns)",
+                    "End (ns)",
+                    "Name",
+                    "Location ID",
+                    "Location Type",
+                    "Location Group ID",
+                    "Location Group Type",
+                    "Attributes",
+                ]
+            ),
+            ignore_index=True,
+        )
         del gpu
 
         """
