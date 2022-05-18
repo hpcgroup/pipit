@@ -95,7 +95,7 @@ class NsightReader:
         gpu["Location Group Type"] = "ACCELERATOR"
 
         # set of columns that are common between all three data frames
-        commonCols = {
+        common_cols = {
             "Start (ns)",
             "End (ns)",
             "Name",
@@ -110,14 +110,14 @@ class NsightReader:
         attributes unique to each data frame (does this by finding which
         columns are not in the common set above)
         """
-        nvtxUniqueCols = set(nvtx.columns) - commonCols
-        nvtx["Attributes"] = nvtx[nvtxUniqueCols].to_dict(orient="records")
+        nvtx_unique_cols = set(nvtx.columns) - common_cols
+        nvtx["Attributes"] = nvtx[nvtx_unique_cols].to_dict(orient="records")
 
-        cudaUniqueCols = set(cuda.columns) - commonCols
-        cuda["Attributes"] = cuda[cudaUniqueCols].to_dict(orient="records")
+        cuda_unique_cols = set(cuda.columns) - common_cols
+        cuda["Attributes"] = cuda[cuda_unique_cols].to_dict(orient="records")
 
-        gpuUniqueCols = set(gpu.columns) - commonCols
-        gpu["Attributes"] = gpu[gpuUniqueCols].to_dict(orient="records")
+        gpu_unique_cols = set(gpu.columns) - common_cols
+        gpu["Attributes"] = gpu[gpu_unique_cols].to_dict(orient="records")
 
         # merge the reports together to generate the final trace
         self.events = nvtx.filter(
@@ -173,7 +173,7 @@ class NsightReader:
         this preserves the structure of a trace and is consistent
         with how the otf2 reader generates the data frame
         """
-        leaveDF = pd.DataFrame(
+        leave_df = pd.DataFrame(
             {
                 "Event": np.full((len(self.events),), "Leave"),
                 "Timestamp (ns)": self.events["End (ns)"],
@@ -188,8 +188,8 @@ class NsightReader:
 
         # clean up the original data frame with entry events
         self.events.drop(columns=["End (ns)"], inplace=True)
-        renameCols = {"Start (ns)": "Timestamp (ns)"}
-        self.events.rename(columns=renameCols, inplace=True)
+        rename_cols = {"Start (ns)": "Timestamp (ns)"}
+        self.events.rename(columns=rename_cols, inplace=True)
 
         self.events["Event"] = np.full((len(self.events),), "Enter")
         self.events = self.events[
@@ -207,7 +207,7 @@ class NsightReader:
 
         # merge and sort the two data frames (entry and exit events)
         # to generate the final trace
-        self.events = self.events.append(leaveDF)
+        self.events = self.events.append(leave_df)
         self.events.sort_values(
             by="Timestamp (ns)", axis=0, ascending=True, inplace=True
         )
