@@ -5,7 +5,7 @@
 
 import numpy as np
 import pandas as pd
-import pipit.tracedata
+import pipit.trace
 
 
 class NsightReader:
@@ -105,8 +105,7 @@ class NsightReader:
         gpu["Attributes"] = gpu[gpuUniqueCols].to_dict(orient="records")
 
         # merge the reports together to generate the final trace
-        self.events = (
-            nvtx.filter(
+        self.events = nvtx.filter(
                 items=[
                     "Start (ns)",
                     "End (ns)",
@@ -118,7 +117,9 @@ class NsightReader:
                     "Attributes",
                 ]
             )
-            .append(
+        del nvtx
+
+        self.events = self.events.append(
                 cuda.filter(
                     items=[
                         "Start (ns)",
@@ -133,7 +134,9 @@ class NsightReader:
                 ),
                 ignore_index=True,
             )
-            .append(
+        del cuda
+
+        self.events = self.events.append(
                 gpu.filter(
                     items=[
                         "Start (ns)",
@@ -148,7 +151,7 @@ class NsightReader:
                 ),
                 ignore_index=True,
             )
-        )
+        del gpu
 
         """
         create a second DataFrame for exit/leave events
@@ -208,4 +211,4 @@ class NsightReader:
         )
 
         # return the trace
-        return pipit.tracedata.TraceData(None, self.events)
+        return pipit.trace.Trace(None, self.events)
