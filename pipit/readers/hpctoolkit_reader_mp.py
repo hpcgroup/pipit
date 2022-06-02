@@ -1,7 +1,8 @@
 from xml.etree.ElementTree import Element, ElementTree
 import pandas as pd
-import pipit.tracedata
 from graph import Graph, Node
+import pipit.tracedata
+from multiprocessing import Process, Manager
 
 
 class ExperimentReader:
@@ -113,7 +114,7 @@ class ProfileReader:
     def read_info(self, prof_info_idx):
         # Given a prof_info_id, returns the heirarchal identifier tuples associated
         # with it - information such as thread id, mpi_rank, node_id, etc.
-        # print("prof_info_idx: ", prof_info_idx)
+        print("prof_info_idx: ", prof_info_idx)
         byte_order = "big"
         signed = False
         file = self.file
@@ -140,8 +141,13 @@ class HPCToolkitReader:
         if dir_name[-1] != "/":
             dir_name += "/"
         self.dir_name = dir_name  # directory of hpctoolkit trace files being read
+        self.byte_order = "big"
+        self.signed = False
 
     def read(self):
+        # do setup work to parallelize
+        self.experiment_reader = ExperimentReader(self.dir_name + "experiment.xml")
+
         # This function reads through the trace.db file with two nested loops -
         # The outer loop iterates on the rank of the process while the inner loop
         # Iterates through each trace line for the given rank and adds it to
@@ -151,14 +157,13 @@ class HPCToolkitReader:
 
         # open file
         file = open(dir_location + "trace.db", "rb")
-
-        experiment_reader = ExperimentReader(dir_location + "experiment.xml")
+        self.trace_db_file = file
 
         # Not currently in use because getting incorrect data from Identifier Tuples
-        profile_reader = ProfileReader(dir_location + "profile.db")
+        # profile_reader = ProfileReader(dir_location + "profile.db")
 
         # create graph
-        graph = experiment_reader.create_graph()
+        self.graph = self.experiment_reader.create_graph()
 
         # read Magic identifier ("HPCPROF-tracedb_")
         # encoding = "ASCII"  # idk just guessing rn
@@ -170,10 +175,6 @@ class HPCToolkitReader:
         # version_minor = file.read(1)
         file.read(2)
 
-        # need to test to see if correct
-        byte_order = "big"
-        signed = False
-
         # Number of trace lines (num_traces)
         # num_traces = int.from_bytes(file.read(4), byteorder=byte_order, signed=signed)
         file.read(4)
@@ -184,11 +185,59 @@ class HPCToolkitReader:
         file.read(2)
 
         # Trace Header section size (hdr_size)
-        hdr_size = int.from_bytes(file.read(8), byteorder=byte_order, signed=signed)
+        hdr_size = int.from_bytes(
+            file.read(8), byteorder=self.byte_order, signed=self.signed
+        )
+
+        num_procs = int((hdr_size) / 22)
 
         # Trace Header section offset (hdr_ptr)
-        hdr_ptr = int.from_bytes(file.read(8), byteorder=byte_order, signed=signed)
+        self.hdr_ptr = int.from_bytes(
+            file.read(8), byteorder=self.byte_order, signed=self.signed
+        )
         # print("hdr_size: ", hdr_size)
+        self.min_max_time = self.experiment_reader.get_min_max_time()
+        manager = Manager()
+        return_list = manager.dict()
+        processes = []
+        for i in range(num_procs):
+            p = Process(target=self.__worker, args=(i, return_list))
+            processes.append(p)
+            p.start()
+            # data.append(self.read_helper(file, hdr_ptr, i, min_max_time, graph))
+        # print(return_list)
+        for i in range(num_procs):
+            processes[i].join()
+        trace_df = pd.DataFrame(self.__merge_map(return_list, num_procs))
+        # print(trace_df.to_string())
+        return pipit.tracedata.TraceData(trace_df)
+
+    def __merge_map(self, return_list, num_procs):
+        data = {
+            "Function Name": [],
+            "Event Type": [],
+            "Time": [],
+            "Process": [],
+            "Graph_Node": [],
+            "Level": [],
+        }
+        for i in range(num_procs):
+            map = return_list[i]
+            # print(type(map))
+            for key in data.keys():
+                # data[key]
+                # thread_data[key]
+                data[key] = data[key] + map[key]
+        return data
+
+    def __worker(self, proc_num, return_list):
+        # print(str(proc_num) + " represent!")
+        return_list[proc_num] = self.__read_helper(
+            self.trace_db_file, self.hdr_ptr, proc_num, self.min_max_time, self.graph
+        )
+        # print(return_list[proc_num])
+
+    def __read_helper(self, file, hdr_ptr, proc_num, min_max_time, graph):
 
         data = {
             "Function Name": [],
@@ -198,123 +247,125 @@ class HPCToolkitReader:
             "Graph_Node": [],
             "Level": [],
         }
-        min_max_time = experiment_reader.get_min_max_time()
 
         # cycle through trace headers (each iteration in this outer loop is a seperate
         # process/thread/rank)
-        for i in range(0, hdr_size, 22):
-            # proc_num = int(i / 22)
-            file.seek(hdr_ptr + i)
+        file.seek(hdr_ptr + (22 * proc_num))
 
-            # prof_info_idx (in profile.db)
-            prof_info_idx = int.from_bytes(
-                file.read(4), byteorder=byte_order, signed=signed
+        # prof_info_idx (in profile.db)
+        # prof_info_idx = int.from_bytes(
+        #     file.read(4), byteorder=byte_order, signed=signed
+        # )
+        # thread_info = profile_reader.read_info(prof_info_idx)
+        file.read(4)
+
+        # Trace type
+        # trace_type = int.from_bytes(
+        #     file.read(2), byteorder=byte_order, signed=signed
+        # )
+        file.read(2)
+
+        # Offset of Trace Line start (line_ptr)
+        line_ptr = int.from_bytes(
+            file.read(8), byteorder=self.byte_order, signed=self.signed
+        )
+
+        # Offset of Trace Line one-after-end (line_end)
+        line_end = int.from_bytes(
+            file.read(8), byteorder=self.byte_order, signed=self.signed
+        )
+
+        last_id = -1
+
+        last_node = None
+
+        # iterate through every trace event in the process
+        for j in range(line_ptr, line_end, 12):
+            file.seek(j)
+
+            # Timestamp (nanoseconds since epoch)
+            timestamp = (
+                int.from_bytes(
+                    file.read(8), byteorder=self.byte_order, signed=self.signed
+                )
+                - min_max_time[0]
             )
-            proc_num = (int(i / 22), profile_reader.read_info(prof_info_idx))
-            # file.read(4)
 
-            # Trace type
-            # trace_type = int.from_bytes(
-            #     file.read(2), byteorder=byte_order, signed=signed
-            # )
-            file.read(2)
+            # Sample calling context id (in experiment.xml)
+            # can use this to get name of function from experiement.xml
+            # Procedure tab
+            calling_context_id = int.from_bytes(
+                file.read(4), byteorder=self.byte_order, signed=self.signed
+            )
 
-            # Offset of Trace Line start (line_ptr)
-            line_ptr = int.from_bytes(file.read(8), byteorder=byte_order, signed=signed)
+            # checking to see if the last event wasn't the same
+            # if it was then we skip it, as to not have multiple sets of
+            # open/close events for a function that it's still in
+            if last_id != calling_context_id:
 
-            # Offset of Trace Line one-after-end (line_end)
-            line_end = int.from_bytes(file.read(8), byteorder=byte_order, signed=signed)
+                # updating the trace_db
 
-            last_id = -1
+                node = graph.get_node(calling_context_id)  # the node in the CCT
 
-            last_node = None
+                # closing functions exited
+                close_node = last_node
+                intersect_level = -1
+                intersect_node = node.get_intersection(last_node)
+                # this is the highest node that last_node and node have in common
+                # we want to close every enter time event higher than than interest
+                # node, because those functions have exited
 
-            # iterate through every trace event in the process
-            for j in range(line_ptr, line_end, 12):
-                file.seek(j)
+                if intersect_node is not None:
+                    intersect_level = intersect_node.get_level()
+                while (
+                    close_node is not None and close_node.get_level() > intersect_level
+                ):
+                    data["Function Name"].append(close_node.name)
+                    data["Event Type"].append("Exit")
+                    data["Time"].append(timestamp)
+                    data["Process"].append(proc_num)
+                    data["Graph_Node"].append(close_node)
+                    data["Level"].append(close_node.get_level())
+                    close_node = close_node.parent
 
-                # Timestamp (nanoseconds since epoch)
-                timestamp = (
-                    int.from_bytes(file.read(8), byteorder=byte_order, signed=signed)
-                    - min_max_time[0]
-                )
+                # creating new rows for the new functions entered
+                enter_list = node.get_node_list(intersect_level)
+                # the list of nodes higher than interesect_level
+                # (the level of interesect_node)
 
-                # Sample calling context id (in experiment.xml)
-                # can use this to get name of function from experiement.xml
-                # Procedure tab
-                calling_context_id = int.from_bytes(
-                    file.read(4), byteorder=byte_order, signed=signed
-                )
+                # all of the nodes in this list have entered into the function since
+                # the last poll so we want to create entries in the data for the
+                # Enter event
+                for enter_node in enter_list[::-1]:
+                    data["Function Name"].append(enter_node.name)
+                    data["Event Type"].append("Enter")
+                    data["Time"].append(timestamp)
+                    data["Process"].append(proc_num)
+                    data["Graph_Node"].append(enter_node)
+                    data["Level"].append(enter_node.get_level())
+                last_node = node
 
-                # checking to see if the last event wasn't the same
-                # if it was then we skip it, as to not have multiple sets of
-                # open/close events for a function that it's still in
-                if last_id != calling_context_id:
+            last_id = calling_context_id  # updating last_id
 
-                    # updating the trace_db
+        # adding last data for trace df
+        close_node = last_node
 
-                    node = graph.get_node(calling_context_id)  # the node in the CCT
+        # after reading through all the trace lines, some Enter events will not have
+        # matching Exit events,
+        # as the functions were still running in the last poll.
+        # Here we are adding Exit events to all of the remaining unmatched
+        # Enter events
+        while close_node is not None:
+            data["Function Name"].append(close_node.name)
+            data["Event Type"].append("Exit")
+            data["Time"].append(min_max_time[1] - min_max_time[0])
+            data["Process"].append(proc_num)
+            data["Graph_Node"].append(close_node)
+            data["Level"].append(close_node.get_level())
+            close_node = close_node.parent
 
-                    # closing functions exited
-                    close_node = last_node
-                    intersect_level = -1
-                    intersect_node = node.get_intersection(last_node)
-                    # this is the highest node that last_node and node have in common
-                    # we want to close every enter time event higher than than interest
-                    # node, because those functions have exited
+        return data
 
-                    if intersect_node is not None:
-                        intersect_level = intersect_node.get_level()
-                    while (
-                        close_node is not None
-                        and close_node.get_level() > intersect_level
-                    ):
-                        data["Function Name"].append(close_node.name)
-                        data["Event Type"].append("Exit")
-                        data["Time"].append(timestamp)
-                        data["Process"].append(proc_num)
-                        data["Graph_Node"].append(close_node)
-                        data["Level"].append(close_node.get_level())
-                        close_node = close_node.parent
 
-                    # creating new rows for the new functions entered
-                    enter_list = node.get_node_list(intersect_level)
-                    # the list of nodes higher than interesect_level
-                    # (the level of interesect_node)
-
-                    # all of the nodes in this list have entered into the function since
-                    # the last poll so we want to create entries in the data for the
-                    # Enter event
-                    for enter_node in enter_list[::-1]:
-                        data["Function Name"].append(enter_node.name)
-                        data["Event Type"].append("Enter")
-                        data["Time"].append(timestamp)
-                        data["Process"].append(proc_num)
-                        data["Graph_Node"].append(enter_node)
-                        data["Level"].append(enter_node.get_level())
-                    last_node = node
-
-                last_id = calling_context_id  # updating last_id
-
-            # adding last data for trace df
-            close_node = last_node
-
-            # after reading through all the trace lines, some Enter events will not have
-            # matching Exit events,
-            # as the functions were still running in the last poll.
-            # Here we are adding Exit events to all of the remaining unmatched
-            # Enter events
-            while close_node is not None:
-                data["Function Name"].append(close_node.name)
-                data["Event Type"].append("Exit")
-                data["Time"].append(min_max_time[1] - min_max_time[0])
-                data["Process"].append(proc_num)
-                data["Graph_Node"].append(close_node)
-                data["Level"].append(close_node.get_level())
-                close_node = close_node.parent
-
-        trace_df = pd.DataFrame(data)
-        self.trace_df = trace_df
-        return pipit.tracedata.TraceData(trace_df)
-        # print(trace_df.to_string())
-        # return trace_df
+x = HPCToolkitReader("../tests/data/ping-pong-hpctoolkit/")
+x.read()
