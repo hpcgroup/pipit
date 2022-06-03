@@ -1,6 +1,6 @@
 from xml.etree.ElementTree import Element, ElementTree
 import pandas as pd
-import pipit.tracedata
+import pipit.trace
 from graph import Graph, Node
 
 
@@ -92,18 +92,23 @@ class ProfileReader:
         # i = 0
         # while i < idt_size:
         #     print("Location: ", i + idt_ptr)
-        # num_tuples = int.from_bytes(file.read(2), byteorder=byte_order,
-        # signed=signed)
+        #     num_tuples = int.from_bytes(file.read(2), byteorder=byte_order,
+        #     signed=signed)
         #     print('num_tuples', num_tuples)
         #     tuples_list = []
         #     for j in range(0, num_tuples, 1):
-        # kind = int.from_bytes(file.read(2), byteorder=byte_order,
-        # signed=signed)
-        # p_val = int.from_bytes(file.read(8), byteorder=byte_order,
-        # signed=signed)
-        # l_val = int.from_bytes(file.read(8), byteorder=byte_order,
-        # signed=signed)
-        # tuples_list.append((kind, p_val, l_val))
+        #         kind = int.from_bytes(file.read(2), byteorder=byte_order,
+        #         signed=signed)
+        #         if kind == 0:
+        #             p_val = file.read(8).decode('ASCII')
+        #             l_val = file.read(8).decode('ASCII')
+        #         else:
+        #             p_val = int.from_bytes(file.read(8), byteorder=byte_order,
+        #             signed=signed)
+        #             l_val = int.from_bytes(file.read(8), byteorder=byte_order,
+        #             signed=signed)
+
+        #         tuples_list.append((kind, p_val, l_val))
         #     print(tuples_list)
         #     i += 2 + 18 * num_tuples
 
@@ -315,6 +320,4 @@ class HPCToolkitReader:
 
         trace_df = pd.DataFrame(data)
         self.trace_df = trace_df
-        return pipit.tracedata.TraceData(trace_df)
-        # print(trace_df.to_string())
-        # return trace_df
+        return pipit.trace.Trace(None, trace_df)
