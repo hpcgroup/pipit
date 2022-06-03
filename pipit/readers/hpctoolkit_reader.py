@@ -7,6 +7,7 @@ from graph import Graph, Node
 class ExperimentReader:
     def __init__(self, file_location):
         self.tree = ElementTree(file=file_location)
+        self.__create_identifier_name_table()
 
     def get_function_name(self, procedure_table_id):
         # return function name, given a procedure_table_id
@@ -14,6 +15,15 @@ class ExperimentReader:
         procedure_table_search = ".//Procedure[@i='" + procedure_table_id + "']"
         procedure = self.tree.find(procedure_table_search)
         return procedure.get("n")
+
+    def __create_identifier_name_table(self):
+        self.identifier_name_table = {}
+        for identifier in list(list(list(list(self.tree.getroot())[1])[0])[0]):
+            identifier_map = identifier.attrib
+            self.identifier_name_table[int(identifier_map['i'])] = identifier_map['n']
+
+    def get_identifier_name(self, kind):
+        return self.identifier_name_table[kind]
 
     def get_min_max_time(self):
         # gets the start and end time of the program
@@ -65,7 +75,8 @@ class ExperimentReader:
 class ProfileReader:
     # class to read data from profile.db file
 
-    def __init__(self, file_location):
+    def __init__(self, file_location, experiment_reader):
+        self.experiment_reader = experiment_reader
         # gets the pi_ptr variable to be able to read the identifier tuples
 
         self.file = open(file_location, "rb")
@@ -134,9 +145,12 @@ class ProfileReader:
         for i in range(0, num_tuples, 1):
             # not working - I don't know why, but the second 2 tuples are just incorrect
             kind = int.from_bytes(file.read(2), byteorder=byte_order, signed=signed)
+            kind = kind & 0x3fff
             p_val = int.from_bytes(file.read(8), byteorder=byte_order, signed=signed)
-            l_val = int.from_bytes(file.read(8), byteorder=byte_order, signed=signed)
-            tuples_list.append((kind, p_val, l_val))
+            # l_val = int.from_bytes(file.read(8), byteorder=byte_order, signed=signed)
+            file.read(8)
+            identifier_name = self.experiment_reader.get_identifier_name(kind)
+            tuples_list.append((identifier_name, p_val))
         return tuples_list
 
 
@@ -160,7 +174,7 @@ class HPCToolkitReader:
         experiment_reader = ExperimentReader(dir_location + "experiment.xml")
 
         # Not currently in use because getting incorrect data from Identifier Tuples
-        profile_reader = ProfileReader(dir_location + "profile.db")
+        profile_reader = ProfileReader(dir_location + "profile.db", experiment_reader)
 
         # create graph
         graph = experiment_reader.create_graph()
@@ -215,7 +229,7 @@ class HPCToolkitReader:
             prof_info_idx = int.from_bytes(
                 file.read(4), byteorder=byte_order, signed=signed
             )
-            proc_num = (int(i / 22), profile_reader.read_info(prof_info_idx))
+            proc_num = profile_reader.read_info(prof_info_idx)
             # file.read(4)
 
             # Trace type
