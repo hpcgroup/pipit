@@ -1,7 +1,12 @@
+# Copyright 2022 Parallel Software and Systems Group, University of Maryland.
+# See the top-level LICENSE file for details.
+#
+# SPDX-License-Identifier: MIT
+
 from xml.etree.ElementTree import Element, ElementTree
 import pandas as pd
 import pipit.trace
-from graph import Graph, Node
+from pipit.graph import Graph, Node
 
 
 class ExperimentReader:

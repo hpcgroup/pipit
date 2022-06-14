@@ -1,3 +1,8 @@
+# Copyright 2022 Parallel Software and Systems Group, University of Maryland.
+# See the top-level LICENSE file for details.
+#
+# SPDX-License-Identifier: MIT
+
 class Node:
     # Each Node corresponds to a PF tag in the experiemnt.xml file, and can be
     # referenced by any calling_context_id directly under it
