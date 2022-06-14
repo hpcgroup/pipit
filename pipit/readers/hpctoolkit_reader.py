@@ -85,8 +85,8 @@ class ProfileReader:
     # class to read data from profile.db file
 
     def __init__(self, file_location, experiment_reader):
-        self.experiment_reader = experiment_reader
         # gets the pi_ptr variable to be able to read the identifier tuples
+        self.experiment_reader = experiment_reader
 
         self.file = open(file_location, "rb")
         file = self.file
@@ -97,7 +97,6 @@ class ProfileReader:
         signed = False
 
         # Profile Info section offset (pi_ptr)
-
         self.pi_ptr = int.from_bytes(file.read(8), byteorder=byte_order, signed=signed)
 
     def read_info(self, prof_info_idx):
@@ -118,7 +117,6 @@ class ProfileReader:
         num_tuples = int.from_bytes(file.read(2), byteorder=byte_order, signed=signed)
         tuples_list = []
         for i in range(0, num_tuples, 1):
-            # not working - I don't know why, but the second 2 tuples are just incorrect
             kind = int.from_bytes(file.read(2), byteorder=byte_order, signed=signed)
             kind = kind & 0x3FFF
             p_val = int.from_bytes(file.read(8), byteorder=byte_order, signed=signed)
@@ -131,8 +129,6 @@ class ProfileReader:
 
 class HPCToolkitReader:
     def __init__(self, dir_name) -> None:
-        if dir_name[-1] != "/":
-            dir_name += "/"
         self.dir_name = dir_name  # directory of hpctoolkit trace files being read
 
     def read(self):
@@ -144,12 +140,11 @@ class HPCToolkitReader:
         dir_location = self.dir_name  # directory of hpctoolkit trace files being read
 
         # open file
-        file = open(dir_location + "trace.db", "rb")
+        file = open(dir_location + "/trace.db", "rb")
 
-        experiment_reader = ExperimentReader(dir_location + "experiment.xml")
+        experiment_reader = ExperimentReader(dir_location + "/experiment.xml")
 
-        # Not currently in use because getting incorrect data from Identifier Tuples
-        profile_reader = ProfileReader(dir_location + "profile.db", experiment_reader)
+        profile_reader = ProfileReader(dir_location + "/profile.db", experiment_reader)
 
         # create graph
         graph = experiment_reader.create_graph()
@@ -253,9 +248,10 @@ class HPCToolkitReader:
                     close_node = last_node
                     intersect_level = -1
                     intersect_node = node.get_intersection(last_node)
-                    # this is the highest node that last_node and node have in common
-                    # we want to close every enter time event higher than than interest
-                    # node, because those functions have exited
+                    # this is the highest node that last_node and node have in
+                    # common we want to close every enter time event higher
+                    # than than interest node, because those functions have
+                    # exited
 
                     if intersect_node is not None:
                         intersect_level = intersect_node.get_level()
@@ -276,9 +272,9 @@ class HPCToolkitReader:
                     # the list of nodes higher than interesect_level
                     # (the level of interesect_node)
 
-                    # all of the nodes in this list have entered into the function since
-                    # the last poll so we want to create entries in the data for the
-                    # Enter event
+                    # all of the nodes in this list have entered into the
+                    # function since the last poll so we want to create entries
+                    # in the data for the Enter event
                     for enter_node in enter_list[::-1]:
                         data["Function Name"].append(enter_node.name)
                         data["Event Type"].append("Enter")
@@ -293,11 +289,10 @@ class HPCToolkitReader:
             # adding last data for trace df
             close_node = last_node
 
-            # after reading through all the trace lines, some Enter events will not have
-            # matching Exit events,
-            # as the functions were still running in the last poll.
-            # Here we are adding Exit events to all of the remaining unmatched
-            # Enter events
+            # after reading through all the trace lines, some Enter events will
+            # not have matching Exit events, as the functions were still
+            # running in the last poll.  Here we are adding Exit events to all
+            # of the remaining unmatched Enter events
             while close_node is not None:
                 data["Function Name"].append(close_node.name)
                 data["Event Type"].append("Exit")

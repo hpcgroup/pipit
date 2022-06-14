@@ -53,6 +53,7 @@ class Node:
         while node1 != node2:
             node1 = node1.parent
             node2 = node2.parent
+
         return node1
 
     def get_node_list(self, min_level):
@@ -62,9 +63,11 @@ class Node:
         """
         node = self
         return_list = []
+
         while node is not None and node.level > min_level:
             return_list.append(node)
             node = node.parent
+
         return return_list
 
     def __str__(self) -> str:
@@ -77,7 +80,7 @@ class Node:
         )
 
     def __calculate_level(self):
-        """ private function to get depth of node"""
+        """private function to get depth of node"""
         if self.parent is None:
             return 0
         else:
@@ -92,12 +95,13 @@ class Node:
 
 class Graph:
     """Represents the calling context tree / call graph"""
+
     def __init__(self) -> None:
         self.roots = []
         self.calling_context_id_map = {}
 
     def add_to_map(self, calling_context_id, node):
-        """adds association between a calling_context_id and a specific node """
+        """adds association between a calling_context_id and a specific node"""
         self.calling_context_id_map[calling_context_id] = node
 
     def add_root(self, node):
