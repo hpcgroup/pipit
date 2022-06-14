@@ -25,7 +25,7 @@ class ExperimentReader:
         self.identifier_name_table = {}
         for identifier in list(list(list(list(self.tree.getroot())[1])[0])[0]):
             identifier_map = identifier.attrib
-            self.identifier_name_table[int(identifier_map['i'])] = identifier_map['n']
+            self.identifier_name_table[int(identifier_map["i"])] = identifier_map["n"]
 
     def get_identifier_name(self, kind):
         return self.identifier_name_table[kind]
@@ -150,7 +150,7 @@ class ProfileReader:
         for i in range(0, num_tuples, 1):
             # not working - I don't know why, but the second 2 tuples are just incorrect
             kind = int.from_bytes(file.read(2), byteorder=byte_order, signed=signed)
-            kind = kind & 0x3fff
+            kind = kind & 0x3FFF
             p_val = int.from_bytes(file.read(8), byteorder=byte_order, signed=signed)
             # l_val = int.from_bytes(file.read(8), byteorder=byte_order, signed=signed)
             file.read(8)
