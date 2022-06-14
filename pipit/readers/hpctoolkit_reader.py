@@ -3,6 +3,7 @@
 #
 # SPDX-License-Identifier: MIT
 
+
 from xml.etree.ElementTree import Element, ElementTree
 import pandas as pd
 import pipit.trace
@@ -15,7 +16,7 @@ class ExperimentReader:
         self.__create_identifier_name_table()
 
     def get_function_name(self, procedure_table_id):
-        # return function name, given a procedure_table_id
+        """return function name, given a procedure_table_id"""
 
         procedure_table_search = ".//Procedure[@i='" + procedure_table_id + "']"
         procedure = self.tree.find(procedure_table_search)
@@ -39,8 +40,10 @@ class ExperimentReader:
         return time
 
     def create_graph(self):
-        # Traverses through the experiment.xml's SecCallPathProfileData tag, creating a
-        # Node for every PF tag and adding it to the Graph
+        """Traverses through the experiment.xml's SecCallPathProfileData tag,
+        creating a Node for every PF tag and adding it to the Graph
+        """
+
         graph = Graph()
         call_path_data = list(list(self.tree.getroot())[-1])[-1]
         root_elems = list(call_path_data)
@@ -52,9 +55,10 @@ class ExperimentReader:
         return graph
 
     def graph_helper(self, parent_node: Node, curr_element: Element, graph: Graph):
-        # Recursive helper function for creating the graph - if the current item in the
-        # SecCallPathProfileData is 'PF' add a node, otherwise create an association
-        # between the id and the last node
+        """Recursive helper function for creating the graph - if the current
+        item in the SecCallPathProfileData is 'PF' add a node, otherwise create
+        an association between the id and the last node
+        """
         if curr_element.tag == "PF":
             procedure_table_id = curr_element.attrib["n"]
             function_name = self.get_function_name(procedure_table_id)
@@ -96,45 +100,11 @@ class ProfileReader:
 
         self.pi_ptr = int.from_bytes(file.read(8), byteorder=byte_order, signed=signed)
 
-        # To read through all the Hierarchical Identifier Tuples
-        # print("Testing")
-        # idt_size = int.from_bytes(file.read(8), byteorder=byte_order, signed=signed)
-        # print('idt_size', idt_size)
-        # idt_ptr = int.from_bytes(file.read(8), byteorder=byte_order, signed=signed)
-        # print('idt_ptr', idt_ptr)
-
-        # file.seek(idt_ptr)
-
-        # i = 0
-        # while i < idt_size:
-        #     print("Location: ", i + idt_ptr)
-        #     num_tuples = int.from_bytes(file.read(2), byteorder=byte_order,
-        #     signed=signed)
-        #     print('num_tuples', num_tuples)
-        #     tuples_list = []
-        #     for j in range(0, num_tuples, 1):
-        #         kind = int.from_bytes(file.read(2), byteorder=byte_order,
-        #         signed=signed)
-        #         if kind == 0:
-        #             p_val = file.read(8).decode('ASCII')
-        #             l_val = file.read(8).decode('ASCII')
-        #         else:
-        #             p_val = int.from_bytes(file.read(8), byteorder=byte_order,
-        #             signed=signed)
-        #             l_val = int.from_bytes(file.read(8), byteorder=byte_order,
-        #             signed=signed)
-
-        #         tuples_list.append((kind, p_val, l_val))
-        #     print(tuples_list)
-        #     i += 2 + 18 * num_tuples
-
-        # print("end", i, idt_size)
-        # print("End Testing")
-
     def read_info(self, prof_info_idx):
-        # Given a prof_info_id, returns the heirarchal identifier tuples associated
-        # with it - information such as thread id, mpi_rank, node_id, etc.
-        # print("prof_info_idx: ", prof_info_idx)
+        """Given a prof_info_id, returns the heirarchal identifier tuples
+        associated with it - information such as thread id, mpi_rank,
+        node_id, etc.
+        """
         byte_order = "big"
         signed = False
         file = self.file
@@ -166,11 +136,11 @@ class HPCToolkitReader:
         self.dir_name = dir_name  # directory of hpctoolkit trace files being read
 
     def read(self):
-        # This function reads through the trace.db file with two nested loops -
-        # The outer loop iterates on the rank of the process while the inner loop
-        # Iterates through each trace line for the given rank and adds it to
-        # the dictionary
-
+        """This function reads through the trace.db file with two nested loops -
+        The outer loop iterates on the rank of the process while the inner
+        loop Iterates through each trace line for the given rank and adds it
+        to the dictionary
+        """
         dir_location = self.dir_name  # directory of hpctoolkit trace files being read
 
         # open file
