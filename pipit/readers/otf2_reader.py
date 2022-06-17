@@ -15,6 +15,7 @@ class OTF2Reader:
 
     def __init__(self, dir_name):
         self.dir_name = dir_name  # directory of otf2 file being read
+        self.file_name = self.dir_name + "/traces.otf2"
 
     def field_to_val(self, field):
         """
@@ -146,7 +147,7 @@ class OTF2Reader:
         to a dataframe
         """
 
-        with otf2.reader.open(self.dir_name) as trace:
+        with otf2.reader.open(self.file_name) as trace:
             # extracts the rank and size
             # and gets all the locations
             # of the trace
@@ -369,7 +370,7 @@ class OTF2Reader:
         events DataFrame as its primary attributes
         """
 
-        with otf2.reader.open(self.dir_name) as trace:
+        with otf2.reader.open(self.file_name) as trace:
             self.definitions = self.read_definitions(trace)  # definitions
             # close the trace and open it later per process
             trace.close()
