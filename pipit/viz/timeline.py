@@ -89,28 +89,13 @@ def timeline(trace, rank=None, rasterization_threshold=40000):
     # See https://examples.pyviz.org/nyc_buildings/nyc_buildings.html
     cats = pd.unique(df.Name).to_numpy()
     colors = cc.glasbey_bw_minc_20
-    # colors = [[0.5411764705882353, 0.44313725490196076, 0.596078431372549], [0.6862745098039216, 0.4392156862745098, 0.5215686274509804], [0.4980392156862745, 0.5294117647058824, 0.8823529411764706], [0.36470588235294116, 0.3176470588235294, 0.5372549019607843], [0.4549019607843137, 0.5607843137254902, 0.4666666666666667], [0.6980392156862745, 0.8392156862745098, 0.47843137254901963], [0.3411764705882353, 0.42745098039215684, 0.5764705882352941], [0.4666666666666667, 0.6078431372549019, 0.37254901960784315], [0.4470588235294118, 0.7058823529411765, 0.6274509803921569], [0.5176470588235295, 0.3333333333333333, 0.403921568627451], [0.615686274509804, 0.8235294117647058, 0.5882352941176471], [0.5803921568627451, 0.3686274509803922, 0.33725490196078434], [0.6431372549019608, 0.4235294117647059, 0.5411764705882353], [0.5450980392156862, 0.7490196078431373, 0.5882352941176471], [0.43137254901960786, 0.38823529411764707, 0.5686274509803921], [0.3137254901960784, 0.5058823529411764, 0.42745098039215684], [0.49019607843137253, 0.5490196078431373, 0.5843137254901961], [0.36470588235294116, 0.48627450980392156, 0.5176470588235295], [0.5490196078431373, 0.3333333333333333, 0.5490196078431373], [0.40784313725490196, 0.6392156862745098, 0.6352941176470588], [0.5176470588235295, 0.5529411764705883, 0.6980392156862745], [0.5137254901960784, 0.4117647058823529, 0.5764705882352941], [0.5294117647058824, 0.7176470588235294, 0.3843137254901961], [0.596078431372549, 0.5254901960784314, 0.6941176470588235], [0.5529411764705883, 0.7372549019607844, 0.5529411764705883], [0.5215686274509804, 0.6274509803921569, 0.8235294117647058], [0.49411764705882355, 0.7294117647058823, 0.5803921568627451], [0.4392156862745098, 0.7764705882352941, 0.803921568627451], [0.7058823529411765, 0.47843137254901963, 0.7647058823529411], [0.796078431372549, 0.5647058823529412, 0.596078431372549]]
-    color_key = {
-        cat: tuple(int(e * 255.0) for e in colors[i]) for i, cat in enumerate(cats)
-    }
-    legend = hv.NdOverlay(
-        {
-            k: hv.Points([0, 0], label=str(k)).opts(
-                color=cc.rgb_to_hex(*v), size=0, apply_ranges=False
-            )
-            for k, v in color_key.items()
-        },
-        "Name",
-    )
+    color_key = {cat: tuple(int(e*255.) for e in colors[i]) for i, cat in enumerate(cats)}
+    legend    = hv.NdOverlay({k: hv.Points([0,0], label=str(k)).opts(
+                                            color=cc.rgb_to_hex(*v), size=0, apply_ranges=False) 
+                            for k, v in color_key.items()}, 'Name')
     
     def hook(plot, element):
-        # print('plot.state:   ', plot.state)
-        # print('plot.handles: ', sorted(plot.handles.keys()))
-        # plot.handles['xaxis'].axis_label_text_color = 'red'
-        # plot.handles['yaxis'].axis_label_text_color = 'blue'
-        # plot.handles['legend'].spacing = '1px'
         plot.state.legend.spacing = 0
-        # plot.state.legend.spacing = 5
 
     # Configure plot options
     common_opts = {
@@ -148,6 +133,8 @@ def timeline(trace, rank=None, rasterization_threshold=40000):
             * legend.opts(hooks=[hook])
         )
     else:
+        import panel as pn
+
         shaded = datashade(
             polys,
             aggregator=ds.by("Name", ds.any()),
@@ -160,9 +147,12 @@ def timeline(trace, rank=None, rasterization_threshold=40000):
         shaded = shaded.opts(default_tools=["xpan", "xwheel_zoom"], active_tools=["xwheel_zoom"])
         hover = hover.opts(default_tools=["xpan", "xwheel_zoom"], active_tools=["xwheel_zoom"], fill_color="none")
 
-        return (shaded * hover * legend).opts(
+        row = (shaded * hover * legend).opts(
             **common_opts, title=title + " (rasterized)", hooks=[hook]
         )
+
+        bokeh_server = pn.Row(row).show(port=12345)
+        # bokeh_server.stop()
 
 
 # # If rank is specified then depth mode else overview mode
