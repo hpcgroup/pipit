@@ -14,15 +14,23 @@ class Node:
         self.name_id = name_id
         self.name = name
         self.children = []
+        self.time = []
         self.parent = parent
         self.level = self.__calculate_level()
 
     def add_child(self, child_node):
         self.children.append(child_node)
 
+    def get_child(self):
+        return self.children
+
     def add_calling_contex_id(self, calling_context_id):
         self.calling_context_ids.append(calling_context_id)
-
+        
+    def add_time(self, start, end):
+        self.time.append(start)
+        self.time.append(end)
+    
     def get_level(self):
         """This function returns the depth of the current node
         (a root node would return 0)
@@ -91,7 +99,9 @@ class Node:
             return False
         else:
             return self.calling_context_ids == obj.calling_context_ids
-
+        
+    def __repr__(self) -> str:
+        return self.name
 
 class Graph:
     """Represents the calling context tree / call graph"""
@@ -109,3 +119,21 @@ class Graph:
 
     def get_node(self, calling_context_id) -> "Node":
         return self.calling_context_id_map.get(str(calling_context_id))
+
+    def is_empty(self):
+        if not self.roots:
+            return True
+        else:
+            return False
+       
+    def get_graph_helper(self, node, level=0):
+        ret = "\t"*level+node.name+"\n"
+        for i in node.get_child():
+            ret += self.get_graph_helper(i, level+1)
+        return ret
+    
+    def get_graphs(self):
+        for i in self.roots:
+           return self.get_graph_helper(i)
+           
+    
