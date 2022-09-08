@@ -73,7 +73,7 @@ class ExperimentReader:
         else:
             calling_context_id = curr_element.attrib.get("it")
             if calling_context_id is not None:
-                parent_node.add_calling_contex_id(calling_context_id)
+                parent_node.add_calling_context_id(calling_context_id)
                 graph.add_to_map(calling_context_id, parent_node)
 
             for child_elem in list(curr_element):
