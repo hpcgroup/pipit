@@ -232,14 +232,17 @@ class Trace:
             list_of_children = list(parents_df["Children"])
 
             # create exc times list as a copy of the inc times
+            inc_times = list(self.events["Inc Time (ns)"])
             exc_times = list(self.events["Inc Time (ns)"])
 
             # iterate through the parent events
             for i in range(len(parents_indices)):
+                curr_parent_idx = parents_indices[i]
+                curr_children = list_of_children[i]
                 # iterate through all children of the current event
-                for child_index in list_of_children[i]:
-                    # subtract the current child's time
-                    exc_times[parents_indices[i]] -= exc_times[child_index]
+                for child_index in curr_children:
+                    # subtract the current child's inclusive time
+                    exc_times[curr_parent_idx] -= inc_times[child_index]
 
             # add the list as a new column to the DataFrame
             self.events["Exc Time (ns)"] = exc_times
