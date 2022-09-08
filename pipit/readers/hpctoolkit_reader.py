@@ -303,5 +303,8 @@ class HPCToolkitReader:
                 close_node = close_node.parent
 
         trace_df = pd.DataFrame(data)
+        trace_df.sort_values(
+            by="Time", axis=0, ascending=True, inplace=True, ignore_index=True
+        )
         self.trace_df = trace_df
         return pipit.trace.Trace(None, trace_df)
