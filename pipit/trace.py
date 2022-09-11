@@ -152,7 +152,7 @@ class Trace:
                 the correct row position in the DataFrame.
 
                 The indices stack is used to keep track of the dataframe
-                indices for the current callpate and calculate metrics & 
+                indices for the current callpate and calculate metrics &
                 match parents with children accordingly.
                 """
                 curr_depth, indices_stack, df_indices = 0, [], list(location_df.index)
@@ -216,10 +216,12 @@ class Trace:
                     # if the row is the exit point of a function call
                     else:
                         """
-                        get the DataFrame index of the corresponding enter row 
+                        get the DataFrame index of the corresponding enter row
                         for the current leave row by popping the indices stack
                         """
-                        enter_df_index = indices_stack.pop()  # corresponding enter event
+                        enter_df_index = (
+                            indices_stack.pop()
+                        )  # corresponding enter event
 
                         """
                         add the matching DataFrame indices to
@@ -248,7 +250,7 @@ class Trace:
             self.events["Children"] = children
             self.events["Matching Index"] = matching_index
             self.events["Inc Time (ns)"] = inc_time
-            
+
     def calculate_exc_time(self):
         """
         This function calculates the exclusive time of each function call
