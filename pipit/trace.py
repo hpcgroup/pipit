@@ -38,7 +38,7 @@ class Trace:
         rows - an "Enter" and a "Leave" that correspond to each other.
         One event (two rows) correspond to a single function call.
 
-        This function iterates through such events a few things:
+        This function iterates through such events and does a few things:
         1. matches each entry and exit rows pair using numerical indices
         2. determines the children of each event
         3. calculates the inclusive time for each function call
@@ -51,6 +51,12 @@ class Trace:
         """
 
         if "Inc Time (ns)" not in self.events.columns:
+            # 4 new columns that will be added to the DataFrame
+            children = [None for i in range(len(self.events))]
+            matching_index = [float("nan") for i in range(len(self.events))]
+            inc_time = [float("nan") for i in range(len(self.events))]
+            depth = [float("nan") for i in range(len(self.events))]
+
             # iterate through all the Location IDs of the trace
             for location_id in set(self.events["Location ID"]):
                 """
@@ -63,10 +69,6 @@ class Trace:
                     & (self.events["Location ID"] == location_id)
                 ]
 
-                # 4 new columns that will be added to the DataFrame
-                children = [None for i in range(len(location_df))]
-                matching_index, inc_time, depth = [], [], []
-
                 """
                 Below are auxiliary lists used in the function.
 
@@ -75,9 +77,9 @@ class Trace:
                 so that the metrics being calculated can be added to
                 the correct row position in the DataFrame.
 
-                The indices stack is used to keep track of the current
-                depth in the call stack and calculate metrics and match
-                parents with children accordingly.
+                The indices stack is used to keep track of the dataframe
+                indices for the current callpate and calculate metrics & 
+                match parents with children accordingly.
                 """
                 curr_depth, indices_stack, df_indices = 0, [], list(location_df.index)
 
@@ -105,109 +107,74 @@ class Trace:
                         if curr_depth > 0:
                             """
                             if the current event is a child of another (curr depth > 0),
-                            get the position of the parent event in the lists using the
-                            indices stack and add the current DataFrame index to that
-                            position in the children list
+                            get the dataframe index of the parent event using the
+                            indices stack and append the current DataFrame index to the
+                            parent's children list
                             """
 
-                            parent_index = indices_stack[-1][0]
+                            parent_df_index = indices_stack[-1]
 
-                            if children[parent_index] is None:
+                            if children[parent_df_index] is None:
                                 """
                                 create a new list of children for the parent
                                 if the current event is the first child
                                 being added
                                 """
-                                children[parent_index] = [curr_df_index]
+                                children[parent_df_index] = [curr_df_index]
                             else:
-                                children[parent_index].append(curr_df_index)
+                                children[parent_df_index].append(curr_df_index)
 
                         """
                         The inclusive time for a function is its Leave timestamp
-                        subtracted by its Enter timestamp. Append the -Enter timestamp
-                        to the inc time list.
+                        subtracted by its Enter timestamp.
                         """
-                        inc_time.append(-timestamp)
+                        inc_time[curr_df_index] = -timestamp
 
                         """
-                        the DataFrame index of the matching leave row is
-                        unknown at this time, so add a placeholder
+                        Whenever an entry point for a function call is encountered,
+                        add the DataFrame index of the row to the indices stack
                         """
-                        matching_index.append(float("nan"))
+                        indices_stack.append(curr_df_index)
 
-                        """
-                        whenever an entry point for a function call is encountered,
-                        add the list index (i) and the corresponding DataFrame index
-                        of the row as a tuple to the indices stack
-                        """
-                        indices_stack.append((i, curr_df_index))
-
-                        depth.append(curr_depth)  # add the current depth to the list
+                        depth[curr_df_index] = curr_depth
                         curr_depth += 1  # increment the depth of the call stack
 
                     # if the row is the exit point of a function call
                     else:
                         """
-                        get the list and DataFrame indices of the corresponding enter
-                        row for the current leave row by popping the indices stack
+                        get the DataFrame index of the corresponding enter row 
+                        for the current leave row by popping the indices stack
                         """
-                        (
-                            enter_index,
-                            enter_df_index,
-                        ) = indices_stack.pop()  # corresponding enter event
+                        enter_df_index = indices_stack.pop()  # corresponding enter event
 
                         """
-                        add the matching DataFrame indices to the
-                        appropriate positions in the list
+                        add the matching DataFrame indices to
+                        the appropriate positions in the list
                         """
-                        matching_index[enter_index] = curr_df_index
-                        matching_index.append(enter_df_index)
+                        matching_index[enter_df_index] = curr_df_index
+                        matching_index[curr_df_index] = enter_df_index
 
                         """
                         by adding the leave timestamp, the
                         calculated time is Leave - Enter, which
                         is the inclusive time for the function call
                         """
-                        inc_time[enter_index] += timestamp
-
-                        # don't store redundant information in the leave row
-                        inc_time.append(float("nan"))
-                        depth.append(float("nan"))
+                        inc_time[enter_df_index] += timestamp
 
                         curr_depth -= 1  # decrement the current depth of the call stack
 
-                # needed because children is a list of nested lists and none objects
-                children = np.array(children, dtype=object)
+            # needed because children is a list of nested lists and none objects
+            children = np.array(children, dtype=object)
 
-                """
-                Create new columns of the DataFrame using
-                the calculated metrics and lists above
-
-                Note: using locs four times is a little inefficient,
-                although I'm not sure how to use the filtered DataFrame
-                location_df as it throws a warning. (will look into further)
-                """
-                self.events.loc[
-                    (self.events["Location ID"] == location_id)
-                    & (self.events["Name"] != "N/A"),
-                    "Depth",
-                ] = depth
-                self.events.loc[
-                    (self.events["Location ID"] == location_id)
-                    & (self.events["Name"] != "N/A"),
-                    "Children",
-                ] = children
-                self.events.loc[
-                    (self.events["Location ID"] == location_id)
-                    & (self.events["Name"] != "N/A"),
-                    "Matching Index",
-                ] = matching_index
-                self.events.loc[
-                    (self.events["Location ID"] == location_id)
-                    & (self.events["Name"] != "N/A"),
-                    "Inc Time (ns)",
-                ] = inc_time
-
+            """
+            Create new columns of the DataFrame using
+            the calculated metrics and lists above
+            """
+            self.events["Depth"] = depth
+            self.events["Children"] = children
+            self.events["Matching Index"] = matching_index
+            self.events["Inc Time (ns)"] = inc_time
+            
     def calculate_exc_time(self):
         """
         This function calculates the exclusive time of each function call
