@@ -370,14 +370,17 @@ class OTF2Reader:
         Add Comments
 
         Question:
-        What are calling context ids for hpctoolkit? Both entry and exit rows have the same node, but do
-        calling context ids correspond to something in the DataFrame or something outside of the trace like
+        What are calling context ids for hpctoolkit? Both entry and exit rows
+        have the same node, but do calling context ids correspond to something
+        in the DataFrame or something outside of the trace like
         the original hpctoolkit data?
 
-        Currently, the DataFrame index of the entry row is being stored in the node's calling context ids.
-        This doesn't really have much of a purpose right now. What should we be storing as calling context ids
-        for OTF2? Perhaps there should also be a way to map entry rows to corresponding exit rows (could either
-        have a separate matching indices column or store both entry and exit indices as calling context ids).
+        Currently, the DataFrame index of the entry row is being stored
+        in the node's calling context ids. This doesn't really have much of a
+        purpose right now. What should we be storing as calling context ids
+        for OTF2? Perhaps there should also be a way to map entry rows to
+        corresponding exit rows (could either have a separate matching indices
+        column or store both entry and exit indices as calling context ids).
         """
 
         graph = Graph()
@@ -396,10 +399,14 @@ class OTF2Reader:
             df_indices = list(location_df.index)
             function_names = list(location_df["Name"])
             event_types = list(location_df["Event Type"])
-            functions_stack, nodes_stack  = [], []
+            functions_stack, nodes_stack = [], []
 
             for i in range(len(location_df)):
-                curr_df_index, evt_type, function_name = df_indices[i], event_types[i], function_names[i]
+                curr_df_index, evt_type, function_name = (
+                    df_indices[i],
+                    event_types[i],
+                    function_names[i],
+                )
 
                 if evt_type == "Enter":
                     functions_stack.append(function_name)
@@ -413,7 +420,9 @@ class OTF2Reader:
                     if callpath in callpath_to_node:
                         curr_node = callpath_to_node[callpath]
                     else:
-                        curr_node = Node(node_id, function_name, parent_node, curr_depth)
+                        curr_node = Node(
+                            node_id, function_name, parent_node, curr_depth
+                        )
                         callpath_to_node[callpath] = curr_node
                         node_id += 1
 
@@ -424,7 +433,7 @@ class OTF2Reader:
 
                     curr_node.add_calling_context_id(curr_df_index)
                     graph.add_to_map(curr_df_index, curr_node)
-                    
+
                     nodes_stack.append(curr_node)
                     graph_nodes[curr_df_index] = curr_node
                     curr_depth += 1
@@ -449,5 +458,5 @@ class OTF2Reader:
             # close the trace and open it later per process
             trace.close()
         self.events = self.read_events()  # events
-        self.create_cct() # cct
+        self.create_cct()  # cct
         return pipit.trace.Trace(self.definitions, self.events)
