@@ -9,7 +9,7 @@ class Node:
     referenced by any calling_context_id directly under it
     """
 
-    def __init__(self, name_id, name, parent, level = None) -> None:
+    def __init__(self, name_id, name, parent, level=None) -> None:
         self.calling_context_ids = []
         self.name_id = name_id
         self.name = name
