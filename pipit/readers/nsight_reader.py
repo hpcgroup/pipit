@@ -112,7 +112,7 @@ class NSightReader:
 
                 # Case #2 Function is outside of the previous function
                 else:
-                    
+
                     # Fix issue with multiple roots
                     while stack[len(stack) - 1]["End (ns)"] < curr_start:
                         stack.pop()
