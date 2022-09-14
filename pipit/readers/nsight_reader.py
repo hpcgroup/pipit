@@ -82,7 +82,7 @@ class NSightReader:
             # create a root
             if call_graph.is_empty():
                 root = graph.Node(-1, df.iloc[i]["Name"], None)
-                root.add_calling_contex_id(df.iloc[i]["RangeStack"])
+                root.add_calling_context_id(df.iloc[i]["RangeStack"])
                 root.add_time(df.iloc[i]["Start (ns)"], df.iloc[i]["End (ns)"])
 
                 # add root to tree
@@ -101,7 +101,7 @@ class NSightReader:
                 if prev_end > curr_start:
                     parent = call_graph.get_node(stack[len(stack) - 1]["RangeStack"])
                     node = graph.Node(-1, df.iloc[i]["Name"], parent)
-                    node.add_calling_contex_id(df.iloc[i]["RangeStack"])
+                    node.add_calling_context_id(df.iloc[i]["RangeStack"])
                     node.add_time(df.iloc[i]["Start (ns)"], df.iloc[i]["End (ns)"])
                     parent.add_child(node)
 
@@ -112,12 +112,14 @@ class NSightReader:
 
                 # Case #2 Function is outside of the previous function
                 else:
+                    
+                    # Fix issue with multiple roots
                     while stack[len(stack) - 1]["End (ns)"] < curr_start:
                         stack.pop()
 
                     parent = call_graph.get_node(stack[len(stack) - 1]["RangeStack"])
                     node = graph.Node(-1, df.iloc[i]["Name"], parent)
-                    node.add_calling_contex_id(df.iloc[i]["RangeStack"])
+                    node.add_calling_context_id(df.iloc[i]["RangeStack"])
                     node.add_time(df.iloc[i]["Start (ns)"], df.iloc[i]["End (ns)"])
                     parent.add_child(node)
 
