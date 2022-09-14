@@ -24,7 +24,7 @@ class Node:
     def get_child(self):
         return self.children
 
-    def add_calling_contex_id(self, calling_context_id):
+    def add_calling_context_id(self, calling_context_id):
         self.calling_context_ids.append(calling_context_id)
 
     def add_time(self, start, end):
