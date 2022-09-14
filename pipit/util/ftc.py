@@ -3,6 +3,8 @@
 #
 # SPDX-License-Identifier: MIT
 
+# Used to create fake traces to test nsight-reader
+
 import random as rand
 import csv
 
