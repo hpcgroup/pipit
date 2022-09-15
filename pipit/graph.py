@@ -21,6 +21,9 @@ class Node:
     def add_child(self, child_node):
         self.children.append(child_node)
 
+    def get_child(self):
+        return self.children
+
     def add_calling_context_id(self, calling_context_id):
         self.calling_context_ids.append(calling_context_id)
 
@@ -131,5 +134,8 @@ class Graph:
         return ret
 
     def get_graphs(self):
+        ret = []
         for i in self.roots:
-            return self.get_graph_helper(i)
+            ret.append(self.get_graph_helper(i))
+
+        return ret
