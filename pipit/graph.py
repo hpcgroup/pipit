@@ -21,9 +21,6 @@ class Node:
     def add_child(self, child_node):
         self.children.append(child_node)
 
-    def get_child(self):
-        return self.children
-
     def add_calling_context_id(self, calling_context_id):
         self.calling_context_ids.append(calling_context_id)
 
