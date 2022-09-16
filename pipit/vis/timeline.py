@@ -2,37 +2,12 @@ import holoviews as hv
 from bokeh.models import HoverTool, PrintfTickFormatter
 from bokeh.palettes import Category20_20 as palette
 from holoviews import opts, streams
+from util import css, formatter
 
 hv.extension("bokeh", logo=False)
 
 # Min fraction of viewport an event has to occupy to be drawn
 min_viewport_percentage = 1 / 3840
-
-
-def formatter(t):
-    """Converts timespan from seconds to something more readable"""
-    if t < 1e-6:  # Less than 1us --> ns
-        return str(round(t * 1e9)) + "ns"
-    if t < 0.001:  # Less than 1ms --> us
-        return str(round(t * 1e6)) + "μs"
-    if t < 1:  # Less than 1s --> ms
-        return str(round(t * 1000)) + "ms"
-    else:
-        return str(round(t, 3)) + "s"
-
-
-def in_notebook():
-    """Determines if we are in a notebook environment"""
-    try:
-        from IPython import get_ipython
-
-        if "IPKernelApp" not in get_ipython().config:  # pragma: no cover
-            return False
-    except ImportError:
-        return False
-    except AttributeError:
-        return False
-    return True
 
 
 def timeline(trace):
@@ -54,21 +29,14 @@ def timeline(trace):
     cmap = {funcs[i]: palette[i] for i in range(len(funcs))}
 
     # Apply css customizations, remove multiple tooltips for overlapping glyphs
-    if in_notebook():
-        from IPython.display import HTML, display
-
-        display(
-            HTML(
-                """
-                <style>
-                    div.bk-tooltip > div.bk > div.bk:not(:last-child) {
-                        display:none !important;
-                    }
-                    div.bk { cursor: default !important; }
-                </style>
-                """
-            )
-        )
+    css(
+        """
+        div.bk-tooltip > div.bk > div.bk:not(:last-child) {
+            display:none !important;
+        }
+        div.bk { cursor: default !important; }
+        """
+    )
 
     # Custom tooltip and hover behavior
     hover = HoverTool(
@@ -81,8 +49,8 @@ def timeline(trace):
     )
 
     # Bokeh-specific customizations
-    def bokeh_hook(plot, element):
-        plot.state.toolbar_location = None
+    def bokeh_hook(plot, _):
+        plot.state.toolbar_location = "above"
         plot.state.ygrid.visible = False
         plot.state.legend.label_text_font_size = "9pt"
 

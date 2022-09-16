@@ -4,6 +4,9 @@
 # SPDX-License-Identifier: MIT
 
 
+from vis.timeline import timeline
+
+
 class Trace:
     """A trace dataset is read into an object of this type, which includes one
     or more dataframes.
@@ -29,3 +32,6 @@ class Trace:
         from .readers.hpctoolkit_reader import HPCToolkitReader
 
         return HPCToolkitReader(dirname).read()
+
+    def timeline(self):
+        return timeline(self)
