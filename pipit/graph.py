@@ -131,5 +131,8 @@ class Graph:
         return ret
 
     def get_graphs(self):
+        ret = []
         for i in self.roots:
-            return self.get_graph_helper(i)
+            ret.append(self.get_graph_helper(i))
+
+        return ret
