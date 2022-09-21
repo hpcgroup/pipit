@@ -29,3 +29,11 @@ class Trace:
         from .readers.hpctoolkit_reader import HPCToolkitReader
 
         return HPCToolkitReader(dirname).read()
+
+    @staticmethod
+    def from_nsight(dirname):
+        """Read an NSight trace into a new Trace object."""
+        # import this lazily to avoid circular dependencies
+        from .readers.nsight_reader import NSightReader
+
+        return NSightReader(dirname).read()
