@@ -53,7 +53,7 @@ class NSightReader:
             node = graph.get_node(df2.iloc[i]["RangeStack"])
             df2.at[i, "Graph_Node"] = node
             df2.at[i, "Level"] = node.level
-            
+
         df2.Level = df2.Level.astype(int)
 
         # Combine dataframes together
@@ -68,7 +68,6 @@ class NSightReader:
 
         return pipit.trace.Trace(None, df)
 
-    
     """
     This create_cct function takes in a dataframe and shows the user
     how the cct would look like within their program.
@@ -115,7 +114,7 @@ class NSightReader:
 
                 # CASE 1 Function in another function
                 if prev_end > curr_start:
-                                        
+
                     path = "->".join(func_path)
                     func_path.append(df.iloc[i]["Name"])
                     path2 = "->".join(func_path)
@@ -129,15 +128,13 @@ class NSightReader:
 
                         callpath[path2] = node
                         call_graph.add_to_map(df.iloc[i]["RangeStack"], node)
-                        
+
                     else:
                         callpath[path2].add_calling_context_id(df.iloc[i]["RangeStack"])
                         call_graph.add_to_map(df.iloc[i]["RangeStack"], callpath[path2])
 
-
                     # Adding child function to stack
                     stack.append(df.iloc[i])
-
 
                 # Case #2 Function is outside of the previous function
                 else:
