@@ -2,9 +2,7 @@ import holoviews as hv
 from bokeh.models import HoverTool, PrintfTickFormatter
 from bokeh.palettes import Category20_20 as palette
 from holoviews import opts, streams
-from util import css, formatter
-
-hv.extension("bokeh", logo=False)
+from pipit.util import formatter, vis_init
 
 # Min fraction of viewport an event has to occupy to be drawn
 min_viewport_percentage = 1 / 3840
@@ -12,6 +10,9 @@ min_viewport_percentage = 1 / 3840
 
 def timeline(trace):
     """Generates interactive timeline of events in a Trace instance"""
+
+    # Initialize vis
+    vis_init()
 
     # Calculate some column values we need for visualization
     df = trace.events.copy()
@@ -27,16 +28,6 @@ def timeline(trace):
     # Generate colormap by function
     funcs = df["Name"].unique().tolist()
     cmap = {funcs[i]: palette[i] for i in range(len(funcs))}
-
-    # Apply css customizations, remove multiple tooltips for overlapping glyphs
-    css(
-        """
-        div.bk-tooltip > div.bk > div.bk:not(:last-child) {
-            display:none !important;
-        }
-        div.bk { cursor: default !important; }
-        """
-    )
 
     # Custom tooltip and hover behavior
     hover = HoverTool(
@@ -79,7 +70,7 @@ def timeline(trace):
             active_tools=["xwheel_zoom"],
             cmap=cmap,
             default_tools=["xpan", "xwheel_zoom"],
-            height=len(df["Rank"].unique()) * 35,
+            height=len(df["Rank"].unique()) * 25 + 150,
             invert_yaxis=True,
             line_width=0.2,
             line_color="black",

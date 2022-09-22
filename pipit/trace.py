@@ -3,8 +3,8 @@
 #
 # SPDX-License-Identifier: MIT
 
-
-from vis.timeline import timeline
+from pipit.vis.timeline import timeline
+from pipit.vis.comm_heatmap import comm_heatmap
 
 
 class Trace:
@@ -35,3 +35,6 @@ class Trace:
 
     def timeline(self):
         return timeline(self)
+
+    def comm_heatmap(self, comm_type):
+        return comm_heatmap(self, comm_type)

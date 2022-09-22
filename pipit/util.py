@@ -13,10 +13,29 @@ def in_notebook():
 
 
 def css(css):
+    """Inject custom CSS to notebook"""
     if in_notebook():
         from IPython.display import HTML, display
 
         display(HTML("<style>" + css + "</style>"))
+
+
+def vis_init():
+    """Initialize environment for visualization"""
+    # Initialize Holoviews and Bokeh
+    import holoviews as hv
+
+    hv.extension("bokeh", logo=False)
+
+    # Apply css customizations, remove multiple tooltips for overlapping glyphs
+    css(
+        """
+        div.bk-tooltip > div.bk > div.bk:not(:last-child) {
+            display:none !important;
+        }
+        div.bk { cursor: default !important; }
+        """
+    )
 
 
 def formatter(t):
