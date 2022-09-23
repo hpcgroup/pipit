@@ -1,3 +1,4 @@
+import pandas as pd
 import holoviews as hv
 from bokeh.models import HoverTool, PrintfTickFormatter
 from bokeh.palettes import Category20_20 as palette
@@ -14,9 +15,22 @@ def timeline(trace):
     # Initialize vis
     vis_init()
 
-    # Calculate some column values we need for visualization
-    df = trace.events.copy()
-    df["Rank"] = df["Rank"].astype("int")
+    # Calculate inc and exc times if not already done
+    if not "Inc Time (ns)" in trace.events:
+        trace.calculate_inc_time()
+        trace.calculate_exc_time()
+
+    # Filter by "Enter" events
+    events = trace.events[trace.events["Event"] == "Enter"]
+
+    # Create a temporary DF specifically for timeline
+    df = pd.DataFrame()
+    df["Name"] = events["Name"]
+    df["Rank"] = events["Location ID"].astype("int")
+    df["Inc Time (s)"] = events["Inc Time (ns)"] * 1e-9
+    df["Exc Time (s)"] = events["Exc Time (ns)"] * 1e-9
+    df["Enter"] = events["Timestamp (ns)"] * 1e-9
+    df["Leave"] = events["Matching Time"] * 1e-9
     df["y0"] = df["Rank"] - 0.5
     df["y1"] = df["Rank"] + 0.5
     df["mid"] = (df["Enter"] + df["Leave"]) / 2
@@ -41,7 +55,7 @@ def timeline(trace):
 
     # Bokeh-specific customizations
     def bokeh_hook(plot, _):
-        plot.state.toolbar_location = "above"
+        plot.state.toolbar_location = "right"
         plot.state.ygrid.visible = False
         plot.state.legend.label_text_font_size = "9pt"
 
@@ -70,11 +84,10 @@ def timeline(trace):
             active_tools=["xwheel_zoom"],
             cmap=cmap,
             default_tools=["xpan", "xwheel_zoom"],
-            height=len(df["Rank"].unique()) * 25 + 150,
+            height=len(df["Rank"].unique()) * 20 + 125,
             invert_yaxis=True,
-            line_width=0.2,
+            line_width=0.35,
             line_color="black",
-            line_alpha=0.5,
             responsive=True,
             title="Events Timeline",
             xaxis="top",
@@ -84,7 +97,7 @@ def timeline(trace):
             yticks=df["Rank"].unique(),
             hooks=[bokeh_hook],
             show_grid=True,
-            tools=[hover],
+            tools=[hover, "box_zoom"],
             fill_color="Name",
             fontsize={
                 "title": 10,
