@@ -16,7 +16,7 @@ def timeline(trace):
     vis_init()
 
     # Calculate inc and exc times if not already done
-    if not "Inc Time (ns)" in trace.events:
+    if "Inc Time (ns)" not in trace.events:
         trace.calculate_inc_time()
         trace.calculate_exc_time()
 
