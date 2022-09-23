@@ -1,5 +1,5 @@
 import holoviews as hv
-from bokeh.models import HoverTool
+from bokeh.models import HoverTool, PrintfTickFormatter
 from pipit.util import vis_init
 
 
@@ -31,8 +31,8 @@ def comm_heatmap(trace, comm_type):
         colorbar=True,
         cmap="viridis",
         tools=[hover],
-        xlabel="Sender ID",
-        ylabel="Receiver ID",
+        xlabel="Sender",
+        ylabel="Receiver",
         xticks=list(range(0, ranks)),
         yticks=list(range(0, ranks)),
         fontsize={
@@ -41,4 +41,9 @@ def comm_heatmap(trace, comm_type):
         },
         padding=0,
         title="Communication Heatmap",
+        yformatter=PrintfTickFormatter(format="Process %d"),
+        xformatter=PrintfTickFormatter(format="Process %d"),
+        xaxis="top",
+        invert_yaxis=True,
+        xrotation=60,
     )
