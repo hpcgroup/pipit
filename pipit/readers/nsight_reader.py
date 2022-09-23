@@ -69,9 +69,8 @@ class NSightReader:
     how the cct would look like within their program.
 
     TODOS:
-    Fixed taking in mutliple roots, but context IDS will be weird 
+    Fixed taking in mutliple roots, but context IDS will be weird
     if range stack is the same for multiple roots
-    
     Add more Comments
 
     """
@@ -88,7 +87,7 @@ class NSightReader:
         for i in range(len(df)):
             rs_len = len(df.iloc[i]["RangeStack"].split(":")) - 1
             print(prev_rs_len, rs_len)
-            
+
             # If root
             if rs_len == 1:
                 root = graph.Node(-1, df.iloc[i]["Name"], None)
@@ -131,10 +130,9 @@ class NSightReader:
                 stack.append(df.iloc[i])
 
             else:
-                for j in range(0, (prev_rs_len+1) - rs_len):
+                for j in range(0, (prev_rs_len + 1) - rs_len):
                     stack.pop()
                     func_path.pop()
-
 
                 path = "->".join(func_path)
                 func_path.append(df.iloc[i]["Name"])
@@ -156,7 +154,6 @@ class NSightReader:
 
                 # Adding child function to stack
                 stack.append(df.iloc[i])
-
 
             prev_rs_len = rs_len
 
