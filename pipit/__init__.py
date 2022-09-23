@@ -4,4 +4,3 @@
 # SPDX-License-Identifier: MIT
 
 from .trace import Trace  # noqa: F401
-from vis.timeline import timeline  # noqa: F401

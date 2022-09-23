@@ -20,7 +20,7 @@ class Node:
     def add_child(self, child_node):
         self.children.append(child_node)
 
-    def add_calling_contex_id(self, calling_context_id):
+    def add_calling_context_id(self, calling_context_id):
         self.calling_context_ids.append(calling_context_id)
 
     def get_level(self):
