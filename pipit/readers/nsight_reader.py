@@ -26,9 +26,6 @@ class NSightReader:
 
         graph = self.create_cct()
 
-        print(graph.get_graphs()[0])
-        print(graph.calling_context_id_map)
-
         # Copy data into new dataframe
         df = self.df
         df2 = df.copy()
@@ -41,7 +38,6 @@ class NSightReader:
 
         for i in range(len(df)):
             node = graph.get_node(df.iloc[i]["RangeStack"])
-            print(node)
             df.at[i, "Graph_Node"] = node
             df.at[i, "Level"] = node.level
 
@@ -73,7 +69,9 @@ class NSightReader:
     how the cct would look like within their program.
 
     TODOS:
-    Fix to work with multiple roots
+    Fixed taking in mutliple roots, but context IDS will be weird 
+    if range stack is the same for multiple roots
+    
     Add more Comments
 
     """
@@ -84,14 +82,15 @@ class NSightReader:
         # Creating calling context graph
         call_graph = graph.Graph()
         callpath = dict()
-        func_path = []
-        stack = []
+        stack, func_path = [], []
+        prev_rs_len, rs_len = 0, 0
 
         for i in range(len(df)):
-            # create a root
-
-            # check if true
-            if call_graph.is_empty():
+            rs_len = len(df.iloc[i]["RangeStack"].split(":")) - 1
+            print(prev_rs_len, rs_len)
+            
+            # If root
+            if rs_len == 1:
                 root = graph.Node(-1, df.iloc[i]["Name"], None)
                 root.add_calling_context_id(df.iloc[i]["RangeStack"])
                 root.add_time(df.iloc[i]["Start (ns)"], df.iloc[i]["End (ns)"])
@@ -108,60 +107,57 @@ class NSightReader:
 
                 callpath[path] = root
 
-            else:
-                curr_start = df.iloc[i]["Start (ns)"]
-                prev_end = stack[len(stack) - 1]["End (ns)"]
+            # If child
+            elif rs_len > prev_rs_len:
+                path = "->".join(func_path)
+                func_path.append(df.iloc[i]["Name"])
+                path2 = "->".join(func_path)
 
-                # CASE 1 Function in another function
-                if prev_end > curr_start:
+                if path2 not in callpath:
+                    parent = callpath[path]
+                    node = graph.Node(-1, df.iloc[i]["Name"], parent)
+                    node.add_calling_context_id(df.iloc[i]["RangeStack"])
+                    node.add_time(df.iloc[i]["Start (ns)"], df.iloc[i]["End (ns)"])
+                    parent.add_child(node)
 
-                    path = "->".join(func_path)
-                    func_path.append(df.iloc[i]["Name"])
-                    path2 = "->".join(func_path)
+                    callpath[path2] = node
+                    call_graph.add_to_map(df.iloc[i]["RangeStack"], node)
 
-                    if path2 not in callpath:
-                        parent = callpath[path]
-                        node = graph.Node(-1, df.iloc[i]["Name"], parent)
-                        node.add_calling_context_id(df.iloc[i]["RangeStack"])
-                        node.add_time(df.iloc[i]["Start (ns)"], df.iloc[i]["End (ns)"])
-                        parent.add_child(node)
-
-                        callpath[path2] = node
-                        call_graph.add_to_map(df.iloc[i]["RangeStack"], node)
-
-                    else:
-                        callpath[path2].add_calling_context_id(df.iloc[i]["RangeStack"])
-                        call_graph.add_to_map(df.iloc[i]["RangeStack"], callpath[path2])
-
-                    # Adding child function to stack
-                    stack.append(df.iloc[i])
-
-                # Case #2 Function is outside of the previous function
                 else:
-                    # Fix issue with multiple roots
-                    while stack[len(stack) - 1]["End (ns)"] < curr_start:
-                        stack.pop()
-                        func_path.pop()
+                    callpath[path2].add_calling_context_id(df.iloc[i]["RangeStack"])
+                    call_graph.add_to_map(df.iloc[i]["RangeStack"], callpath[path2])
 
-                    path = "->".join(func_path)
-                    func_path.append(df.iloc[i]["Name"])
-                    path2 = "->".join(func_path)
+                # Adding child function to stack
+                stack.append(df.iloc[i])
 
-                    if path2 not in callpath:
-                        parent = callpath[path]
-                        node = graph.Node(-1, df.iloc[i]["Name"], parent)
-                        node.add_calling_context_id(df.iloc[i]["RangeStack"])
-                        node.add_time(df.iloc[i]["Start (ns)"], df.iloc[i]["End (ns)"])
-                        parent.add_child(node)
+            else:
+                for j in range(0, (prev_rs_len+1) - rs_len):
+                    stack.pop()
+                    func_path.pop()
 
-                        callpath[path2] = node
-                        call_graph.add_to_map(df.iloc[i]["RangeStack"], node)
 
-                    else:
-                        callpath[path2].add_calling_context_id(df.iloc[i]["RangeStack"])
-                        call_graph.add_to_map(df.iloc[i]["RangeStack"], callpath[path2])
+                path = "->".join(func_path)
+                func_path.append(df.iloc[i]["Name"])
+                path2 = "->".join(func_path)
 
-                    # Adding child function to stack
-                    stack.append(df.iloc[i])
+                if path2 not in callpath:
+                    parent = callpath[path]
+                    node = graph.Node(-1, df.iloc[i]["Name"], parent)
+                    node.add_calling_context_id(df.iloc[i]["RangeStack"])
+                    node.add_time(df.iloc[i]["Start (ns)"], df.iloc[i]["End (ns)"])
+                    parent.add_child(node)
+
+                    callpath[path2] = node
+                    call_graph.add_to_map(df.iloc[i]["RangeStack"], node)
+
+                else:
+                    callpath[path2].add_calling_context_id(df.iloc[i]["RangeStack"])
+                    call_graph.add_to_map(df.iloc[i]["RangeStack"], callpath[path2])
+
+                # Adding child function to stack
+                stack.append(df.iloc[i])
+
+
+            prev_rs_len = rs_len
 
         return call_graph
