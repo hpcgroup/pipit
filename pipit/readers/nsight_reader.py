@@ -86,7 +86,6 @@ class NSightReader:
 
         for i in range(len(df)):
             rs_len = len(df.iloc[i]["RangeStack"].split(":")) - 1
-            print(prev_rs_len, rs_len)
 
             # If root
             if rs_len == 1:
