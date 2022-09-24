@@ -4,13 +4,10 @@
 # SPDX-License-Identifier: MIT
 
 import os
-import sys
 import shutil
-import struct
 from glob import glob
 
 import pytest
-import numpy as np
 
 
 @pytest.fixture
