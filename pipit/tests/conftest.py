@@ -43,4 +43,3 @@ def ping_pong_otf2_trace(data_dir, tmpdir):
     shutil.copy(os.path.join(otf2_dir, "traces.otf2"), str(tmpdir))
 
     return tmpdir
-
