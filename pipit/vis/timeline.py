@@ -49,7 +49,7 @@ def timeline(trace, palette=default_palette, max_ranks=16):
 
     # Filter by ranks
     n_ranks = events["Location ID"].astype("int").max() + 1
-    dividend = round(n_ranks / max_ranks)
+    dividend = max(1, round(n_ranks / max_ranks))
     events = events[(events["Location ID"].astype("int")) % dividend == 0]
 
     # Create a temporary DF specifically for timeline
