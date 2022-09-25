@@ -1,11 +1,11 @@
 import pandas as pd
 import holoviews as hv
-from bokeh.models import HoverTool, PrintfTickFormatter
 from holoviews import opts, streams
-from pipit.util import formatter, vis_init
+from bokeh.models import HoverTool, PrintfTickFormatter
+from pipit.util import clamp, formatter, vis_init
 
 # Min fraction of viewport an event has to occupy to be drawn
-min_viewport_percentage = 1 / 3840
+min_viewport_percentage = 1 / 1920
 
 default_palette = (
     "#c8a83a",
@@ -31,7 +31,7 @@ default_palette = (
 )
 
 
-def timeline(trace, palette=default_palette):
+def timeline(trace, palette=default_palette, max_ranks=16):
     """Generates interactive timeline of events in a Trace instance"""
 
     # Initialize vis
@@ -40,10 +40,17 @@ def timeline(trace, palette=default_palette):
     # Calculate inc and exc times if not already done
     if "Inc Time (ns)" not in trace.events:
         trace.calculate_inc_time()
+
+    if "Exc Time (ns)" not in trace.events:
         trace.calculate_exc_time()
 
     # Filter by "Enter" events
     events = trace.events[trace.events["Event"] == "Enter"]
+
+    # Filter by ranks
+    n_ranks = events["Location ID"].astype("int").max() + 1
+    dividend = round(n_ranks / max_ranks)
+    events = events[(events["Location ID"].astype("int")) % dividend == 0]
 
     # Create a temporary DF specifically for timeline
     df = pd.DataFrame()
@@ -53,8 +60,8 @@ def timeline(trace, palette=default_palette):
     df["Exc Time (s)"] = events["Exc Time (ns)"] * 1e-9
     df["Enter"] = events["Timestamp (ns)"] * 1e-9
     df["Leave"] = events["Matching Time"] * 1e-9
-    df["y0"] = df["Rank"] - 0.5
-    df["y1"] = df["Rank"] + 0.5
+    df["y0"] = df["Rank"] - (dividend / 2 - 0.5)
+    df["y1"] = df["Rank"] + (dividend / 2 + 0.5)
     df["mid"] = (df["Enter"] + df["Leave"]) / 2
     df["inc_time_pct"] = df["Inc Time (s)"] / df["Leave"].max()
     df["exc_time_pct"] = df["Exc Time (s)"] / df["Leave"].max()
@@ -121,7 +128,7 @@ def timeline(trace, palette=default_palette):
             active_tools=["xwheel_zoom"],
             cmap=cmap,
             default_tools=["xpan", "xwheel_zoom"],
-            height=len(df["Rank"].unique()) * 20 + 100,
+            height=clamp(len(df["Rank"].unique()) * 20 + 100, 150, 1000),
             invert_yaxis=True,
             line_width=0.35,
             line_color="black",
@@ -135,7 +142,7 @@ def timeline(trace, palette=default_palette):
             yticks=df["Rank"].unique(),
             hooks=[bokeh_hook],
             show_grid=True,
-            tools=[hover, "xbox_zoom"],
+            tools=[hover, "xbox_zoom", "tap"],
             fill_color="Name",
             fontsize={
                 "title": 10,
