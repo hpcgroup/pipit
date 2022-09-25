@@ -1,9 +1,10 @@
 import holoviews as hv
-from bokeh.models import HoverTool, PrintfTickFormatter
-from pipit.util import vis_init
+from bokeh.models import HoverTool, PrintfTickFormatter, AdaptiveTicker
+from pipit.util import clamp, vis_init
+import numpy as np
 
 
-def comm_heatmap(trace, comm_type):
+def comm_heatmap(trace, comm_type="counts", label_threshold=16, cmap="blues"):
     """Generates interactive plot of comm_matrix"""
 
     # Initialize vis
@@ -20,7 +21,8 @@ def comm_heatmap(trace, comm_type):
     hover = HoverTool(
         tooltips="""
             <div>
-                <span style="font-weight: bold;">Process $x{0.} → $y{0.}</span>
+                <span style="font-weight: bold;">Process IDs:</span>&nbsp;
+                <span style="font-family: Monaco, monospace;">$x{0.} → $y{0.}</span>
             </div>
             <div>
                 <span style="font-weight: bold;">Count:</span>&nbsp;
@@ -30,16 +32,16 @@ def comm_heatmap(trace, comm_type):
     )
 
     # Generate heatmap image
-    return hv.Image(comm_matrix, bounds=bounds).opts(
-        width=max(160 + ranks * 20, 300),
-        height=max(65 + ranks * 20, 200),
+    image = hv.Image(comm_matrix, bounds=bounds).opts(
+        width=clamp(160 + ranks * 35, 300, 850),
+        height=clamp(65 + ranks * 25, 200, 650),
         colorbar=True,
-        cmap="viridis",
+        cmap=cmap,
         tools=[hover],
         xlabel="Sender",
         ylabel="Receiver",
-        xticks=list(range(0, ranks)),
-        yticks=list(range(0, ranks)),
+        xticks=AdaptiveTicker(base=2),
+        yticks=AdaptiveTicker(base=2),
         fontsize={
             "title": 10,
             "legend": 8,
@@ -52,3 +54,17 @@ def comm_heatmap(trace, comm_type):
         invert_yaxis=True,
         xrotation=60,
     )
+
+    if ranks > label_threshold:
+        return image
+
+    # Generate labels
+    max_val = np.amax(comm_matrix)
+    labels = hv.Labels(image).opts(
+        text_color="z",
+        color_levels=[0, max_val / 2, max_val],
+        cmap=["black", "white"],
+        text_font_size="8pt",
+    )
+
+    return image * labels

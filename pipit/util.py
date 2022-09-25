@@ -44,3 +44,7 @@ def formatter(t):
         return str(round(t * 1000)) + "ms"
     else:
         return str(round(t, 3)) + "s"
+
+
+def clamp(n, smallest, largest):
+    return max(smallest, min(n, largest))
