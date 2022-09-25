@@ -1,15 +1,37 @@
 import pandas as pd
 import holoviews as hv
 from bokeh.models import HoverTool, PrintfTickFormatter
-from bokeh.palettes import Category20_20
 from holoviews import opts, streams
 from pipit.util import formatter, vis_init
 
 # Min fraction of viewport an event has to occupy to be drawn
 min_viewport_percentage = 1 / 3840
 
+default_palette = (
+    "#c8a83a",
+    "#7662ca",
+    "#5bb645",
+    "#bf51b6",
+    "#9db641",
+    "#da4b83",
+    "#5dbd83",
+    "#d2404e",
+    "#3fbcc1",
+    "#d4502d",
+    "#6488ca",
+    "#e08a3c",
+    "#cb89cb",
+    "#3b804c",
+    "#9e4a6b",
+    "#68782c",
+    "#e28981",
+    "#bcab6c",
+    "#a55236",
+    "#946d2e",
+)
 
-def timeline(trace, palette=Category20_20):
+
+def timeline(trace, palette=default_palette):
     """Generates interactive timeline of events in a Trace instance"""
 
     # Initialize vis
@@ -52,11 +74,15 @@ def timeline(trace, palette=Category20_20):
             </div>
             <div>
                 <span style="font-weight: bold;">Total:</span>&nbsp;
-                <span style="font-family: Monaco, monospace;">@{inc_time_form} (@inc_time_pct{0.00%})</span>
+                <span style="font-family: Monaco, monospace;">@{inc_time_form}
+                    (@inc_time_pct{0.00%})
+                </span>
             </div>
             <div>
                 <span style="font-weight: bold;">Self:</span>&nbsp;
-                <span style="font-family: Monaco, monospace;">@{exc_time_form} (@exc_time_pct{0.00%})</span>
+                <span style="font-family: Monaco, monospace;">@{exc_time_form}
+                    (@exc_time_pct{0.00%})
+                </span>
             </div>
         """,
         point_policy="follow_mouse",
