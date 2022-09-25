@@ -46,6 +46,11 @@ class Trace:
         Returns:
         A 2D Numpy Array that represents the communication matrix for all P2P
         messages of the given trace
+
+        Note:
+        The first dimension of the returned 2d array
+        is senders and the second dimension is receivers
+        ex) comm_matrix[sender_rank][receiver_rank]
         """
 
         # get the list of ranks/process ids
@@ -94,9 +99,6 @@ class Trace:
             loops through all the communication events and adds the
             message volumes to the corresponding entry of the 2d array
             using the sender and receiver ranks
-
-            Note: first dimension of the 2d array is senders
-                  and second dimension is receivers
             """
             communication_matrix[sender_ranks[i], receiver_ranks[i]] += message_volumes[
                 i
