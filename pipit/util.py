@@ -22,10 +22,6 @@ def css(css):
 
 def vis_init():
     """Initialize environment for visualization"""
-    # Initialize Holoviews and Bokeh
-    import holoviews as hv
-
-    hv.extension("bokeh", logo=False)
 
     # Apply css customizations, remove multiple tooltips for overlapping glyphs
     css(

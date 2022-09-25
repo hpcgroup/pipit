@@ -1,7 +1,7 @@
 import pandas as pd
 import holoviews as hv
 from bokeh.models import HoverTool, PrintfTickFormatter
-from bokeh.palettes import Category20_20 as palette
+from bokeh.palettes import Category20_20
 from holoviews import opts, streams
 from pipit.util import formatter, vis_init
 
@@ -9,7 +9,7 @@ from pipit.util import formatter, vis_init
 min_viewport_percentage = 1 / 3840
 
 
-def timeline(trace):
+def timeline(trace, palette=Category20_20):
     """Generates interactive timeline of events in a Trace instance"""
 
     # Initialize vis
@@ -46,18 +46,29 @@ def timeline(trace):
     # Custom tooltip and hover behavior
     hover = HoverTool(
         tooltips="""
-            <b>@Name</b> <em>($index)</em><br/>
-            <b>Total:</b> @{inc_time_form} <em>(@inc_time_pct{0.00%})</em><br/>
-            <b>Self:</b> @{exc_time_form} <em>(@exc_time_pct{0.00%})</em><br/>
+            <div>
+                <span style="font-weight: bold;">Name:</span>&nbsp;
+                <span style="font-family: Monaco, monospace;">@Name</span>
+            </div>
+            <div>
+                <span style="font-weight: bold;">Total:</span>&nbsp;
+                <span style="font-family: Monaco, monospace;">@{inc_time_form} (@inc_time_pct{0.00%})</span>
+            </div>
+            <div>
+                <span style="font-weight: bold;">Self:</span>&nbsp;
+                <span style="font-family: Monaco, monospace;">@{exc_time_form} (@exc_time_pct{0.00%})</span>
+            </div>
         """,
         point_policy="follow_mouse",
     )
 
     # Bokeh-specific customizations
     def bokeh_hook(plot, _):
-        plot.state.toolbar_location = "right"
+        plot.state.toolbar_location = "above"
         plot.state.ygrid.visible = False
-        plot.state.legend.label_text_font_size = "9pt"
+        plot.state.legend.label_text_font_size = "8pt"
+        plot.state.legend.location = "right"
+        plot.state.legend.spacing = 0
 
     # Callback for hv.DynamicMap
     # Generates hv.Rectangles based on current x-range
@@ -70,8 +81,8 @@ def timeline(trace):
         min_inc_time = min_viewport_percentage * viewport_size
 
         filtered = df[
-            (df["Leave"] > x_min)
-            & (df["Enter"] < x_max)
+            (df["Leave"] > x_min - (viewport_size * 0.25))
+            & (df["Enter"] < x_max + (viewport_size * 0.25))
             & (df["Inc Time (s)"] > min_inc_time)
         ]
         return hv.Rectangles(filtered, ["Enter", "y0", "Leave", "y1"])
@@ -84,20 +95,21 @@ def timeline(trace):
             active_tools=["xwheel_zoom"],
             cmap=cmap,
             default_tools=["xpan", "xwheel_zoom"],
-            height=len(df["Rank"].unique()) * 20 + 125,
+            height=len(df["Rank"].unique()) * 20 + 100,
             invert_yaxis=True,
             line_width=0.35,
             line_color="black",
             responsive=True,
             title="Events Timeline",
             xaxis="top",
+            legend_position="right",
             xlabel="",
             yformatter=PrintfTickFormatter(format="Process %d"),
             ylabel="",
             yticks=df["Rank"].unique(),
             hooks=[bokeh_hook],
             show_grid=True,
-            tools=[hover, "box_zoom"],
+            tools=[hover, "xbox_zoom"],
             fill_color="Name",
             fontsize={
                 "title": 10,

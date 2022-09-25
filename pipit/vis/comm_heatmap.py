@@ -19,15 +19,20 @@ def comm_heatmap(trace, comm_type):
     # Custom tooltip
     hover = HoverTool(
         tooltips="""
-            <b>Count: @image</b></br>
-            <em>Process $x{0.} → $y{0.}</em>
+            <div>
+                <span style="font-weight: bold;">Process $x{0.} → $y{0.}</span>
+            </div>
+            <div>
+                <span style="font-weight: bold;">Count:</span>&nbsp;
+                <span style="font-family: Monaco, monospace;">@image messages</span>
+            </div>
         """
     )
 
     # Generate heatmap image
     return hv.Image(comm_matrix, bounds=bounds).opts(
-        width=max(160 + ranks * 20, 250),
-        height=max(65 + ranks * 20, 150),
+        width=max(160 + ranks * 20, 300),
+        height=max(65 + ranks * 20, 200),
         colorbar=True,
         cmap="viridis",
         tools=[hover],
