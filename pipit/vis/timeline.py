@@ -100,7 +100,7 @@ def timeline(trace, palette=default_palette, max_ranks=16):
         plot.state.toolbar_location = "above"
         plot.state.ygrid.visible = False
         plot.state.legend.label_text_font_size = "8pt"
-        plot.state.legend.location = "right"
+        plot.state.legend.location = "top_right"
         plot.state.legend.spacing = 0
 
     # Callback for hv.DynamicMap
@@ -128,7 +128,7 @@ def timeline(trace, palette=default_palette, max_ranks=16):
             active_tools=["xwheel_zoom"],
             cmap=cmap,
             default_tools=["xpan", "xwheel_zoom"],
-            height=clamp(len(df["Rank"].unique()) * 20 + 100, 150, 1000),
+            height=clamp(len(df["Rank"].unique()) * 20 + 100, 180, 1000),
             invert_yaxis=True,
             line_width=0.35,
             line_color="black",
