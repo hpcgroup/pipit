@@ -1,5 +1,6 @@
 import readline
 import projections_constants
+import gzip
 
 class STSReader:
     def __init__(self, file_location):
@@ -31,10 +32,32 @@ class STSReader:
                 chare_id = int(line_arr[4])
                 name = self.chares[chare_id] + '::' + entry_name
                 self.entry_chares[id] = name
-                
+        
+
+        self.sts_file.close()
         print(self.chares)
         print('\n\n\n')
         print(self.entry_chares)
+
+class LogReader:
+    def __init__(self, executable_location) -> None:
+        self.executable_location = executable_location
+    
+    def read_file(self, pe_num):
+        log_file = gzip.open(self.executable_location + '.prj.' + str(pe_num) + '.log.gz', 'rt')
+        for line in log_file:
+            line_arr = line.split()
+            print(line_arr)
+            if line_arr[0] == projections_constants.BEGIN_IDLE:
+                time = int(line_arr[1])
+                pe = int(line_arr[2])
+
+            elif line_arr[0] == projections_constants.END_IDLE:
+                time = int(line_arr[1])
+                pe = int(line_arr[2])
+
+            elif line_arr[0] == projections_constants.BEGIN_PACK:                
+
 
 
 
@@ -43,5 +66,6 @@ class STSReader:
     
 
 
-x = STSReader('../tests/data/ping-pong-projections/pingpong.prj.sts')
+x = LogReader('../tests/data/ping-pong-projections/pingpong')
+x.read_file(0)
 
