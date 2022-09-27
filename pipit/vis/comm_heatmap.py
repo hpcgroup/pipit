@@ -40,8 +40,8 @@ def comm_heatmap(trace, comm_type="counts", label_threshold=16, cmap="blues"):
         tools=[hover],
         xlabel="Sender",
         ylabel="Receiver",
-        xticks=AdaptiveTicker(base=2),
-        yticks=AdaptiveTicker(base=2),
+        xticks=AdaptiveTicker(base=2, min_interval=1, max_interval=None),
+        yticks=AdaptiveTicker(base=2, min_interval=1, max_interval=None),
         fontsize={
             "title": 10,
             "legend": 8,
