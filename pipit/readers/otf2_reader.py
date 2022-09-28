@@ -3,12 +3,12 @@
 #
 # SPDX-License-Identifier: MIT
 
+
 import math
 import otf2
 import pandas as pd
 import multiprocessing as mp
 import pipit.trace
-from pipit.graph import Graph, Node
 
 
 class OTF2Reader:
@@ -364,88 +364,6 @@ class OTF2Reader:
 
         return events_dataframe
 
-    def create_cct(self):
-        """
-        To Do:
-        Add Comments
-
-        Question:
-        What are calling context ids for hpctoolkit? Both entry and exit rows
-        have the same node, but do calling context ids correspond to something
-        in the DataFrame or something outside of the trace like
-        the original hpctoolkit data?
-
-        Currently, the DataFrame index of the entry row is being stored
-        in the node's calling context ids. This doesn't really have much of a
-        purpose right now. What should we be storing as calling context ids
-        for OTF2? Perhaps there should also be a way to map entry rows to
-        corresponding exit rows (could either have a separate matching indices
-        column or store both entry and exit indices as calling context ids).
-        """
-
-        graph = Graph()
-        callpath_to_node = dict()
-        graph_nodes = [None for i in range(len(self.events))]
-        node_id = 0
-
-        for location_id in set(self.events["Location ID"]):
-            location_df = self.events.loc[
-                (self.events["Name"] != "N/A")
-                & (self.events["Location ID"] == location_id)
-            ]
-
-            curr_depth = 0
-            callpath = ""
-            df_indices = list(location_df.index)
-            function_names = list(location_df["Name"])
-            event_types = list(location_df["Event Type"])
-            functions_stack, nodes_stack = [], []
-
-            for i in range(len(location_df)):
-                curr_df_index, evt_type, function_name = (
-                    df_indices[i],
-                    event_types[i],
-                    function_names[i],
-                )
-
-                if evt_type == "Enter":
-                    functions_stack.append(function_name)
-                    callpath = "->".join(functions_stack)
-
-                    if curr_depth == 0:
-                        parent_node = None
-                    else:
-                        parent_node = nodes_stack[-1]
-
-                    if callpath in callpath_to_node:
-                        curr_node = callpath_to_node[callpath]
-                    else:
-                        curr_node = Node(
-                            node_id, function_name, parent_node, curr_depth
-                        )
-                        callpath_to_node[callpath] = curr_node
-                        node_id += 1
-
-                        if curr_depth == 0:
-                            graph.add_root(curr_node)
-                        else:
-                            parent_node.add_child(curr_node)
-
-                    curr_node.add_calling_context_id(curr_df_index)
-                    graph.add_to_map(curr_df_index, curr_node)
-
-                    nodes_stack.append(curr_node)
-                    graph_nodes[curr_df_index] = curr_node
-                    curr_depth += 1
-                else:
-                    curr_node = nodes_stack.pop()
-                    graph_nodes[curr_df_index] = curr_node
-
-                    functions_stack.pop()
-                    curr_depth -= 1
-
-        self.events["Graph_Node"] = graph_nodes
-
     def read(self):
         """
         Returns a TraceData object for the otf2 file
@@ -458,5 +376,8 @@ class OTF2Reader:
             # close the trace and open it later per process
             trace.close()
         self.events = self.read_events()  # events
-        self.create_cct()  # cct
-        return pipit.trace.Trace(self.definitions, self.events)
+
+        trace = pipit.trace.Trace(self.definitions, self.events, None)
+        trace.create_cct()  # create cct
+
+        return trace
