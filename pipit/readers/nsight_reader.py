@@ -33,24 +33,22 @@ class NSightReader:
         # Create new columns for df with start time
         df["Event Type"] = "Enter"
         df["Time"] = df["Start (ns)"]
-        df["Graph_Node"] = None
-        df["Level"] = None
 
-        for i in range(len(df)):
-            node = graph.get_node(df.iloc[i]["RangeStack"])
-            df.at[i, "Graph_Node"] = node
-            df.at[i, "Level"] = node.level
+        # # Update this to work with MAD data
+        # for i in range(len(df)):
+        #     node = graph.get_node(df.iloc[i]["RangeStack"])
+        #     df.at[i, "Graph_Node"] = node
+        #     df.at[i, "Level"] = node.level
+
+        df["Graph_Node"] = df.apply(lambda x: graph.get_node(x["RangeStack"]), axis=1)
+        df["Level"] = df.apply(lambda x: graph.get_node(x["RangeStack"]).level, axis=1)
 
         # Create new columns for df2 with end time
         df2["Event Type"] = "Exit"
         df2["Time"] = df2["End (ns)"]
 
-        for i in range(len(df2)):
-            node = graph.get_node(df2.iloc[i]["RangeStack"])
-            df2.at[i, "Graph_Node"] = node
-            df2.at[i, "Level"] = node.level
-
-        df2.Level = df2.Level.astype(int)
+        df2["Graph_Node"] = df2.apply(lambda x: graph.get_node(x["RangeStack"]), axis=1)
+        df2["Level"] = df2.apply(lambda x: graph.get_node(x["RangeStack"]).level, axis=1)
 
         # Combine dataframes together
         df = pd.concat([df, df2])
