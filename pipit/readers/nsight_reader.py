@@ -48,7 +48,9 @@ class NSightReader:
         df2["Time"] = df2["End (ns)"]
 
         df2["Graph_Node"] = df2.apply(lambda x: graph.get_node(x["RangeStack"]), axis=1)
-        df2["Level"] = df2.apply(lambda x: graph.get_node(x["RangeStack"]).level, axis=1)
+        df2["Level"] = df2.apply(
+            lambda x: graph.get_node(x["RangeStack"]).level, axis=1
+        )
 
         # Combine dataframes together
         df = pd.concat([df, df2])

@@ -32,6 +32,14 @@ class Trace:
 
         return HPCToolkitReader(dirname).read()
 
+    @staticmethod
+    def from_nsight(dirname):
+        """Read an NSight trace into a new Trace object."""
+        # import this lazily to avoid circular dependencies
+        from .readers.nsight_reader import NSightReader
+
+        return NSightReader(dirname).read()
+
     def comm_matrix(self, comm_type="bytes"):
         """
         Communication Matrix for Peer-to-Peer (P2P) MPI messages
