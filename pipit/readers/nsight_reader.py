@@ -34,12 +34,6 @@ class NSightReader:
         df["Event Type"] = "Enter"
         df["Time"] = df["Start (ns)"]
 
-        # # Update this to work with MAD data
-        # for i in range(len(df)):
-        #     node = graph.get_node(df.iloc[i]["RangeStack"])
-        #     df.at[i, "Graph_Node"] = node
-        #     df.at[i, "Level"] = node.level
-
         df["Graph_Node"] = df.apply(lambda x: graph.get_node(x["RangeStack"]), axis=1)
         df["Level"] = df.apply(lambda x: graph.get_node(x["RangeStack"]).level, axis=1)
 
