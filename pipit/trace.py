@@ -53,6 +53,7 @@ class Trace:
         if "Inc Time (ns)" not in self.events.columns:
             # 4 new columns that will be added to the DataFrame
             children = [None for i in range(len(self.events))]
+            matching_time = [float("nan") for i in range(len(self.events))]
             matching_index = [float("nan") for i in range(len(self.events))]
             inc_time = [float("nan") for i in range(len(self.events))]
             depth = [float("nan") for i in range(len(self.events))]
@@ -81,7 +82,7 @@ class Trace:
                 indices for the current callpate and calculate metrics &
                 match parents with children accordingly.
                 """
-                curr_depth, indices_stack, df_indices = 0, [], list(location_df.index)
+                curr_depth, stack, df_indices = 0, [], list(location_df.index)
 
                 """
                 copies of two columns as lists
@@ -108,11 +109,11 @@ class Trace:
                             """
                             if the current event is a child of another (curr depth > 0),
                             get the dataframe index of the parent event using the
-                            indices stack and append the current DataFrame index to the
+                            stack and append the current DataFrame index to the
                             parent's children list
                             """
 
-                            parent_df_index = indices_stack[-1]
+                            parent_df_index = stack[-1][0]
 
                             if children[parent_df_index] is None:
                                 """
@@ -132,9 +133,9 @@ class Trace:
 
                         """
                         Whenever an entry point for a function call is encountered,
-                        add the DataFrame index of the row to the indices stack
+                        add the DataFrame index and timestamp of the row to the stack
                         """
-                        indices_stack.append(curr_df_index)
+                        stack.append((curr_df_index, timestamp))
 
                         depth[curr_df_index] = curr_depth
                         curr_depth += 1  # increment the depth of the call stack
@@ -142,12 +143,18 @@ class Trace:
                     # if the row is the exit point of a function call
                     else:
                         """
-                        get the DataFrame index of the corresponding enter row
-                        for the current leave row by popping the indices stack
+                        get the DataFrame index and timestamp of the
+                        corresponding enter row for the current leave
+                        row by popping the stack
                         """
-                        enter_df_index = (
-                            indices_stack.pop()
-                        )  # corresponding enter event
+                        enter_df_index, enter_timestamp = stack.pop()
+
+                        """
+                        add the matching times to
+                        the appropriate positions in the list
+                        """
+                        matching_time[enter_df_index] = timestamp
+                        matching_time[curr_df_index] = enter_timestamp
 
                         """
                         add the matching DataFrame indices to
@@ -175,6 +182,7 @@ class Trace:
             self.events["Depth"] = depth
             self.events["Children"] = children
             self.events["Matching Index"] = matching_index
+            self.events["Matching Timestamp"] = matching_time
             self.events["Inc Time (ns)"] = inc_time
 
     def calculate_exc_time(self):
