@@ -5,7 +5,6 @@
 
 import pandas as pd
 import pipit.trace
-import pipit.graph as graph
 
 
 class NSightReader:
@@ -45,7 +44,7 @@ class NSightReader:
         # Checks if multi-process trace
         if len(set(df.loc[:, "PID"])) == 1:
             df.drop(["PID"], axis=1, inplace=True)
-            # Checks if multi-threaded trace 
+            # Checks if multi-threaded trace
             if len(set(df.loc[:, "TID"])) == 1:
                 df.drop(["TID"], axis=1, inplace=True)
 
@@ -53,7 +52,6 @@ class NSightReader:
         else:
             if set(df.loc[:, "PID"]) == set(df.loc[:, "TID"]):
                 df.drop(["TID"], axis=1, inplace=True)
-
 
         df.sort_values(by="Timestamp (ns)", ascending=True, inplace=True)
 
