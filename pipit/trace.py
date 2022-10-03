@@ -167,8 +167,7 @@ class Trace:
     names, process id, duration in bin, and graph node.
 
     Issues:
-    1) Need to implement if start_time starts in the middle of a function
-    2) Need to optimize if possible.
+    1) Need to optimize if possible.
     """
 
     def time_profile(self, start_time=0, end_time=245412000, time_interval=100000000):
@@ -223,41 +222,19 @@ class Trace:
                         ]
 
                 else:
-                    start_t = stack[data["Function Name"]][str(data["Graph_Node"])]
-                    end_t = data["Time"]
+                    # See if time profile started in the middle of a function
+                    if (
+                        data["Function Name"] not in stack
+                        or str(data["Graph_Node"]) not in stack[data["Function Name"]]
+                    ):
+                        end_t = data["Time"]
 
-                    # remove value from dict
-                    stack[data["Function Name"]].pop(str(data["Graph_Node"]))
-
-                    # Find start and end bins for where the nodes need to be added
-                    start_bound = self.binary(
-                        keys_list, 0, len(keys_list) - 1, start_t, True
-                    )
-
-                    end_bound = self.binary(
-                        keys_list, 0, len(keys_list) - 1, end_t, False
-                    )
-
-                    # If the function time fits in one bin
-                    if start_bound == end_bound - 1:
-                        bins[keys_list[start_bound]].append(
-                            Node(
-                                data["Function Name"],
-                                data["Process"],
-                                float(end_t - start_t),
-                                data["Graph_Node"],
-                            )
+                        # Find end time bin
+                        end_bound = self.binary(
+                            keys_list, 0, len(keys_list) - 1, end_t, False
                         )
-                    # if the function time spans across multiple bins with exits given
-                    else:
-                        bins[keys_list[start_bound]].append(
-                            Node(
-                                data["Function Name"],
-                                data["Process"],
-                                float(keys_list[start_bound + 1] - start_t) - 0.1,
-                                data["Graph_Node"],
-                            )
-                        )
+
+                        # Add time to bin
                         bins[keys_list[end_bound - 1]].append(
                             Node(
                                 data["Function Name"],
@@ -266,7 +243,9 @@ class Trace:
                                 data["Graph_Node"],
                             )
                         )
-                        for i in range(start_bound + 1, end_bound - 1):
+
+                        # Add time down the other bins if needed
+                        for i in range(end_bound - 1, 0, -1):
                             bins[keys_list[i]].append(
                                 Node(
                                     data["Function Name"],
@@ -275,6 +254,61 @@ class Trace:
                                     data["Graph_Node"],
                                 )
                             )
+
+                    else:
+                        start_t = stack[data["Function Name"]][str(data["Graph_Node"])]
+                        end_t = data["Time"]
+
+                        # remove value from dict
+                        stack[data["Function Name"]].pop(str(data["Graph_Node"]))
+
+                        # Find start and end bins for where the nodes need to be added
+                        start_bound = self.binary(
+                            keys_list, 0, len(keys_list) - 1, start_t, True
+                        )
+
+                        end_bound = self.binary(
+                            keys_list, 0, len(keys_list) - 1, end_t, False
+                        )
+
+                        # If the function time fits in one bin
+                        if start_bound == end_bound - 1:
+                            bins[keys_list[start_bound]].append(
+                                Node(
+                                    data["Function Name"],
+                                    data["Process"],
+                                    float(end_t - start_t),
+                                    data["Graph_Node"],
+                                )
+                            )
+                        # if the function time spans across
+                        # multiple bins with exits given
+                        else:
+                            bins[keys_list[start_bound]].append(
+                                Node(
+                                    data["Function Name"],
+                                    data["Process"],
+                                    float(keys_list[start_bound + 1] - start_t) - 0.1,
+                                    data["Graph_Node"],
+                                )
+                            )
+                            bins[keys_list[end_bound - 1]].append(
+                                Node(
+                                    data["Function Name"],
+                                    data["Process"],
+                                    float(end_t - keys_list[end_bound - 1]),
+                                    data["Graph_Node"],
+                                )
+                            )
+                            for i in range(start_bound + 1, end_bound - 1):
+                                bins[keys_list[i]].append(
+                                    Node(
+                                        data["Function Name"],
+                                        data["Process"],
+                                        time_interval - 0.1,
+                                        data["Graph_Node"],
+                                    )
+                                )
             # if the stack has left over functions without any exits
             if len(stack) > 0:
                 for k in stack:
@@ -304,5 +338,4 @@ class Trace:
 
         # remove buffer
         bins.pop(end_time)
-
         return bins
