@@ -154,7 +154,7 @@ class Trace:
     1) start_time (inclusive) -
     Input an int to choose where you want the trace to start
 
-    2) end time (exclusive) -
+    2) end time (inclusive) -
     Input an int to choose where you want the trace to end
 
     3) time_interval -
@@ -171,7 +171,7 @@ class Trace:
     2) Need to optimize if possible.
     """
 
-    def time_profile(self, start_time=0, end_time=245412000, time_interval=1000000):
+    def time_profile(self, start_time=0, end_time=245412000, time_interval=100000000):
         if time_interval <= 0:
             raise Exception("Not Valid Time Interval")
         if start_time >= end_time or start_time < 0:
@@ -180,12 +180,12 @@ class Trace:
         # dict of bin times
         # {bin interval times: array of nodes}
         # Node contains name, pid, duration of how long in bin, graph node
-        bins = dict.fromkeys(
-            np.arange(start_time, end_time, time_interval).tolist(), []
-        )
+        bins = np.arange(start_time, end_time, time_interval).tolist()
+
+        bins = {key: [] for key in bins}
 
         # Add cushion for calculating duration time
-        bins[end_time + time_interval] = []
+        bins[end_time] = []
 
         # Create a list of keys to use in binary search function
         keys_list = list(bins.keys())
@@ -212,7 +212,6 @@ class Trace:
             # Going through the subset of certain process
             for i in range(len(sub)):
                 data = sub.iloc[i]
-                # If the event type is enter, add it to the stack
                 if data["Event Type"] == "Enter":
                     if data["Function Name"] not in stack:
                         stack[data["Function Name"]] = {
@@ -222,11 +221,8 @@ class Trace:
                         stack[data["Function Name"]][str(data["Graph_Node"])] = data[
                             "Time"
                         ]
-                # If the event type is exit, find the start time and
-                # end time of the certain function and add to the bins set
+
                 else:
-                    # else find start time in dicts of dicts
-                    # store start and end
                     start_t = stack[data["Function Name"]][str(data["Graph_Node"])]
                     end_t = data["Time"]
 
@@ -237,6 +233,7 @@ class Trace:
                     start_bound = self.binary(
                         keys_list, 0, len(keys_list) - 1, start_t, True
                     )
+
                     end_bound = self.binary(
                         keys_list, 0, len(keys_list) - 1, end_t, False
                     )
@@ -247,7 +244,7 @@ class Trace:
                             Node(
                                 data["Function Name"],
                                 data["Process"],
-                                float(end_t - start_t) - 0.1,
+                                float(end_t - start_t),
                                 data["Graph_Node"],
                             )
                         )
@@ -278,7 +275,6 @@ class Trace:
                                     data["Graph_Node"],
                                 )
                             )
-
             # if the stack has left over functions without any exits
             if len(stack) > 0:
                 for k in stack:
@@ -307,7 +303,6 @@ class Trace:
                                 )
 
         # remove buffer
-        bins.pop(end_time + time_interval)
-        print(stack)
+        bins.pop(end_time)
 
         return bins
