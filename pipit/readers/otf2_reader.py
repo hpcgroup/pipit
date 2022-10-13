@@ -13,9 +13,15 @@ import pipit.trace
 class OTF2Reader:
     """Reader for OTF2 trace files"""
 
-    def __init__(self, dir_name):
+    def __init__(self, dir_name, num_parallel=None):
         self.dir_name = dir_name  # directory of otf2 file being read
         self.file_name = self.dir_name + "/traces.otf2"
+
+        num_cpus = mp.cpu_count()
+        if num_parallel is None or num_parallel < 1 or num_parallel > num_cpus:
+            self.num_parallel = math.floor(num_cpus * 0.75)
+        else:
+            self.num_parallel = num_parallel
 
     def field_to_val(self, field):
         """
@@ -162,7 +168,13 @@ class OTF2Reader:
 
             # columns of the DataFrame
             timestamps, event_types, event_attributes, names = [], [], [], []
-            locs, loc_types, loc_groups, loc_group_types = [], [], [], []
+
+            """
+            Note:
+            1. The below lists are for storing logical ids.
+            2. Support for GPU events has to be added and unified across readers.
+            """
+            process_ids, thread_ids = [], []
 
             # selects a subset of all trace locations to
             # read based on the current rank
@@ -180,20 +192,26 @@ class OTF2Reader:
 
                 # information about the location
                 # that the event occurred on
-                locs.append(loc._ref)
-                loc_types.append(str(loc.type)[13:])
-                loc_groups.append(loc.group._ref)
-                loc_group_types.append(str(loc.group.location_group_type)[18:])
+                thread_ids.append(loc._ref)
+                process_ids.append(loc.group._ref)
 
-                # type of event - enter, leave, or other types
+                # type of event - entry, exit, or other types
+                # note: otf2 uses enter/leave but pipit uses entry/exit
                 event_type = str(type(event))[20:-2]
-                event_types.append(event_type)
+                if event_type == "Enter":
+                    event_types.append("Entry")
+                elif event_type == "Leave":
+                    event_types.append("Exit")
+                else:
+                    # placeholder
+                    # need to think of a good event type category for others
+                    event_types.append(event_type)
 
-                # only enter/leave events have a name
                 if event_type in ["Enter", "Leave"]:
                     names.append(event.region.name)
                 else:
-                    # names column is of categorical dtype
+                    # placeholder
+                    # have event type here once an "other" category name is decided
                     names.append("N/A")
 
                 timestamps.append(event.time)
@@ -226,13 +244,11 @@ class OTF2Reader:
 
         # returns dictionary with all events and their fields
         return {
-            "Event Type": event_types,
             "Timestamp (ns)": timestamps,
+            "Event Type": event_types,
             "Name": names,
-            "Location ID": locs,
-            "Location Type": loc_types,
-            "Location Group ID": loc_groups,
-            "Location Group Type": loc_group_types,
+            "Thread ID": thread_ids,
+            "Process ID": process_ids,
             "Attributes": event_attributes,
         }
 
@@ -307,7 +323,7 @@ class OTF2Reader:
 
         # parallelizes the reading of events
         # using the multiprocessing library
-        pool_size, pool = mp.cpu_count(), mp.Pool()
+        pool_size, pool = self.num_parallel, mp.Pool(self.num_parallel)
 
         # confusing, but at this moment in time events_dict is actually a
         # list of dicts that will be merged into one dictionary after this
@@ -354,18 +370,33 @@ class OTF2Reader:
             {
                 "Event Type": "category",
                 "Name": "category",
-                "Location ID": "category",
-                "Location Type": "category",
-                "Location Group ID": "category",
-                "Location Group Type": "category",
+                "Thread ID": "category",
+                "Process ID": "category",
             }
         )
+
+        # removing unnecessary columns
+        # make this into a common function across readers?
+        num_process_ids, num_thread_ids = len(set(events_dataframe["Process ID"])), len(
+            set(events_dataframe["Thread ID"])
+        )
+
+        if num_process_ids > 1:
+            if num_process_ids == num_thread_ids:
+                # remove thread id column for multi-process, single-threaded trace
+                events_dataframe.drop(columns="Thread ID", inplace=True)
+        else:
+            # remove process id column for single-process trace
+            events_dataframe.drop(columns="Process ID", inplace=True)
+            if num_thread_ids == 1:
+                # remove thread id column for single-process, single-threaded trace
+                events_dataframe.drop(columns="Thread ID", inplace=True)
 
         return events_dataframe
 
     def read(self):
         """
-        Returns a TraceData object for the otf2 file
+        Returns a Trace object for the otf2 file
         that has one definitions DataFrame and another
         events DataFrame as its primary attributes
         """
