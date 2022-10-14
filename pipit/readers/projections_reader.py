@@ -1,4 +1,6 @@
 import gzip
+import multiprocessing
+from multiprocessing.managers import ListProxy
 import pandas
 import pipit.trace
 
@@ -244,7 +246,7 @@ class ProjectionsReader:
         
         return pipit.trace.Trace(None, trace_df)
     
-    def __read_log_file(self, pe_num: int) -> pandas.DataFrame:
+    def __read_log_file(self, pe_num: int, shared_list: ListProxy = None) -> pandas.DataFrame:
         
         # has information needed in sts file
         sts_reader = self.sts_reader
@@ -648,4 +650,6 @@ class ProjectionsReader:
         
         log_file.close()
         df = pandas.DataFrame(data)
+        if shared_list != None:
+            shared_list.append(df)
         return df
