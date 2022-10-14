@@ -1,6 +1,7 @@
 import pandas as pd
 import holoviews as hv
 from holoviews import opts, streams
+from holoviews.operation import decimate
 from bokeh.models import HoverTool, PrintfTickFormatter
 from pipit.vis.util import DEFAULT_PALETTE, clamp, formatter, vis_init
 import random
@@ -112,21 +113,26 @@ def timeline(trace, palette=DEFAULT_PALETTE, ranks=None, max_ranks=16):
             x_range = (default_x_min, default_x_max)
 
         x_min, x_max = x_range
-        min_width = (x_max - x_min) * MIN_VIEWPORT_PERCENTAGE
+        viewport_size = x_max - x_min
+
+        x_min_buff = x_min - (viewport_size * 0.25)
+        x_max_buff = x_max + (viewport_size * 0.25)
+        min_width = viewport_size * MIN_VIEWPORT_PERCENTAGE
 
         # Filter dataframes based on x_range
         inst_filtered = inst[
-            (inst["Timestamp (ns)"] > x_min) & (inst["Timestamp (ns)"] < x_max)
+            (inst["Timestamp (ns)"] > x_min_buff)
+            & (inst["Timestamp (ns)"] < x_max_buff)
         ]
 
         func_filtered = func[
-            (func["Matching Time"] > x_min)
-            & (func["Timestamp (ns)"] < x_max)
+            (func["Matching Time"] > x_min_buff)
+            & (func["Timestamp (ns)"] < x_max_buff)
             & (func["Exc Time (ns)"] > min_width)
         ]
 
         comm_filtered = comm[
-            ((comm["x0"] < x_max) & (comm["x1"] > x_min))
+            ((comm["x0"] < x_max_buff) & (comm["x1"] > x_min_buff))
             & (comm["x1"] - comm["x0"] > min_width)
         ]
 
@@ -144,12 +150,12 @@ def timeline(trace, palette=DEFAULT_PALETTE, ranks=None, max_ranks=16):
 
     return dmap.opts(
         opts.Points(
-            color="black",
-            size=5,
+            color="Event",
+            cmap="category20",
+            size=8,
+            line_color="black",
         ),
-        opts.Segments(
-            color="black"
-        ),
+        opts.Segments(color="black"),
         opts.Rectangles(
             active_tools=["xwheel_zoom"],
             cmap=cmap,
