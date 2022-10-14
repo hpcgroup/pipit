@@ -29,3 +29,11 @@ class Trace:
         from .readers.hpctoolkit_reader import HPCToolkitReader
 
         return HPCToolkitReader(dirname).read()
+
+    @staticmethod
+    def from_projections(dirname):
+        """Read an HPCToolkit trace into a new Trace object."""
+        # import this lazily to avoid circular dependencies
+        from .readers.projections_reader import ProjectionsReader, ProjectionsConstants
+
+        return ProjectionsReader(dirname).read_projections()
