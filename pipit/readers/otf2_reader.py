@@ -13,18 +13,22 @@ import pipit.trace
 class OTF2Reader:
     """Reader for OTF2 trace files"""
 
-    def __init__(self, dir_name):
+    def __init__(self, dir_name, num_parallel=None):
         self.dir_name = dir_name  # directory of otf2 file being read
         self.file_name = self.dir_name + "/traces.otf2"
+
+        num_cpus = mp.cpu_count()
+        if num_parallel is None or num_parallel < 1 or num_parallel > num_cpus:
+            self.num_parallel = math.floor(num_cpus * 0.75)
+        else:
+            self.num_parallel = num_parallel
 
     def field_to_val(self, field):
         """
         Handles otf2 and _otf2 objects
-
         Arguments:
         field: an otf2 object, _otf2 object, or any other field
         that can have different data types such as strings, ints, etc
-
         Returns:
         if otf2 definition, a string representation of the definition and
         its ID such as "Region 19" that the user can use to refer back
@@ -32,7 +36,6 @@ class OTF2Reader:
         else if other otf2 or _otf2 objects, a simple string representation of
         the object
         else don't make any changes
-
         This function also ensures that there is no pickling of otf2 or _otf2
         objects, which could cause errors
         """
@@ -70,18 +73,14 @@ class OTF2Reader:
     def handle_data(self, data):
         """
         Handles different data structures
-
         Arguments:
         data: could be a list, tuple, set, dict, or any other python data type
-
         Returns:
         the same data structure as the passed argument but field_to_val is applied
         to all of the values it contains
-
         Note: all of the below cases handle the case where the data structure
         could be nested, which is always possibility depending on the trace's
         specific attributes
-
         """
 
         if isinstance(data, list):
@@ -99,9 +98,9 @@ class OTF2Reader:
             }
         elif isinstance(data, tuple):
             """
-            There is a definition called CartTopology which has a field called
-            dimensions that is a tuple of two other definitions called
-            CartDimensions, showing why this nested structure is needed
+            Example: There is a definition called CartTopology which has a
+            field called dimensions that is a tuple of two other definitions
+            called CartDimensions, showing why this nested structure is needed
             """
             return tuple([self.handle_data(data_element) for data_element in data])
         elif isinstance(data, set):
@@ -137,11 +136,9 @@ class OTF2Reader:
     def events_reader(self, rank_size):
         """
         Serial events reader that reads a subset of the trace
-
         Arguments:
         rank_size: a tuple containing the rank of the process
         and the size/total number of processors that are being used
-
         Returns:
         a dictionary with a subset of the trace events that can be converted
         to a dataframe
@@ -162,7 +159,13 @@ class OTF2Reader:
 
             # columns of the DataFrame
             timestamps, event_types, event_attributes, names = [], [], [], []
-            locs, loc_types, loc_groups, loc_group_types = [], [], [], []
+
+            """
+            Note:
+            1. The below lists are for storing logical ids.
+            2. Support for GPU events has to be added and unified across readers.
+            """
+            process_ids, thread_ids = [], []
 
             # selects a subset of all trace locations to
             # read based on the current rank
@@ -178,22 +181,32 @@ class OTF2Reader:
                 # location could be thread, process, accelerator stream, etc
                 loc, event = loc_event[0], loc_event[1]
 
-                # information about the location
-                # that the event occurred on
-                locs.append(loc._ref)
-                loc_types.append(str(loc.type)[13:])
-                loc_groups.append(loc.group._ref)
-                loc_group_types.append(str(loc.group.location_group_type)[18:])
+                """
+                information about the location that the event occurred on
+                TO DO:
+                need to add support for accelerator and metric locations
+                """
+                if str(loc.type)[13:] == "CPU_THREAD":
+                    thread_ids.append(loc._ref)
+                    process_ids.append(loc.group._ref)
 
-                # type of event - enter, leave, or other types
+                # type of event - entry, exit, or other types
+                # note: otf2 uses enter/leave but pipit uses entry/exit
                 event_type = str(type(event))[20:-2]
-                event_types.append(event_type)
+                if event_type == "Enter":
+                    event_types.append("Entry")
+                elif event_type == "Leave":
+                    event_types.append("Exit")
+                else:
+                    # placeholder
+                    # need to think of a good event type category for others
+                    event_types.append(event_type)
 
-                # only enter/leave events have a name
                 if event_type in ["Enter", "Leave"]:
                     names.append(event.region.name)
                 else:
-                    # names column is of categorical dtype
+                    # placeholder
+                    # have event type here once an "other" category name is decided
                     names.append("N/A")
 
                 timestamps.append(event.time)
@@ -226,13 +239,11 @@ class OTF2Reader:
 
         # returns dictionary with all events and their fields
         return {
-            "Event Type": event_types,
             "Timestamp (ns)": timestamps,
+            "Event Type": event_types,
             "Name": names,
-            "Location ID": locs,
-            "Location Type": loc_types,
-            "Location Group ID": loc_groups,
-            "Location Group Type": loc_group_types,
+            "Thread ID": thread_ids,
+            "Process ID": process_ids,
             "Attributes": event_attributes,
         }
 
@@ -307,7 +318,7 @@ class OTF2Reader:
 
         # parallelizes the reading of events
         # using the multiprocessing library
-        pool_size, pool = mp.cpu_count(), mp.Pool()
+        pool_size, pool = self.num_parallel, mp.Pool(self.num_parallel)
 
         # confusing, but at this moment in time events_dict is actually a
         # list of dicts that will be merged into one dictionary after this
@@ -354,18 +365,33 @@ class OTF2Reader:
             {
                 "Event Type": "category",
                 "Name": "category",
-                "Location ID": "category",
-                "Location Type": "category",
-                "Location Group ID": "category",
-                "Location Group Type": "category",
+                "Thread ID": "category",
+                "Process ID": "category",
             }
         )
+
+        # removing unnecessary columns
+        # make this into a common function across readers?
+        num_process_ids, num_thread_ids = len(set(events_dataframe["Process ID"])), len(
+            set(events_dataframe["Thread ID"])
+        )
+
+        if num_process_ids > 1:
+            if num_process_ids == num_thread_ids:
+                # remove thread id column for multi-process, single-threaded trace
+                events_dataframe.drop(columns="Thread ID", inplace=True)
+        else:
+            # remove process id column for single-process trace
+            events_dataframe.drop(columns="Process ID", inplace=True)
+            if num_thread_ids == 1:
+                # remove thread id column for single-process, single-threaded trace
+                events_dataframe.drop(columns="Thread ID", inplace=True)
 
         return events_dataframe
 
     def read(self):
         """
-        Returns a TraceData object for the otf2 file
+        Returns a Trace object for the otf2 file
         that has one definitions DataFrame and another
         events DataFrame as its primary attributes
         """
