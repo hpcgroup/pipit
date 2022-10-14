@@ -1,4 +1,6 @@
+import random
 import holoviews as hv
+
 hv.extension("bokeh", logo=False)
 
 DEFAULT_PALETTE = [
@@ -33,6 +35,7 @@ DEFAULT_PALETTE = [
     "rgb(180,122,195)",
     "rgb(203,144,152)",
 ]
+
 
 def in_notebook():
     """Determines if we are in a notebook environment"""
@@ -85,6 +88,16 @@ def formatter(t):
 
 def clamp(n, smallest, largest):
     return max(smallest, min(n, largest))
+
+
+def generate_cmap(series, palette=DEFAULT_PALETTE, randomize=False):
+    names = series.unique().tolist()
+
+    if randomize:
+        random.shuffle(palette)
+
+    cmap = {names[i]: palette[i] for i in range(len(names))}
+    return cmap
 
 
 # from pipit.vis.timeline import timeline

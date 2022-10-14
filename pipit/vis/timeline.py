@@ -1,10 +1,8 @@
 import pandas as pd
 import holoviews as hv
 from holoviews import opts, streams
-from holoviews.operation import decimate
 from bokeh.models import HoverTool, PrintfTickFormatter
-from pipit.vis.util import DEFAULT_PALETTE, clamp, formatter, vis_init
-import random
+from pipit.vis.util import DEFAULT_PALETTE, clamp, generate_cmap, vis_init
 
 # Min % of viewport that a functional event must occupy to be displayed
 MIN_VIEWPORT_PERCENTAGE = 1 / 1920
@@ -45,8 +43,8 @@ STANDARD_COLS = [
 def apply_bokeh_customizations(plot, _):
     plot.state.toolbar_location = "above"
     plot.state.ygrid.visible = False
-    # plot.state.legend.label_text_font_size = "8pt"
-    # plot.state.legend.spacing = 0
+    plot.state.legend.label_text_font_size = "8pt"
+    plot.state.legend.spacing = 0
 
 
 def timeline(trace, palette=DEFAULT_PALETTE, ranks=None, max_ranks=16):
@@ -79,22 +77,19 @@ def timeline(trace, palette=DEFAULT_PALETTE, ranks=None, max_ranks=16):
     dividend = max(1, round(n_ranks / max_ranks))
     events = events[(events["Location ID"].astype("int")) % dividend == 0]
 
-    # Generate colormap for functions
-    funcs = events[events["Event"] == "Enter"]["Name"].unique().tolist()
-    cmap = {funcs[i]: palette[i] for i in range(len(funcs))}
-
     # Initial viewport range
     default_x_min = events["Timestamp (ns)"].min()
     default_x_max = events["Timestamp (ns)"].max()
 
     # Do some preprocessing for Holoviews elements
-    ## Functional events
+    # Functional events
     func = events[events["Event"] == "Enter"].copy(deep=False)
     func["y"] = func["Location ID"].astype("int")
     func["y0"] = func["y"] - (dividend / 2)
     func["y1"] = func["y"] + (dividend / 2)
+    func_cmap = generate_cmap(func["Name"], palette, True)
 
-    ## Communication events
+    # Communication events
     send = events[events["Event"] == "MpiSend"]
     recv = events[events["Event"] == "MpiRecv"]
 
@@ -104,8 +99,9 @@ def timeline(trace, palette=DEFAULT_PALETTE, ranks=None, max_ranks=16):
     comm["x1"] = recv["Timestamp (ns)"].values
     comm["y1"] = recv["Location ID"].values
 
-    ## Instant events
+    # Instant events
     inst = events[(events["Event"] != "Enter") & (events["Event"] != "Leave")]
+    inst_cmap = generate_cmap(inst["Event"], palette, True)
 
     # DynamicMap callback
     def get_elements(x_range):
@@ -151,14 +147,14 @@ def timeline(trace, palette=DEFAULT_PALETTE, ranks=None, max_ranks=16):
     return dmap.opts(
         opts.Points(
             color="Event",
-            cmap="category20",
+            cmap=inst_cmap,
             size=8,
             line_color="black",
         ),
         opts.Segments(color="black"),
         opts.Rectangles(
             active_tools=["xwheel_zoom"],
-            cmap=cmap,
+            cmap=func_cmap,
             default_tools=["xpan", "xwheel_zoom"],
             height=clamp(len(events["Location ID"].unique()) * 20 + 100, 150, 1000),
             invert_yaxis=True,
