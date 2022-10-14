@@ -105,9 +105,9 @@ class OTF2Reader:
             }
         elif isinstance(data, tuple):
             """
-            There is a definition called CartTopology which has a field called
-            dimensions that is a tuple of two other definitions called
-            CartDimensions, showing why this nested structure is needed
+            Example: There is a definition called CartTopology which has a
+            field called dimensions that is a tuple of two other definitions
+            called CartDimensions, showing why this nested structure is needed
             """
             return tuple([self.handle_data(data_element) for data_element in data])
         elif isinstance(data, set):
@@ -190,10 +190,15 @@ class OTF2Reader:
                 # location could be thread, process, accelerator stream, etc
                 loc, event = loc_event[0], loc_event[1]
 
-                # information about the location
-                # that the event occurred on
-                thread_ids.append(loc._ref)
-                process_ids.append(loc.group._ref)
+                """
+                information about the location that the event occurred on
+
+                TO DO:
+                need to add support for accelerator and metric locations
+                """
+                if str(loc.type)[13:] == "CPU_THREAD":
+                    thread_ids.append(loc._ref)
+                    process_ids.append(loc.group._ref)
 
                 # type of event - entry, exit, or other types
                 # note: otf2 uses enter/leave but pipit uses entry/exit
