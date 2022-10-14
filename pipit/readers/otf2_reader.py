@@ -183,6 +183,7 @@ class OTF2Reader:
 
                 """
                 information about the location that the event occurred on
+
                 TO DO:
                 need to add support for accelerator and metric locations
                 """
