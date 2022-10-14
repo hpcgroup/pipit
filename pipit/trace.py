@@ -36,9 +36,9 @@ class Trace:
     def from_nsight(dirname):
         """Read an NSight trace into a new Trace object."""
         # import this lazily to avoid circular dependencies
-        from .readers.nsight_reader import NSightReader
+        from .readers.nsight_reader import NsightReader
 
-        return NSightReader(dirname).read()
+        return NsightReader(dirname).read()
 
     def comm_matrix(self, comm_type="bytes"):
         """

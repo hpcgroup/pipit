@@ -7,7 +7,7 @@ import pandas as pd
 import pipit.trace
 
 
-class NSightReader:
+class NsightReader:
     """Reader for NSight trace files"""
 
     def __init__(self, file_name) -> None:
@@ -50,7 +50,7 @@ class NSightReader:
             pid_dict = dict.fromkeys(pid, 0)
             pid_dict.update((k, i) for i, k in enumerate(pid_dict))
             df["PID"].replace(pid_dict, inplace=True)
-            df.rename(columns={"PID": "Parent ID"}, inplace=True)
+            df.rename(columns={"PID": "Process ID"}, inplace=True)
 
         if "TID" in df.columns:
             tid_dict = dict.fromkeys(tid, 0)
