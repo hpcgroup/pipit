@@ -1,6 +1,6 @@
 import holoviews as hv
 from bokeh.models import HoverTool, PrintfTickFormatter, AdaptiveTicker
-from pipit.util import clamp, vis_init
+from pipit.vis.util import clamp, vis_init
 import numpy as np
 
 
