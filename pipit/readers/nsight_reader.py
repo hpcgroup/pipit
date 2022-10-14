@@ -85,6 +85,21 @@ class NsightReader:
             }
         )
 
-        print(df.dtypes)
+        cols = list(df)
+        cols.insert(0, cols.pop(cols.index("Timestamp (ns)")))
+        cols.insert(1, cols.pop(cols.index("Event Type")))
+        cols.insert(2, cols.pop(cols.index("Name")))
+
+        if "Process ID" in df.columns and "Thread ID" not in df.columns:
+            cols.insert(3, cols.pop(cols.index("Process ID")))
+
+        elif "Process ID" in df.columns and "Thread ID" in df.columns:
+            cols.insert(3, cols.pop(cols.index("Thread ID")))
+            cols.insert(4, cols.pop(cols.index("Process ID")))
+
+        elif "Process ID" not in df.columns and "Thread ID" in df.columns:
+            cols.insert(3, cols.pop(cols.index("Thread ID")))
+
+        df = df.loc[:, cols]
 
         return pipit.trace.Trace(None, df)
