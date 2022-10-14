@@ -184,7 +184,7 @@ class STSReader:
                 # rest of line is the stat
                 for i in range(2, len(line_arr)):
                     event_name = event_name + line_arr[i] + ' '
-                self.user_events[id] = event_name
+                self.user_stats[id] = event_name
 
             # create papi array
             elif line_arr[0] == 'TOTAL_PAPI_EVENTS':
@@ -203,7 +203,7 @@ class STSReader:
 class ProjectionsReader:
     def __init__(self, executable_location: str) -> None:
         self.executable_location = executable_location
-        self.sts_reader = STSReader(self.executable_location + '.prj.sts')
+        self.sts_reader = STSReader(self.executable_location + '.sts')
         self.num_pes = self.sts_reader.num_pes
 
     @staticmethod
@@ -235,7 +235,7 @@ class ProjectionsReader:
         
         data = self.__create_empty_dict()
         
-        log_file = gzip.open(self.executable_location + '.prj.' + str(pe_num) + '.log.gz', 'rt')
+        log_file = gzip.open(self.executable_location + '.' + str(pe_num) + '.log.gz', 'rt')
         
 
         # Basing read on projections log reader and log entry viewer
@@ -617,7 +617,7 @@ class ProjectionsReader:
                 pe = int(line_arr[4])
                 user_event_id = int(line_arr[5])
                 
-                details = sts_reader.get_user_stat(user_event_id)
+                details = sts_reader.get_user_stat(user_event_id) + ': ' + str(stat)
                 
                 data['Function Name'].append('User Stat')
                 data['Event Type'].append('User Stat')
@@ -643,6 +643,6 @@ class ProjectionsReader:
     
 
 
-reader = ProjectionsReader('../tests/data/ping-pong-projections/pingpong')
-trace = reader.read_projections()
-print(trace.events)
+# reader = ProjectionsReader('../tests/data/ping-pong-projections/pingpong')
+# trace = reader.read_projections()
+# print(trace.events)

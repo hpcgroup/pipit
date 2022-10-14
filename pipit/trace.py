@@ -32,6 +32,14 @@ class Trace:
 
         return HPCToolkitReader(dirname).read()
 
+    @staticmethod
+    def from_projections(dirname):
+        """Read an HPCToolkit trace into a new Trace object."""
+        # import this lazily to avoid circular dependencies
+        from .readers.projections_reader import ProjectionsReader, ProjectionsConstants
+
+        return ProjectionsReader(dirname).read_projections()
+
     def comm_matrix(self, output="size"):
         """
         Communication Matrix for Peer-to-Peer (P2P) MPI messages
@@ -111,3 +119,4 @@ class Trace:
             ]
 
         return communication_matrix
+
