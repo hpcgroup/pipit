@@ -25,6 +25,39 @@ class NSightReader:
 
         # Copy data into new dataframe
         df = self.df
+        
+        pid, tid = set(df["PID"]), set(df["TID"])
+        
+        df = df.astype(
+            {
+                "PID": "category",
+                "TID": "category",
+            }
+        )
+        
+        # check if multi-process, single-threaded trace, if so remove tid column
+        if len(pid) > 1:
+                if len(pid) == len(tid):
+                    df.drop(columns="TID", inplace=True)
+        else:
+            # remove pid column, single process thread
+            df.drop(columns="PID", inplace=True)
+            # remove tid column for  single-threaded trace and single-process
+            if len(tid) == 1:
+                df.drop(columns="TID", inplace=True)
+        
+        if 'PID' in df.columns:
+            pid_dict = dict.fromkeys(pid, 0)
+            pid_dict.update((k,i) for i, k in enumerate(pid_dict))
+            df['PID'].replace(pid_dict, inplace=True)
+            df.rename(columns={'PID': 'Parent ID'}, inplace=True)         
+            
+        if 'TID' in df.columns:
+            tid_dict = dict.fromkeys(tid, 0)
+            tid_dict.update((k,i) for i, k in enumerate(tid_dict))
+            df['TID'].replace(tid_dict, inplace=True)    
+            df.rename(columns={'TID': 'Thread ID'}, inplace=True) 
+        
         df2 = df.copy()
 
         # Create new columns for df with start time
@@ -41,20 +74,17 @@ class NSightReader:
         # Tidy Dataframe
         df.drop(["Start (ns)", "End (ns)"], axis=1, inplace=True)
 
-        # Checks if multi-process trace
-        if len(set(df.loc[:, "PID"])) == 1:
-            df.drop(["PID"], axis=1, inplace=True)
-            # Checks if multi-threaded trace
-            if len(set(df.loc[:, "TID"])) == 1:
-                df.drop(["TID"], axis=1, inplace=True)
-
-        # If multi-processed, checks if also multi-threaded
-        else:
-            if set(df.loc[:, "PID"]) == set(df.loc[:, "TID"]):
-                df.drop(["TID"], axis=1, inplace=True)
-
         df.sort_values(by="Timestamp (ns)", ascending=True, inplace=True)
 
         df.reset_index(drop=True, inplace=True)
+        
+        df = df.astype(
+            {
+                "Event Type": "category",
+                "Name": "category",
+            }
+        )
+        
+        print(df.dtypes)
 
         return pipit.trace.Trace(None, df)
