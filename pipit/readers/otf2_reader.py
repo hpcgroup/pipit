@@ -13,18 +13,22 @@ import pipit.trace
 class OTF2Reader:
     """Reader for OTF2 trace files"""
 
-    def __init__(self, dir_name):
+    def __init__(self, dir_name, num_parallel=None):
         self.dir_name = dir_name  # directory of otf2 file being read
         self.file_name = self.dir_name + "/traces.otf2"
+
+        num_cpus = mp.cpu_count()
+        if num_parallel is None or num_parallel < 1 or num_parallel > num_cpus:
+            self.num_parallel = math.floor(num_cpus * 0.75)
+        else:
+            self.num_parallel = num_parallel
 
     def field_to_val(self, field):
         """
         Handles otf2 and _otf2 objects
-
         Arguments:
         field: an otf2 object, _otf2 object, or any other field
         that can have different data types such as strings, ints, etc
-
         Returns:
         if otf2 definition, a string representation of the definition and
         its ID such as "Region 19" that the user can use to refer back
@@ -32,7 +36,6 @@ class OTF2Reader:
         else if other otf2 or _otf2 objects, a simple string representation of
         the object
         else don't make any changes
-
         This function also ensures that there is no pickling of otf2 or _otf2
         objects, which could cause errors
         """
@@ -70,18 +73,14 @@ class OTF2Reader:
     def handle_data(self, data):
         """
         Handles different data structures
-
         Arguments:
         data: could be a list, tuple, set, dict, or any other python data type
-
         Returns:
         the same data structure as the passed argument but field_to_val is applied
         to all of the values it contains
-
         Note: all of the below cases handle the case where the data structure
         could be nested, which is always possibility depending on the trace's
         specific attributes
-
         """
 
         if isinstance(data, list):
@@ -137,11 +136,9 @@ class OTF2Reader:
     def events_reader(self, rank_size):
         """
         Serial events reader that reads a subset of the trace
-
         Arguments:
         rank_size: a tuple containing the rank of the process
         and the size/total number of processors that are being used
-
         Returns:
         a dictionary with a subset of the trace events that can be converted
         to a dataframe
@@ -363,6 +360,23 @@ class OTF2Reader:
                 "Process": "category",
             }
         )
+
+        # removing unnecessary columns
+        # make this into a common function across readers?
+        num_process_ids, num_thread_ids = len(set(events_dataframe["Process ID"])), len(
+            set(events_dataframe["Thread ID"])
+        )
+
+        if num_process_ids > 1:
+            if num_process_ids == num_thread_ids:
+                # remove thread id column for multi-process, single-threaded trace
+                events_dataframe.drop(columns="Thread ID", inplace=True)
+        else:
+            # remove process id column for single-process trace
+            events_dataframe.drop(columns="Process ID", inplace=True)
+            if num_thread_ids == 1:
+                # remove thread id column for single-process, single-threaded trace
+                events_dataframe.drop(columns="Thread ID", inplace=True)
 
         return events_dataframe
 

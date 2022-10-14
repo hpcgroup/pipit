@@ -108,46 +108,58 @@ class Trace:
         
     def calculate_inc_time(self):
         """
-        An OTF2 Trace has several events that are represented using two
-        rows - an "Enter" and a "Leave" that correspond to each other.
-        One event (two rows) correspond to a single function call.
+        Some events are represented using two rows - an "Entry" and a "Exit"
+        that correspond to each other. One event (two rows) correspond to a
+        single function call.
 
         This function iterates through such events and does a few things:
         1. matches each entry and exit rows pair using numerical indices
-        2. determines the children of each event
+        2. determines the children and parent of each event
         3. calculates the inclusive time for each function call
         4. determines the depth of each event in the call stack
 
         To reduce redundancy, the last three pieces of information listed above
         are stored only in the entry row of an event. The matching indices, by
         design, have to be stored in both so the user can find the corresponding
-        "leave" row for an "enter" row of an event and vica-versa.
+        "exit" row for an "entry" row of an event and vica-versa.
         """
 
         if "Inc Time (ns)" not in self.events.columns:
-            # 4 new columns that will be added to the DataFrame
+            # 6 new columns that will be added to the DataFrame
+            parent = [float("nan") for i in range(len(self.events))]
             children = [None for i in range(len(self.events))]
             matching_time = [float("nan") for i in range(len(self.events))]
             matching_index = [float("nan") for i in range(len(self.events))]
             inc_time = [float("nan") for i in range(len(self.events))]
             depth = [float("nan") for i in range(len(self.events))]
 
-            # iterate through all the Location IDs of the trace
-            for location_id in set(self.events["Location ID"]):
+            if "Thread ID" in self.events.columns:
+                filter_set = set(self.events["Thread ID"])
+                filter_col = "Thread ID"
+            elif "Process ID" in self.events.columns:
+                filter_set = set(self.events["Process ID"])
+                filter_col = "Process ID"
+            else:
+                filter_col = None
+
+            entry_exit_df = self.events.loc[
+                self.events["Event Type"].isin(["Entry", "Exit"])
+            ]
+
+            # filter by thread/process and then iterate over events
+            for id in filter_set:
                 """
-                filter the DataFrame by current Location ID so
+                filter the DataFrame by current ID so
                 that the ordering of the rows make sense in the
                 context of a call stack
                 """
-                location_df = self.events.loc[
-                    (self.events["Name"] != "N/A")
-                    & (self.events["Location ID"] == location_id)
-                ]
+                if filter_col is not None:
+                    filtered_df = entry_exit_df.loc[entry_exit_df[filter_col] == id]
 
                 """
                 Below are auxiliary lists used in the function.
 
-                Since the DataFrame is filtered by Location ID,
+                Since the DataFrame is filtered by Process/Thread ID,
                 df_indices keeps trace of the DataFrame indices
                 so that the metrics being calculated can be added to
                 the correct row position in the DataFrame.
@@ -156,29 +168,29 @@ class Trace:
                 indices for the current callpate and calculate metrics &
                 match parents with children accordingly.
                 """
-                curr_depth, stack, df_indices = 0, [], list(location_df.index)
+                curr_depth, stack, df_indices = 0, [], list(filtered_df.index)
 
                 """
                 copies of two columns as lists
                 more efficient to iterate through these than the
                 DataFrame itself (from what I've seen so far)
                 """
-                event_types, timestamps = list(location_df["Event Type"]), list(
-                    location_df["Timestamp (ns)"]
+                event_types, timestamps = list(filtered_df["Event Type"]), list(
+                    filtered_df["Timestamp (ns)"]
                 )
 
-                # iterate through all events of the current Location ID
-                for i in range(len(location_df)):
+                # iterate through all events of the current ID
+                for i in range(len(filtered_df)):
                     """
                     curr_df_index is the actual DataFrame index
-                    that corresponds to the i'th row of location_df
+                    that corresponds to the i'th row of filtered_df
                     """
                     curr_df_index = df_indices[i]
 
                     evt_type, timestamp = event_types[i], timestamps[i]
 
                     # if the row is the entry point of a function call
-                    if evt_type == "Enter":
+                    if evt_type == "Entry":
                         if curr_depth > 0:
                             """
                             if the current event is a child of another (curr depth > 0),
@@ -199,9 +211,11 @@ class Trace:
                             else:
                                 children[parent_df_index].append(curr_df_index)
 
+                            parent[curr_df_index] = parent_df_index
+
                         """
-                        The inclusive time for a function is its Leave timestamp
-                        subtracted by its Enter timestamp.
+                        The inclusive time for a function is its Exit timestamp
+                        subtracted by its Entry timestamp.
                         """
                         inc_time[curr_df_index] = -timestamp
 
@@ -218,31 +232,31 @@ class Trace:
                     else:
                         """
                         get the DataFrame index and timestamp of the
-                        corresponding enter row for the current leave
+                        corresponding entry row for the current exit
                         row by popping the stack
                         """
-                        enter_df_index, enter_timestamp = stack.pop()
+                        entry_df_index, entry_timestamp = stack.pop()
 
                         """
                         add the matching times to
                         the appropriate positions in the list
                         """
-                        matching_time[enter_df_index] = timestamp
-                        matching_time[curr_df_index] = enter_timestamp
+                        matching_time[entry_df_index] = timestamp
+                        matching_time[curr_df_index] = entry_timestamp
 
                         """
                         add the matching DataFrame indices to
                         the appropriate positions in the list
                         """
-                        matching_index[enter_df_index] = curr_df_index
-                        matching_index[curr_df_index] = enter_df_index
+                        matching_index[entry_df_index] = curr_df_index
+                        matching_index[curr_df_index] = entry_df_index
 
                         """
-                        by adding the leave timestamp, the
-                        calculated time is Leave - Enter, which
+                        by adding the exit timestamp, the
+                        calculated time is Exit - Entry, which
                         is the inclusive time for the function call
                         """
-                        inc_time[enter_df_index] += timestamp
+                        inc_time[entry_df_index] += timestamp
 
                         curr_depth -= 1  # decrement the current depth of the call stack
 
@@ -254,6 +268,7 @@ class Trace:
             the calculated metrics and lists above
             """
             self.events["Depth"] = depth
+            self.events["Parent"] = parent
             self.events["Children"] = children
             self.events["Matching Index"] = matching_index
             self.events["Matching Timestamp"] = matching_time
@@ -271,7 +286,7 @@ class Trace:
             and "Exc Time (ns)" not in self.events.columns
         ):
             # filter the DataFrame by those rows that have children
-            parents_df = self.events.loc[~self.events["Children"].isnull()]
+            parents_df = self.events.loc[self.events["Children"].notnull()]
 
             # DataFrame indices of the parents
             parents_indices = list(parents_df.index)

@@ -250,7 +250,7 @@ class HPCToolkitReader:
                     intersect_level = -1
                     intersect_node = node.get_intersection(last_node)
                     # this is the highest node that last_node and node have in
-                    # common we want to close every enter time event higher
+                    # common we want to close every entry time event higher
                     # than than interest node, because those functions have
                     # exited
 
@@ -270,7 +270,7 @@ class HPCToolkitReader:
                         close_node = close_node.parent
 
                     # creating new rows for the new functions entered
-                    enter_list = node.get_node_list(intersect_level)
+                    entry_list = node.get_node_list(intersect_level)
                     # the list of nodes higher than interesect_level
                     # (the level of interesect_node)
 
