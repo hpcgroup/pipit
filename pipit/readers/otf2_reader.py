@@ -13,7 +13,7 @@ import pipit.trace
 class OTF2Reader:
     """Reader for OTF2 trace files"""
 
-    def __init__(self, dir_name, num_parallel = None):
+    def __init__(self, dir_name, num_parallel=None):
         self.dir_name = dir_name  # directory of otf2 file being read
         self.file_name = self.dir_name + "/traces.otf2"
 
