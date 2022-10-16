@@ -322,7 +322,7 @@ class OTF2Reader:
 
         # parallelizes the reading of events
         # using the multiprocessing library
-        pool_size = mp.cpu_count
+        pool_size = mp.cpu_count()
         pool = mp.Pool(pool_size)
 
         # confusing, but at this moment in time events_dict is actually a
