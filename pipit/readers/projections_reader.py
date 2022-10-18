@@ -3,6 +3,8 @@ import pandas
 import pipit.trace
 
 class ProjectionsConstants:
+    # Projection constants are copied over from projections -- used to determine type of line in log files
+
         # Message Creation po
     CREATION                 = 1;
 
@@ -70,16 +72,20 @@ class ProjectionsConstants:
 
 class STSReader:
 
-    # In 'self.chares', each entry stores (chare_name: str, dimension: int)
-    # In 'self.entries', each entry stores (entry_name: str, chare_id: int)
+
 
     def __init__(self, file_location):
-        self.sts_file = open(file_location, 'r')
-        # self.chares = {}
+        self.sts_file = open(file_location, 'r')# self.chares = {}
+        
+        # In 'self.entries', each entry stores (entry_name: str, chare_id: int)
         self.entries = {}
-        # self.messages = []
+        
+        # Stores user event names: {user_event_id: user event name}
         self.user_events = {}
+
+        # Stores user stat names: {user_event_id: user stat name}
         self.user_stats = {}
+
         self.read_sts_file()
 
     # to get name of entry print <name of chare + :: + name of entry>> 
@@ -87,22 +93,17 @@ class STSReader:
         # self.entries[entry_id][1] is the chare_id (index for self.chares)
         return self.chares[self.entries[entry_id][1]][0] + '::' + self.entries[entry_id][0]
 
+    # To get the dimension of an entry
     def get_dimension(self, entry_id):
-        # self.entries[entry_id][1] is the chare_id (index for self.chares)
         return self.chares[self.entries[entry_id][1]][1]
 
+    # Gets the user event name from the user_event_id
     def get_user_event(self, user_event_id):
         return self.user_events[user_event_id]
 
+    # Gets the name of the user stat from the user_event_id
     def get_user_stat(self, user_event_id):
         return self.user_stats[user_event_id]
-
-        #     public int getNumPerfCounts() {
-	# if (hasPAPI) {
-	#     return numPapiEvents;
-	# } else {
-	#     return 0;
-	# }
 
     # unsure what this is used for, but necessary to read PROCESSING
     def get_num_perf_counts(self):
@@ -110,7 +111,9 @@ class STSReader:
             return len(self.papi_event_names)
         else:
             return 0
+        # self.entries[entry_id][1] is the chare_id (index for self.chares)
 
+    # Gets event name from event_id
     def get_event_name(self, event_id):
         return self.user_events[event_id]
 
@@ -126,6 +129,7 @@ class STSReader:
             #   COMMANDLINE, CHARMVERSION, USERNAME, HOSTNAME
             
             # create chares array
+            # In 'self.chares', each entry stores (chare_name: str, dimension: int)
             if line_arr[0] == 'TOTAL_CHARES':
                 total_chares = int(line_arr[1])
                 self.chares = [None] * total_chares
@@ -144,13 +148,15 @@ class STSReader:
             elif line_arr[0] == 'TIMESTAMP':
                 self.timestamp_string = line_arr[1]
 
+            # Add to self.chares
             elif line_arr[0] == 'CHARE':
                 id = int(line_arr[1])
                 name = line_arr[2][1:len(line_arr[2]) - 1]
                 dimensions = int(line_arr[3])
                 self.chares[id] = (name, dimensions)
                 # print(int(line_arr[1]), line_arr[2][1:len(line_arr[2]) - 1])
-                
+            
+            # add to self.entries 
             elif line_arr[0] == 'ENTRY':
 
                 # Need to concat entry_name
@@ -165,11 +171,14 @@ class STSReader:
                 # name = self.chares[chare_id][0] + '::' + entry_name
                 self.entries[id] = (entry_name, chare_id)
         
+            # Add to message_table
+            # Need clarification on this, as message_table is never referenced in projections
             elif line_arr[0] == 'MESSAGE':
                 id = int(line_arr[1])
                 message_size = int(line_arr[2])
                 self.message_table[id] = message_size
             
+            # Read/store event
             elif line_arr[0] == 'EVENT':
                 id = int(line_arr[1])
                 event_name = ''
@@ -178,6 +187,7 @@ class STSReader:
                     event_name = event_name + line_arr[i] + ' '
                 self.user_events[id] = event_name
             
+            # Read/store user stat
             elif line_arr[0] == 'STAT':
                 id = int(line_arr[1])
                 event_name = ''
@@ -191,6 +201,7 @@ class STSReader:
                 num_papi_events = int(line_arr[1])
                 self.papi_event_names = [None] * num_papi_events
             
+            # Unsure of what these are for
             elif line_arr[0] == 'PAPI_EVENT':
                 id = int(line_arr[1])
                 papi_event = line_arr[2]
@@ -206,6 +217,7 @@ class ProjectionsReader:
         self.sts_reader = STSReader(self.executable_location + '.sts')
         self.num_pes = self.sts_reader.num_pes
 
+    # Returns an empty dict, used for reading log file into dataframe
     @staticmethod
     def __create_empty_dict() -> dict:
         return {
@@ -217,28 +229,35 @@ class ProjectionsReader:
             'Created By': []
         }
 
-    def read_projections(self):
+    def read(self):
 
         if self.num_pes < 1:
             return None
         
+        # Read each log file and store as list of dataframes
         dataframes_list = []
         for i in range(self.num_pes):
             dataframes_list.append(self.__read_log_file(i))
 
+        # Concatinate the dataframes list into dataframe containing entire trace
         trace_df = pandas.concat(dataframes_list, ignore_index=True)
+        
         return pipit.trace.Trace(None, trace_df)
     
     def __read_log_file(self, pe_num: int) -> pandas.DataFrame:
         
+        # has information needed in sts file
         sts_reader = self.sts_reader
         
+        # create an empty dict to append to
         data = self.__create_empty_dict()
         
+        # opening the log file we need to read
         log_file = gzip.open(self.executable_location + '.' + str(pe_num) + '.log.gz', 'rt')
         
 
         # Basing read on projections log reader and log entry viewer
+        # Iterated through every line in the file and adds to dict
         for line in log_file:
             line_arr = line.split()
 
@@ -630,19 +649,3 @@ class ProjectionsReader:
         log_file.close()
         df = pandas.DataFrame(data)
         return df
-
-
-            
-
-
-
-
-
-
-
-    
-
-
-# reader = ProjectionsReader('../tests/data/ping-pong-projections/pingpong')
-# trace = reader.read_projections()
-# print(trace.events)
