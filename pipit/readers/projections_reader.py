@@ -231,21 +231,41 @@ class ProjectionsReader:
             'Created By Process': []
         }
 
-    def read(self):
+    def read(self, read_mp: bool = True):
 
         if self.num_pes < 1:
             return None
-        
-        # Read each log file and store as list of dataframes
-        dataframes_list = []
-        for i in range(self.num_pes):
-            dataframes_list.append(self.__read_log_file(i))
+
+        # Parallelized read
+        if read_mp:
+
+            # Create list of processes
+            processes = [None] * self.num_pes
+
+            # Create shared list that processes will append their dataframes to 
+            manager = multiprocessing.Manager()
+            dataframes_list = manager.list()
+
+            # Start each process
+            for i in range(self.num_pes):
+                processes[i] = multiprocessing.Process(target=self.__read_log_file, args=(i, dataframes_list))
+                processes[i].start()
+            
+            # Join each process
+            for i in range(self.num_pes):
+                processes[i].join()
+
+        else:
+            # Read each log file and store as list of dataframes
+            dataframes_list = []
+            for i in range(self.num_pes):
+                dataframes_list.append(self.__read_log_file(i))
 
         # Concatinate the dataframes list into dataframe containing entire trace
         trace_df = pandas.concat(dataframes_list, ignore_index=True)
         
         return pipit.trace.Trace(None, trace_df)
-    
+
     def __read_log_file(self, pe_num: int, shared_list: ListProxy = None) -> pandas.DataFrame:
         
         # has information needed in sts file
