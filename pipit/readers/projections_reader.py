@@ -221,12 +221,12 @@ class ProjectionsReader:
     @staticmethod
     def __create_empty_dict() -> dict:
         return {
-            "Function Name": [],
+            "Name": [],
             "Event Type": [],
-            "Time": [],
-            "Process": [],
+            "Timestamp (ns)": [],
+            "Process ID": [],
             'Details': [],
-            'Created By': []
+            'Created By Process': []
         }
 
     def read(self):
@@ -267,74 +267,74 @@ class ProjectionsReader:
             elif int(line_arr[0]) == ProjectionsConstants.BEGIN_IDLE:
                 time = int(line_arr[1])
                 pe = int(line_arr[2])
-                data['Function Name'].append('Idle')
+                data['Name'].append('Idle')
                 data['Event Type'].append('Entry')
-                data['Time'].append(time)
-                data['Process'].append(pe_num)
-                data['Created By'].append(pe)
+                data['Timestamp (ns)'].append(time)
+                data['Process ID'].append(pe_num)
+                data['Created By Process'].append(pe)
                 data['Details'].append('')
 
                 
             elif int(line_arr[0]) == ProjectionsConstants.END_IDLE:
                 time = int(line_arr[1])
                 pe = int(line_arr[2])
-                data['Function Name'].append('Idle')
+                data['Name'].append('Idle')
                 data['Event Type'].append('Exit')
-                data['Time'].append(time)
-                data['Process'].append(pe_num)
-                data['Created By'].append(pe)
+                data['Timestamp (ns)'].append(time)
+                data['Process ID'].append(pe_num)
+                data['Created By Process'].append(pe)
                 data['Details'].append('')
 
                 
             elif int(line_arr[0]) == ProjectionsConstants.BEGIN_PACK:
                 time = int(line_arr[1])
                 pe = int(line_arr[2])
-                data['Function Name'].append('Pack')
+                data['Name'].append('Pack')
                 data['Event Type'].append('Entry')
-                data['Time'].append(time)
-                data['Process'].append(pe_num)
-                data['Created By'].append(pe)
+                data['Timestamp (ns)'].append(time)
+                data['Process ID'].append(pe_num)
+                data['Created By Process'].append(pe)
                 data['Details'].append('')
                 
             elif int(line_arr[0]) == ProjectionsConstants.END_PACK:
                 time = int(line_arr[1])
                 pe = int(line_arr[2])
-                data['Function Name'].append('Pack')
+                data['Name'].append('Pack')
                 data['Event Type'].append('Exit')
-                data['Time'].append(time)
-                data['Process'].append(pe_num)
-                data['Created By'].append(pe)
+                data['Timestamp (ns)'].append(time)
+                data['Process ID'].append(pe_num)
+                data['Created By Process'].append(pe)
                 data['Details'].append('')
                 
             elif int(line_arr[0]) == ProjectionsConstants.BEGIN_UNPACK:
                 time = int(line_arr[1])
                 pe = int(line_arr[2])
-                data['Function Name'].append('Unpack')
+                data['Name'].append('Unpack')
                 data['Event Type'].append('Entry')
-                data['Time'].append(time)
-                data['Process'].append(pe_num)
-                data['Created By'].append(pe)
+                data['Timestamp (ns)'].append(time)
+                data['Process ID'].append(pe_num)
+                data['Created By Process'].append(pe)
                 data['Details'].append('')
                 
             elif int(line_arr[0]) == ProjectionsConstants.END_UNPACK:
                 time = int(line_arr[1])
                 pe = int(line_arr[2])
 
-                data['Function Name'].append('Unpack')
+                data['Name'].append('Unpack')
                 data['Event Type'].append('Exit')
-                data['Time'].append(time)
-                data['Process'].append(pe_num)
-                data['Created By'].append(pe)
+                data['Timestamp (ns)'].append(time)
+                data['Process ID'].append(pe_num)
+                data['Created By Process'].append(pe)
                 data['Details'].append('')
                 
             elif int(line_arr[0]) == ProjectionsConstants.USER_SUPPLIED:
                 user_supplied = line_arr[1]
                 
-                data['Function Name'].append('User Supplied')
+                data['Name'].append('User Supplied')
                 data['Event Type'].append('User Supplied')
-                data['Time'].append(-1)
-                data['Process'].append(pe_num)
-                data['Created By'].append(-1)
+                data['Timestamp (ns)'].append(-1)
+                data['Process ID'].append(pe_num)
+                data['Created By Process'].append(-1)
                 data['Details'].append(user_supplied)
 
             elif int(line_arr[0]) == ProjectionsConstants.USER_SUPPLIED_NOTE:
@@ -343,11 +343,11 @@ class ProjectionsReader:
                 for i in range(2, len(line_arr)):
                     note = note + line_arr[i] + ' '
                 
-                data['Function Name'].append('User Supplied Note')
+                data['Name'].append('User Supplied Note')
                 data['Event Type'].append('User Supplied Note')
-                data['Time'].append(time)
-                data['Process'].append(pe_num)
-                data['Created By'].append(-1)
+                data['Timestamp (ns)'].append(time)
+                data['Process ID'].append(pe_num)
+                data['Created By Process'].append(-1)
                 data['Details'].append(note)
                 
             elif int(line_arr[0]) == ProjectionsConstants.USER_SUPPLIED_BRACKETED_NOTE:
@@ -359,18 +359,18 @@ class ProjectionsReader:
                     note = note + line_arr[i] + ' '
                 note = note + '"'
                 
-                data['Function Name'].append('User Supplied Bracketed Note')
+                data['Name'].append('User Supplied Bracketed Note')
                 data['Event Type'].append('Entry')
-                data['Time'].append(time)
-                data['Process'].append(pe_num)
-                data['Created By'].append(-1)
+                data['Timestamp (ns)'].append(time)
+                data['Process ID'].append(pe_num)
+                data['Created By Process'].append(-1)
                 data['Details'].append(note)
                 
-                data['Function Name'].append('User Supplied Bracketed Note')
+                data['Name'].append('User Supplied Bracketed Note')
                 data['Event Type'].append('Exit')
-                data['Time'].append(end_time)
-                data['Process'].append(pe_num)
-                data['Created By'].append(-1)
+                data['Timestamp (ns)'].append(end_time)
+                data['Process ID'].append(pe_num)
+                data['Created By Process'].append(-1)
                 data['Details'].append(note)
                 
                 
@@ -378,11 +378,11 @@ class ProjectionsReader:
                 memory_usage = int(line_arr[1])
                 time = int(line_arr[2])
 
-                data['Function Name'].append('Memory Usage')
+                data['Name'].append('Memory Usage')
                 data['Event Type'].append('Memory Usage')
-                data['Time'].append(time)
-                data['Process'].append(pe_num)
-                data['Created By'].append(-1)
+                data['Timestamp (ns)'].append(time)
+                data['Process ID'].append(pe_num)
+                data['Created By Process'].append(-1)
                 data['Details'].append(memory_usage)
                 
             elif int(line_arr[0]) == ProjectionsConstants.CREATION:
@@ -395,11 +395,11 @@ class ProjectionsReader:
                 send_time = int(line_arr[7])
                 sts_reader.get_entry_name(entry)
 
-                data['Function Name'].append('Create')
+                data['Name'].append('Create')
                 data['Event Type'].append('Create')
-                data['Time'].append(time)
-                data['Process'].append(pe_num)
-                data['Created By'].append(pe)
+                data['Timestamp (ns)'].append(time)
+                data['Process ID'].append(pe_num)
+                data['Created By Process'].append(pe)
                 data['Details'].append(sts_reader.get_entry_name(entry))
                 
             elif int(line_arr[0]) == ProjectionsConstants.CREATION_MULTICAST:
@@ -415,11 +415,11 @@ class ProjectionsReader:
                 for i in (0, numPEs):
                     destPEs.append(int(line_arr[9 + i]))
                 
-                data['Function Name'].append('Multicast')
+                data['Name'].append('Multicast')
                 data['Event Type'].append('Multicast')
-                data['Time'].append(time)
-                data['Process'].append(pe_num)
-                data['Created By'].append(pe)
+                data['Timestamp (ns)'].append(time)
+                data['Process ID'].append(pe_num)
+                data['Created By Process'].append(pe)
                 data['Details'].append('To ' + str(numPEs) + 'processors')
 
                 
@@ -442,11 +442,11 @@ class ProjectionsReader:
                 for i in range(9 + dimensions, 9 + dimensions + num_perf_counts):
                     perf_counts.append(int(line_arr[i]))
                 
-                data['Function Name'].append('Processing')
+                data['Name'].append('Processing')
                 data['Event Type'].append('Entry')
-                data['Time'].append(time)
-                data['Process'].append(pe_num)
-                data['Created By'].append(pe)
+                data['Timestamp (ns)'].append(time)
+                data['Process ID'].append(pe_num)
+                data['Created By Process'].append(pe)
                 data['Details'].append(sts_reader.get_entry_name(entry))
                 
             elif int(line_arr[0]) == ProjectionsConstants.END_PROCESSING:
@@ -462,31 +462,31 @@ class ProjectionsReader:
                 for i in range(8 + dimensions, 8 + dimensions + num_perf_counts):
                     perf_counts.append(int(line_arr[i]))
                 
-                data['Function Name'].append('Processing')
+                data['Name'].append('Processing')
                 data['Event Type'].append('Exit')
-                data['Time'].append(time)
-                data['Process'].append(pe_num)
-                data['Created By'].append(pe)
+                data['Timestamp (ns)'].append(time)
+                data['Process ID'].append(pe_num)
+                data['Created By Process'].append(pe)
                 data['Details'].append(sts_reader.get_entry_name(entry))
                 
             elif int(line_arr[0]) == ProjectionsConstants.BEGIN_TRACE:
                 time = int(line_arr[1])
 
-                data['Function Name'].append('Begin Trace')
+                data['Name'].append('Begin Trace')
                 data['Event Type'].append('Entry')
-                data['Time'].append(time)
-                data['Process'].append(pe_num)
-                data['Created By'].append(-1)
+                data['Timestamp (ns)'].append(time)
+                data['Process ID'].append(pe_num)
+                data['Created By Process'].append(-1)
                 data['Details'].append('')
 
             elif int(line_arr[0]) == ProjectionsConstants.END_TRACE:
                 time = int(line_arr[1])
 
-                data['Function Name'].append('Begin Trace')
+                data['Name'].append('Begin Trace')
                 data['Event Type'].append('Entry')
-                data['Time'].append(time)
-                data['Process'].append(pe_num)
-                data['Created By'].append(-1)
+                data['Timestamp (ns)'].append(time)
+                data['Process ID'].append(pe_num)
+                data['Created By Process'].append(-1)
                 data['Details'].append('')
                 
             elif int(line_arr[0]) == ProjectionsConstants.MESSAGE_RECV:
@@ -502,11 +502,11 @@ class ProjectionsReader:
                 event = int(line_arr[3])
                 pe = int(line_arr[4])
                 
-                data['Function Name'].append('Enque')
+                data['Name'].append('Enque')
                 data['Event Type'].append('Enque')
-                data['Time'].append(time)
-                data['Process'].append(pe_num)
-                data['Created By'].append(pe)
+                data['Timestamp (ns)'].append(time)
+                data['Process ID'].append(pe_num)
+                data['Created By Process'].append(pe)
                 data['Details'].append('message received from processor ' + pe + ' destined for UNKOWN')
 
             elif int(line_arr[0]) == ProjectionsConstants.DEQUEUE:
@@ -515,11 +515,11 @@ class ProjectionsReader:
                 event = int(line_arr[3])
                 pe = int(line_arr[4])
                 
-                data['Function Name'].append('Deque')
+                data['Name'].append('Deque')
                 data['Event Type'].append('Deque')
-                data['Time'].append(time)
-                data['Process'].append(pe_num)
-                data['Created By'].append(pe)
+                data['Timestamp (ns)'].append(time)
+                data['Process ID'].append(pe_num)
+                data['Created By Process'].append(pe)
                 data['Details'].append('')
                 
             elif int(line_arr[0]) == ProjectionsConstants.BEGIN_INTERRUPT:
@@ -527,11 +527,11 @@ class ProjectionsReader:
                 event = int(line_arr[2])
                 pe = int(line_arr[3])
 
-                data['Function Name'].append('Interrupt')
+                data['Name'].append('Interrupt')
                 data['Event Type'].append('Entry')
-                data['Time'].append(time)
-                data['Process'].append(pe_num)
-                data['Created By'].append(pe)
+                data['Timestamp (ns)'].append(time)
+                data['Process ID'].append(pe_num)
+                data['Created By Process'].append(pe)
                 data['Details'].append('')
                 
             elif int(line_arr[0]) == ProjectionsConstants.END_INTERRUPT:
@@ -539,31 +539,31 @@ class ProjectionsReader:
                 event = int(line_arr[2])
                 pe = int(line_arr[3])
 
-                data['Function Name'].append('Interrupt')
+                data['Name'].append('Interrupt')
                 data['Event Type'].append('Entry')
-                data['Time'].append(time)
-                data['Process'].append(pe_num)
-                data['Created By'].append(pe)
+                data['Timestamp (ns)'].append(time)
+                data['Process ID'].append(pe_num)
+                data['Created By Process'].append(pe)
                 data['Details'].append('')
                 
             elif int(line_arr[0]) == ProjectionsConstants.BEGIN_COMPUTATION:
                 time = int(line_arr[1])
                 
-                data['Function Name'].append('Computation')
+                data['Name'].append('Computation')
                 data['Event Type'].append('Entry')
-                data['Time'].append(time)
-                data['Process'].append(pe_num)
-                data['Created By'].append(-1)
+                data['Timestamp (ns)'].append(time)
+                data['Process ID'].append(pe_num)
+                data['Created By Process'].append(-1)
                 data['Details'].append('')
                 
             elif int(line_arr[0]) == ProjectionsConstants.END_COMPUTATION:
                 time = int(line_arr[1])
                 
-                data['Function Name'].append('Computation')
+                data['Name'].append('Computation')
                 data['Event Type'].append('Exit')
-                data['Time'].append(time)
-                data['Process'].append(pe_num)
-                data['Created By'].append(-1)
+                data['Timestamp (ns)'].append(time)
+                data['Process ID'].append(pe_num)
+                data['Created By Process'].append(-1)
                 data['Details'].append('')
                 
             elif int(line_arr[0]) == ProjectionsConstants.USER_EVENT:
@@ -572,14 +572,14 @@ class ProjectionsReader:
                 event = int(line_arr[3])
                 pe = int(line_arr[4])
 
-                details = sts_reader.get_user_event(user_event_id)
+                user_event_name = sts_reader.get_user_event(user_event_id)
                 
-                data['Function Name'].append('User Event')
+                data['Name'].append(user_event_name)
                 data['Event Type'].append('User Event')
-                data['Time'].append(time)
-                data['Process'].append(pe_num)
-                data['Created By'].append(pe)
-                data['Details'].append(details)
+                data['Timestamp (ns)'].append(time)
+                data['Process ID'].append(pe_num)
+                data['Created By Process'].append(pe)
+                data['Details'].append('')
                 
             elif int(line_arr[0]) == ProjectionsConstants.USER_EVENT_PAIR:
                 user_event_id = int(line_arr[1])
@@ -588,14 +588,14 @@ class ProjectionsReader:
                 pe = int(line_arr[4])
                 nested_id = int(line_arr[5])
                 
-                details = sts_reader.get_user_event(user_event_id)
+                user_event_name = sts_reader.get_user_event(user_event_id)
                 
-                data['Function Name'].append('User Event Pair')
+                data['Name'].append(user_event_name)
                 data['Event Type'].append('User Event Pair')
-                data['Time'].append(time)
-                data['Process'].append(pe_num)
-                data['Created By'].append(pe)
-                data['Details'].append(details)
+                data['Timestamp (ns)'].append(time)
+                data['Process ID'].append(pe_num)
+                data['Created By Process'].append(pe)
+                data['Details'].append('')
                 
             elif int(line_arr[0]) == ProjectionsConstants.BEGIN_USER_EVENT_PAIR:
                 user_event_id = int(line_arr[1])
@@ -606,11 +606,11 @@ class ProjectionsReader:
                 
                 details = sts_reader.get_user_event(user_event_id)
                 
-                data['Function Name'].append('User Event Pair')
+                data['Name'].append('User Event Pair')
                 data['Event Type'].append('Entry')
-                data['Time'].append(time)
-                data['Process'].append(pe_num)
-                data['Created By'].append(pe)
+                data['Timestamp (ns)'].append(time)
+                data['Process ID'].append(pe_num)
+                data['Created By Process'].append(pe)
                 data['Details'].append(details)
                 
             elif int(line_arr[0]) == ProjectionsConstants.END_USER_EVENT_PAIR:
@@ -622,11 +622,11 @@ class ProjectionsReader:
                 
                 details = sts_reader.get_user_event(user_event_id)
                 
-                data['Function Name'].append('User Event Pair')
+                data['Name'].append('User Event Pair')
                 data['Event Type'].append('Exit')
-                data['Time'].append(time)
-                data['Process'].append(pe_num)
-                data['Created By'].append(pe)
+                data['Timestamp (ns)'].append(time)
+                data['Process ID'].append(pe_num)
+                data['Created By Process'].append(pe)
                 data['Details'].append(details)
                 
             elif int(line_arr[0]) == ProjectionsConstants.USER_STAT:
@@ -636,14 +636,14 @@ class ProjectionsReader:
                 pe = int(line_arr[4])
                 user_event_id = int(line_arr[5])
                 
-                details = sts_reader.get_user_stat(user_event_id) + ': ' + str(stat)
+                user_stat_name = sts_reader.get_user_stat(user_event_id)
                 
-                data['Function Name'].append('User Stat')
+                data['Name'].append(user_stat_name)
                 data['Event Type'].append('User Stat')
-                data['Time'].append(time)
-                data['Process'].append(pe_num)
-                data['Created By'].append(pe)
-                data['Details'].append(details)
+                data['Timestamp (ns)'].append(time)
+                data['Process ID'].append(pe_num)
+                data['Created By Process'].append(pe)
+                data['Details'].append(str(stat))
 
         
         log_file.close()
