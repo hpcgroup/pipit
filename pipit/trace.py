@@ -32,6 +32,7 @@ class Trace:
 
         return HPCToolkitReader(dirname).read()
 
+
     def __event_locations(self):
         """
         private helper function to return a set of the thread or process ids
@@ -44,6 +45,7 @@ class Trace:
             return (set(self.events["Process ID"]), "Process ID")
         else:
             return (set(), None)
+
 
     def match_rows(self):
         if "Matching Index" not in self.events.columns:
@@ -99,6 +101,7 @@ class Trace:
             self.events["Matching Index"] = matching_indices
             self.events["Matching Timestamp"] = matching_times
 
+
     def calc_inc_time(self):
         # Adds "Inc Time" column
         if "Inc Time" not in self.events.columns:
@@ -109,6 +112,7 @@ class Trace:
             self.events["Inc Time"] = (
                 self.events["Matching Timestamp"] - self.events["Timestamp (ns)"]
             ).abs()
+
 
     def calling_relationships(self):
         """
@@ -185,6 +189,7 @@ class Trace:
             # parent categorical?
             self.events["Parent"], self.events["Children"] = parent, children
 
+
     def calc_exc_time(self):
         if "Exc Time" not in self.events.columns:
             if "Inc Time" not in self.events.columns:
@@ -215,6 +220,7 @@ class Trace:
                 exc_times[int(matching_indices[i])] = exc_times[parent_df_indices[i]]
 
             self.events["Exc Time"] = exc_times
+
 
     def comm_matrix(self, comm_type="bytes"):
         """
