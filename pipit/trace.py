@@ -32,16 +32,16 @@ class Trace:
 
         return HPCToolkitReader(dirname).read()
 
-    def comm_matrix(self, comm_type="bytes"):
+    def comm_matrix(self, output="size"):
         """
         Communication Matrix for Peer-to-Peer (P2P) MPI messages
 
         Arguments:
 
-        1) comm_type -
+        1) output -
         string to choose whether the communication volume should be measured
         by bytes transferred between two processes or the number of messages
-        sent (two choices - "bytes" or "counts")
+        sent (two choices - "size" or "count")
 
         Returns:
         A 2D Numpy Array that represents the communication matrix for all P2P
@@ -55,11 +55,7 @@ class Trace:
 
         # get the list of ranks/process ids
         # (mpi messages are sent between processes)
-        ranks = set(
-            self.events.loc[self.events["Location Group Type"] == "PROCESS"][
-                "Location Group ID"
-            ]
-        )
+        ranks = set(self.events["Process ID"])
 
         # create a 2d numpy array that will be returned
         # at the end of the function
@@ -68,11 +64,11 @@ class Trace:
         # filter the dataframe by MPI Send and Isend events
         sender_dataframe = self.events.loc[
             self.events["Event Type"].isin(["MpiSend", "MpiIsend"]),
-            ["Location Group ID", "Attributes"],
+            ["Process ID", "Attributes"],
         ]
 
         # get the mpi ranks of all the sender processes
-        sender_ranks = sender_dataframe["Location Group ID"].to_list()
+        sender_ranks = sender_dataframe["Process ID"].to_list()
 
         # get the corresponding mpi ranks of the receivers
         receiver_ranks = (
@@ -82,25 +78,25 @@ class Trace:
         )
 
         # number of bytes communicated
-        if comm_type == "bytes":
+        if output == "size":
             # (1 communication is a single row in the sender dataframe)
-            message_volumes = (
+            message_volume = (
                 sender_dataframe["Attributes"]
                 .apply(lambda attrDict: attrDict["msg_length"])
                 .to_list()
             )
-        elif comm_type == "counts":
+        elif output == "count":
             # 1 message between the pairs of processes
             # for each row in the sender dataframe
-            message_volumes = np.full(len(sender_dataframe), 1)
+            message_volume = np.full(len(sender_dataframe), 1)
 
         for i in range(len(sender_ranks)):
             """
             loops through all the communication events and adds the
-            message volumes to the corresponding entry of the 2d array
+            message volume to the corresponding entry of the 2d array
             using the sender and receiver ranks
             """
-            communication_matrix[sender_ranks[i], receiver_ranks[i]] += message_volumes[
+            communication_matrix[sender_ranks[i], receiver_ranks[i]] += message_volume[
                 i
             ]
 
