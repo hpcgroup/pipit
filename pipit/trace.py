@@ -119,7 +119,6 @@ class Trace:
         else:
             return (set(), None)
 
-
     def match_rows(self):
         if "Matching Index" not in self.events.columns:
             """
@@ -145,11 +144,17 @@ class Trace:
 
                 stack = []
                 event_types = list(filtered_df["Event Type"])
-                df_indices, timestamps= list(filtered_df.index), list(filtered_df["Timestamp (ns)"])
-                
+                df_indices, timestamps = list(filtered_df.index), list(
+                    filtered_df["Timestamp (ns)"]
+                )
+
                 # Iterate through all events of filtered DataFrame
                 for i in range(len(filtered_df)):
-                    curr_df_index, curr_timestamp, evt_type = df_indices[i], timestamps[i], event_types[i]
+                    curr_df_index, curr_timestamp, evt_type = (
+                        df_indices[i],
+                        timestamps[i],
+                        event_types[i],
+                    )
 
                     if evt_type == "Entry":
                         # Add current dataframe index and timestamp to stack
@@ -168,16 +173,16 @@ class Trace:
             self.events["Matching Index"] = matching_indices
             self.events["Matching Timestamp"] = matching_times
 
-    
     def calc_inc_time(self):
         # Adds "Inc Time" column
         if "Inc Time" not in self.events.columns:
             if "Matching Timestamp" not in self.events.columns:
                 self.match_rows()
-            
-            # Uses matching timestamp to calculate the inclusive time
-            self.events["Inc Time"] = (self.events["Matching Timestamp"] - self.events["Timestamp (ns)"]).abs()
 
+            # Uses matching timestamp to calculate the inclusive time
+            self.events["Inc Time"] = (
+                self.events["Matching Timestamp"] - self.events["Timestamp (ns)"]
+            ).abs()
 
     def calling_relationships(self):
         """
@@ -191,9 +196,9 @@ class Trace:
 
         if "Children" not in self.events.columns:
             children = [None] * len(self.events)
-            depth, parent = [float("nan")] * len(self.events), [float("nan")] * len(self.events)
-
-            inc_times = list(self.events["Inc Time"])
+            depth, parent = [float("nan")] * len(self.events), [float("nan")] * len(
+                self.events
+            )
 
             filter_set, filter_col = self.__event_locations()
 
@@ -206,13 +211,15 @@ class Trace:
                     filtered_df = entry_exit_df.loc[entry_exit_df[filter_col] == id]
 
                 curr_depth, stack = 0, []
-                df_indices, event_types = list(filtered_df.index), list(filtered_df["Event Type"])
+                df_indices, event_types = list(filtered_df.index), list(
+                    filtered_df["Event Type"]
+                )
 
                 for i in range(len(filtered_df)):
                     curr_df_index, evt_type = df_indices[i], event_types[i]
 
                     if evt_type == "Entry":
-                        if curr_depth > 0: # if event is a child of some other event
+                        if curr_depth > 0:  # if event is a child of some other event
                             parent_df_index = stack[-1]
 
                             if children[parent_df_index] is None:
@@ -245,13 +252,12 @@ class Trace:
                         parent[curr_df_index] = parent[entry_df_index]
 
                         curr_depth -= 1
-            
+
             self.events["Depth"] = depth
             self.events = self.events.astype({"Depth": "category"})
 
             # parent categorical?
             self.events["Parent"], self.events["Children"] = parent, children
-
 
     def calc_exc_time(self):
         if "Exc Time" not in self.events.columns:
@@ -266,7 +272,9 @@ class Trace:
 
             # Filter to events that have children
             filtered_df = self.events.loc[self.events["Children"].notnull()]
-            parent_df_indices, children = list(filtered_df.index), list(filtered_df["Children"])
+            parent_df_indices, children = list(filtered_df.index), list(
+                filtered_df["Children"]
+            )
 
             # Iterate through the events that are parents
             for i in range(len(filtered_df)):
