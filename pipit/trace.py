@@ -5,6 +5,7 @@
 
 import numpy as np
 
+
 class Node:
     def __init__(self, name, pid, dur, graph_node) -> None:
         self.name = name
@@ -22,6 +23,7 @@ class Node:
             + " "
             + str(self.graph_node)
         )
+
 
 class Trace:
     """A trace dataset is read into an object of this type, which includes one
