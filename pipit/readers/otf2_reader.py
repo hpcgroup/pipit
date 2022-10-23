@@ -230,17 +230,19 @@ class OTF2Reader:
 
             trace.close()  # close event files
 
-        # returns dictionary with all events and their fields
-        return {
-            "Event Type": event_types,
-            "Timestamp (ns)": timestamps,
-            "Name": names,
-            "Location ID": locs,
-            "Location Type": loc_types,
-            "Location Group ID": loc_groups,
-            "Location Group Type": loc_group_types,
-            "Attributes": event_attributes,
-        }
+        # returns dataframe with all events and their fields
+        return pd.DataFrame(
+            {
+                "Event Type": event_types,
+                "Timestamp (ns)": timestamps,
+                "Name": names,
+                "Location ID": locs,
+                "Location Type": loc_types,
+                "Location Group ID": loc_groups,
+                "Location Group Type": loc_group_types,
+                "Attributes": event_attributes,
+            }
+        )
 
     def read_definitions(self, trace):
         """
@@ -315,24 +317,16 @@ class OTF2Reader:
         # using the multiprocessing library
         pool_size, pool = self.num_parallel, mp.Pool(self.num_parallel)
 
-        # confusing, but at this moment in time events_dict is actually a
-        # list of dicts that will be merged into one dictionary after this
-        events_dict = pool.map(
+        # list of dataframes returned by the processes pool
+        events_dataframes = pool.map(
             self.events_reader, [(rank, pool_size) for rank in range(pool_size)]
         )
 
         pool.close()
 
-        # combines the dictionaries returned from each
-        # process to generate a full trace
-        for i in range(len(events_dict) - 1):
-            for key, value in events_dict[0].items():
-                value.extend(events_dict[1][key])
-            del events_dict[1]
-        events_dict = events_dict[0]
-
-        # returns the events as a DataFrame
-        events_dataframe = pd.DataFrame(events_dict)
+        # merges the dataframe into one events dataframe
+        events_dataframe = pd.concat(events_dataframes)
+        del events_dataframes
 
         # accessing the clock properties of the trace using the definitions
         clock_properties = self.definitions.loc[
