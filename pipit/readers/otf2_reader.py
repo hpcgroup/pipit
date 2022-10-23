@@ -317,31 +317,18 @@ class OTF2Reader:
 
         # parallelizes the reading of events
         # using the multiprocessing library
-<<<<<<< HEAD
-        pool_size = mp.cpu_count()
-        pool = mp.Pool(pool_size)
-=======
         pool_size, pool = self.num_parallel, mp.Pool(self.num_parallel)
->>>>>>> 327c13d (feature: give optional argument for number of cores to parallelize reader with)
 
-        # confusing, but at this moment in time events_dict is actually a
-        # list of dicts that will be merged into one dictionary after this
-        events_dict = pool.map(
+        # list of dataframes returned by the processes pool
+        events_dataframes = pool.map(
             self.events_reader, [(rank, pool_size) for rank in range(pool_size)]
         )
 
         pool.close()
 
-        # combines the dictionaries returned from each
-        # process to generate a full trace
-        for i in range(len(events_dict) - 1):
-            for key, value in events_dict[0].items():
-                value.extend(events_dict[1][key])
-            del events_dict[1]
-        events_dict = events_dict[0]
-
-        # returns the events as a DataFrame
-        events_dataframe = pd.DataFrame(events_dict)
+        # merges the dataframe into one events dataframe
+        events_dataframe = pd.concat(events_dataframes)
+        del events_dataframes
 
         # accessing the clock properties of the trace using the definitions
         clock_properties = self.definitions.loc[
