@@ -30,64 +30,62 @@ class Trace:
 
         return HPCToolkitReader(dirname).read()
 
-    def time_per_func_occurrence(self, metric="exc"):
+    """
+    Note: Relies on Standardizing and Inc/Exc PRs to be merged first!
+    """
+
+    def time_per_func_occurrence(self, metric="Exc Time", groupby_column="Name"):
         """
         Arguments:
-        metric - a string that can be either "exc" or "inc"
+        metric - a string that can be either "Exc Time" or "Inc Time"
+        groupby_column - a string containing the column to be grouped by
 
         Returns:
         A dictionary where the keys are the names of all the events in the trace
         and the values are lists containing the times that every individual function
-        occurrence of that event took. Depending on the metric paramter, the times
+        occurrence of that event took. Depending on the metric parameter, the times
         will either be inclusive or exclusive.
 
         The dictionary's values can be used to create a scatterplot of the times of
         all of a function's occurrences, calculate imbalance, etc.
         """
 
-        if metric == "exc":
-            col_name = "Exc Time (ns)"
-        elif metric == "inc":
-            col_name = "Inc Time (ns)"
-        else:
-            print('Input a valid metric - either "exc" or "inc".')
+        if metric == "Exc Time" and "Exc Time" not in self.events.columns:
+            self.calc_exc_time()  # once inc/exc pr is merged
+        elif metric == "Inc Time" and "Inc Time" not in self.events.columns:
+            self.calc_inc_time()  # once inc/exc pr is merged
 
         return (
-            self.events.loc[self.events["Event Type"] == "Enter"]
-            .groupby("Name", observed=True)[col_name]
+            self.events.loc[self.events["Event Type"] == "Entry"]
+            .groupby(groupby_column, observed=True)[metric]
             .apply(list)
             .to_dict()
         )
 
-    def flat_profile(self, metric="both"):
+    def flat_profile(self, metric=["Inc Time", "Exc Time"], groupby_column="Name"):
         """
         Arguments:
-        metric - a string that can be either "both", "exc", or "inc"
+        metric - a string or list of strings containing the metrics to be aggregated
+        groupby_column - a string or list containing the columns to be grouped by
 
         Returns:
-        A Pandas DataFrame where each row corresponds to a function
-        and it will have the total summed up inclusive or exclusive time
-        for that function as columns. Depending on the metric parameter,
-        there will either be an exclusive column, inclusive column, or both.
+        A Pandas DataFrame that will have the aggregated metrics
+        for the grouped by columns.
 
         Note:
-        Filtering by rank, location id, event names, etc has not been added.
+        Filtering by process id, event names, etc has not been added.
         Perhaps a query language similar to Hatchet can be utilized.
-        Only very basic error handling has been added to some of the functions.
-        These are areas to touch up on throughout the program.
+        There should also be some error handling.
+        These are areas to touch up on throughout the repo.
         """
 
-        if metric == "both":
-            columns = ["Exc Time (ns)", "Inc Time (ns)"]
-        elif metric == "exc":
-            columns = "Exc Time (ns)"
-        elif metric == "inc":
-            columns = "Inc Time (ns)"
-        else:
-            print('Input a valid metric - either "both", "exc", or "inc".')
+        if "Inc Time" in metric and "Inc Time" not in self.events.columns:
+            self.calc_inc_time()  # once inc/exc pr is merged
+        if "Exc Time" in metric and "Exc Time" not in self.events.columns:
+            self.calc_exc_time()  # once inc/exc pr is merged
 
         return (
-            self.events.loc[self.events["Event Type"] == "Enter"]
-            .groupby("Name", observed=True)[columns]
+            self.events.loc[self.events["Event Type"] == "Entry"]
+            .groupby(groupby_column, observed=True)[metric]
             .sum()
         )
