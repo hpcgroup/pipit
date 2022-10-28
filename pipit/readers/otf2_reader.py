@@ -221,11 +221,11 @@ class OTF2Reader:
                             # and ignores time so there isn't a duplicate time
                             if value is not None and key != "time":
 
-                                # uses field_to_val to convert all data types appropriately
+                                # uses field_to_val to convert all data types
                                 # and ensure that there are no pickling errors
-                                attributes_dict[self.field_to_val(key)] = self.handle_data(
-                                    value
-                                )
+                                attributes_dict[
+                                    self.field_to_val(key)
+                                ] = self.handle_data(value)
                         event_attributes.append(attributes_dict)
                     else:
                         # nan attributes for leave rows
