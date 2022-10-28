@@ -5,7 +5,6 @@
 
 import pandas as pd
 import pipit.trace
-import time
 
 
 class NsightReader:
@@ -23,7 +22,7 @@ class NsightReader:
     def read(self):
         # Read in csv
         self.df = pd.read_csv(self.file_name)
-        
+
         # Grab the set of the column PID columns to see if mutliprocess
         pid = set(self.df["PID"])
 
@@ -31,7 +30,7 @@ class NsightReader:
         if self.df["PID"].equals(self.df["TID"]) is False:
             # get the list of pid
             pid_list = list(pid)
-            
+
             # group the pids together and give each process it's own set of threads
             # Example
             #       Process (8226) 0  Process (8227) 1
@@ -40,8 +39,8 @@ class NsightReader:
             for i in pid_list:
                 # grabbing the TIDs from distinct PID
                 tid = self.df.loc[self.df.PID == i, "TID"]
-                
-                # Creating a dictionary and then incrementing each value 
+
+                # Creating a dictionary and then incrementing each value
                 tid_dict = dict.fromkeys(tid, 0)
                 tid_dict.update((k, i) for i, k in enumerate(tid_dict))
                 # Setting the Thread ID using the dictionary and the TID
@@ -58,7 +57,7 @@ class NsightReader:
             self.df["Process ID"] = self.df["PID"]
             self.df["Process ID"].replace(pid_dict, inplace=True)
 
-        # Copy self.df to create enter and exit rows 
+        # Copy self.df to create enter and exit rows
         df2 = self.df.copy()
 
         # Create new columns for self.df with start time to create entry rows
@@ -88,8 +87,8 @@ class NsightReader:
             }
         )
 
-        # Grabbing the list of columns and rearranging them to put 
-        # Timestamp, Event Types, Name, Thread ID (potentially), 
+        # Grabbing the list of columns and rearranging them to put
+        # Timestamp, Event Types, Name, Thread ID (potentially),
         # Process ID(potentially) in the front of the dataframe
         cols = list(self.df)
         cols.insert(0, cols.pop(cols.index("Timestamp (ns)")))
