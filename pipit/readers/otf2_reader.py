@@ -181,7 +181,7 @@ class OTF2Reader:
             # iterates through the events and processes them
             for loc_event in loc_events:
                 # extracts the location and event
-                # location could be thread, process, accelerator stream, etc
+                # location could be thread, process, etc
                 loc, event = loc_event[0], loc_event[1]
 
                 """
@@ -194,50 +194,43 @@ class OTF2Reader:
                     thread_ids.append(loc._ref)
                     process_ids.append(loc.group._ref)
 
-                # type of event - entry, exit, or other types
-                # note: otf2 uses enter/leave but pipit uses entry/exit
-                event_type = str(type(event))[20:-2]
-                if event_type == "Enter":
-                    event_types.append("Entry")
-                elif event_type == "Leave":
-                    event_types.append("Exit")
-                else:
-                    # placeholder
-                    # need to think of a good event type category for others
-                    event_types.append(event_type)
+                    # type of event - enter, leave, or other types
+                    event_type = str(type(event))[20:-2]
+                    if event_type == "Enter" or event_type == "Leave":
+                        event_types.append(event_type)
+                    else:
+                        event_types.append("Instant")
 
-                if event_type in ["Enter", "Leave"]:
-                    names.append(event.region.name)
-                else:
-                    # placeholder
-                    # have event type here once an "other" category name is decided
-                    names.append("N/A")
+                    if event_type in ["Enter", "Leave"]:
+                        names.append(event.region.name)
+                    else:
+                        names.append(event_type)
 
-                timestamps.append(event.time)
+                    timestamps.append(event.time)
 
-                # only add attributes for non-leave rows so that
-                # there aren't duplicate attributes for a single event
-                if event_type != "Leave":
-                    attributes_dict = {}
+                    # only add attributes for non-leave rows so that
+                    # there aren't duplicate attributes for a single event
+                    if event_type != "Leave":
+                        attributes_dict = {}
 
-                    # iterates through the event's attributes
-                    # (ex: region, bytes sent, etc)
-                    for key, value in vars(event).items():
+                        # iterates through the event's attributes
+                        # (ex: region, bytes sent, etc)
+                        for key, value in vars(event).items():
 
-                        # only adds non-empty attributes
-                        # and ignores time so there isn't a duplicate time
-                        if value is not None and key != "time":
+                            # only adds non-empty attributes
+                            # and ignores time so there isn't a duplicate time
+                            if value is not None and key != "time":
 
-                            # uses field_to_val to convert all data types appropriately
-                            # and ensure that there are no pickling errors
-                            attributes_dict[self.field_to_val(key)] = self.handle_data(
-                                value
-                            )
-                    event_attributes.append(attributes_dict)
-                else:
-                    # nan attributes for leave rows
-                    # attributes column is of object dtype
-                    event_attributes.append(None)
+                                # uses field_to_val to convert all data types appropriately
+                                # and ensure that there are no pickling errors
+                                attributes_dict[self.field_to_val(key)] = self.handle_data(
+                                    value
+                                )
+                        event_attributes.append(attributes_dict)
+                    else:
+                        # nan attributes for leave rows
+                        # attributes column is of object dtype
+                        event_attributes.append(None)
 
             trace.close()  # close event files
 
@@ -246,8 +239,8 @@ class OTF2Reader:
             "Timestamp (ns)": timestamps,
             "Event Type": event_types,
             "Name": names,
-            "Thread ID": thread_ids,
-            "Process ID": process_ids,
+            "Thread": thread_ids,
+            "Process": process_ids,
             "Attributes": event_attributes,
         }
 
@@ -370,27 +363,10 @@ class OTF2Reader:
             {
                 "Event Type": "category",
                 "Name": "category",
-                "Thread ID": "category",
-                "Process ID": "category",
+                "Thread": "category",
+                "Process": "category",
             }
         )
-
-        # removing unnecessary columns
-        # make this into a common function across readers?
-        num_process_ids, num_thread_ids = len(set(events_dataframe["Process ID"])), len(
-            set(events_dataframe["Thread ID"])
-        )
-
-        if num_process_ids > 1:
-            if num_process_ids == num_thread_ids:
-                # remove thread id column for multi-process, single-threaded trace
-                events_dataframe.drop(columns="Thread ID", inplace=True)
-        else:
-            # remove process id column for single-process trace
-            events_dataframe.drop(columns="Process ID", inplace=True)
-            if num_thread_ids == 1:
-                # remove thread id column for single-process, single-threaded trace
-                events_dataframe.drop(columns="Thread ID", inplace=True)
 
         return events_dataframe
 

@@ -183,10 +183,10 @@ class HPCToolkitReader:
             "Timestamp (ns)": [],
             "Event Type": [],
             "Name": [],
-            "Thread ID": [],
-            "Process ID": [],
-            "Cluster Node": [],
-            "CCT Node": [],
+            "Thread": [],
+            "Process": [],
+            "Host": [],
+            "Node": [],
         }
         min_max_time = experiment_reader.get_min_max_time()
 
@@ -238,19 +238,19 @@ class HPCToolkitReader:
 
                 # checking to see if the last event wasn't the same
                 # if it was then we skip it, as to not have multiple sets of
-                # open/close events for a function that it's still in
+                # open/close events for a function that it's still ino
                 if last_id != calling_context_id:
 
                     # updating the trace_db
 
-                    node = graph.get_node(calling_context_id)  # the node in the CCT
+                    node = graph.get_node(calling_context_id)  # the node in the Graph
 
                     # closing functions exited
                     close_node = last_node
                     intersect_level = -1
                     intersect_node = node.get_intersection(last_node)
                     # this is the highest node that last_node and node have in
-                    # common we want to close every entry time event higher
+                    # common we want to close every enter time event higher
                     # than than interest node, because those functions have
                     # exited
 
@@ -261,30 +261,30 @@ class HPCToolkitReader:
                         and close_node.get_level() > intersect_level
                     ):
                         data["Name"].append(close_node.name)
-                        data["Event Type"].append("Exit")
+                        data["Event Type"].append("Leave")
                         data["Timestamp (ns)"].append(timestamp)
-                        data["Process ID"].append(proc_num[1][1])
-                        data["Thread ID"].append(proc_num[2][1])
-                        data["Cluster Node"].append(proc_num[0][1])
-                        data["CCT Node"].append(close_node)
+                        data["Process"].append(proc_num[1][1])
+                        data["Thread"].append(proc_num[2][1])
+                        data["Host"].append(proc_num[0][1])
+                        data["Node"].append(close_node)
                         close_node = close_node.parent
 
                     # creating new rows for the new functions entered
-                    entry_list = node.get_node_list(intersect_level)
+                    enter_list = node.get_node_list(intersect_level)
                     # the list of nodes higher than interesect_level
                     # (the level of interesect_node)
 
                     # all of the nodes in this list have entered into the
                     # function since the last poll so we want to create entries
-                    # in the data for the Entry event
-                    for entry_node in entry_list[::-1]:
-                        data["Name"].append(entry_node.name)
-                        data["Event Type"].append("Entry")
+                    # in the data for the Enter event
+                    for enter_node in enter_list[::-1]:
+                        data["Name"].append(enter_node.name)
+                        data["Event Type"].append("Enter")
                         data["Timestamp (ns)"].append(timestamp)
-                        data["Process ID"].append(proc_num[1][1])
-                        data["Thread ID"].append(proc_num[2][1])
-                        data["Cluster Node"].append(proc_num[0][1])
-                        data["CCT Node"].append(entry_node)
+                        data["Process"].append(proc_num[1][1])
+                        data["Thread"].append(proc_num[2][1])
+                        data["Host"].append(proc_num[0][1])
+                        data["Node"].append(enter_node)
                     last_node = node
 
                 last_id = calling_context_id  # updating last_id
@@ -292,18 +292,18 @@ class HPCToolkitReader:
             # adding last data for trace df
             close_node = last_node
 
-            # after reading through all the trace lines, some Entry events will
-            # not have matching Exit events, as the functions were still
-            # running in the last poll.  Here we are adding Exit events to all
-            # of the remaining unmatched Entry events
+            # after reading through all the trace lines, some Enter events will
+            # not have matching Leave events, as the functions were still
+            # running in the last poll.  Here we are adding Leave events to all
+            # of the remaining unmatched Enter events
             while close_node is not None:
                 data["Name"].append(close_node.name)
-                data["Event Type"].append("Exit")
+                data["Event Type"].append("Leave")
                 data["Timestamp (ns)"].append(min_max_time[1] - min_max_time[0])
-                data["Process ID"].append(proc_num[1][1])
-                data["Thread ID"].append(proc_num[2][1])
-                data["Cluster Node"].append(proc_num[0][1])
-                data["CCT Node"].append(close_node)
+                data["Process"].append(proc_num[1][1])
+                data["Thread"].append(proc_num[2][1])
+                data["Host"].append(proc_num[0][1])
+                data["Node"].append(close_node)
                 close_node = close_node.parent
 
         trace_df = pd.DataFrame(data)
@@ -316,27 +316,11 @@ class HPCToolkitReader:
             {
                 "Event Type": "category",
                 "Name": "category",
-                "Thread ID": "category",
-                "Process ID": "category",
-                "Cluster Node": "category",
+                "Thread": "category",
+                "Process": "category",
+                "Host": "category",
             }
         )
-
-        # removing unnecessary columns
-        num_process_ids, num_thread_ids = len(set(trace_df["Process ID"])), len(
-            set(trace_df["Thread ID"])
-        )
-
-        if num_process_ids > 1:
-            if num_thread_ids == 1:
-                # remove thread id column for multi-process, single-threaded trace
-                trace_df.drop(columns="Thread ID", inplace=True)
-        else:
-            # remove process id column for single-process trace
-            trace_df.drop(columns="Process ID", inplace=True)
-            if num_thread_ids == 1:
-                # remove thread id column for single-process, single-threaded trace
-                trace_df.drop(columns="Thread ID", inplace=True)
 
         self.trace_df = trace_df
         return pipit.trace.Trace(None, trace_df)
