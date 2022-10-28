@@ -163,11 +163,9 @@ class OTF2Reader:
             # columns of the DataFrame
             timestamps, event_types, event_attributes, names = [], [], [], []
 
-            """
-            Note:
-            1. The below lists are for storing logical ids.
-            2. Support for GPU events has to be added and unified across readers.
-            """
+            # Note:
+            # 1. The below lists are for storing logical ids.
+            # 2. Support for GPU events has to be added and unified across readers.
             process_ids, thread_ids = [], []
 
             # selects a subset of all trace locations to
@@ -184,12 +182,10 @@ class OTF2Reader:
                 # location could be thread, process, etc
                 loc, event = loc_event[0], loc_event[1]
 
-                """
-                information about the location that the event occurred on
+                # information about the location that the event occurred on
 
-                TO DO:
-                need to add support for accelerator and metric locations
-                """
+                # TO DO:
+                # need to add support for accelerator and metric locations
                 if str(loc.type)[13:] == "CPU_THREAD":
                     thread_ids.append(loc._ref)
                     process_ids.append(loc.group._ref)
