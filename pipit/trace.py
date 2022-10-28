@@ -25,16 +25,16 @@ class Trace:
         return OTF2Reader(dirname).read()
 
     @staticmethod
-    def from_hpctoolkit(dirname):
+    def from_hpctoolkit(filename):
         """Read an HPCToolkit trace into a new Trace object."""
         # import this lazily to avoid circular dependencies
         from .readers.hpctoolkit_reader import HPCToolkitReader
 
-        return HPCToolkitReader(dirname).read()
+        return HPCToolkitReader(filename).read()
 
     @staticmethod
     def from_nsight(dirname):
-        """Read an NSight trace into a new Trace object."""
+        """Read an Nsight trace into a new Trace object."""
         # import this lazily to avoid circular dependencies
         from .readers.nsight_reader import NsightReader
 
