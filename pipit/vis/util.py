@@ -74,16 +74,17 @@ def vis_init():
     )
 
 
-def formatter(t):
-    """Converts timespan from seconds to something more readable"""
-    if t < 1e-6:  # Less than 1us --> ns
-        return str(round(t * 1e9)) + "ns"
-    if t < 0.001:  # Less than 1ms --> us
-        return str(round(t * 1e6)) + "μs"
-    if t < 1:  # Less than 1s --> ms
-        return str(round(t * 1000)) + "ms"
+def humanize_timedelta(ns):
+    """Converts timespan from ns to something more readable"""
+
+    if ns < 1e3:  # Less than 1us --> ns
+        return str(round(ns)) + "ns"
+    if ns < 1e6:  # Less than 1ms --> us
+        return str(round(ns / 1e3)) + "μs"
+    if ns < 1e9:  # Less than 1s --> ms
+        return str(round(ns / 1e6)) + "ms"
     else:
-        return str(round(t, 3)) + "s"
+        return str(round(ns / 1e9, 3)) + "s"
 
 
 def clamp(n, smallest, largest):
