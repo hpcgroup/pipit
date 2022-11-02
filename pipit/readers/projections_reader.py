@@ -225,8 +225,7 @@ class ProjectionsReader:
             "Event Type": [],
             "Timestamp (ns)": [],
             "Process ID": [],
-            'Details': [],
-            'Created By Process': []
+            'Details': []
         }
 
     def read(self):
