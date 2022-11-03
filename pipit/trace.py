@@ -53,9 +53,9 @@ class Trace:
         ex) comm_matrix[sender_rank][receiver_rank]
         """
 
-        # get the list of ranks/process ids
+        # get the list of ranks/processes
         # (mpi messages are sent between processes)
-        ranks = set(self.events["Process ID"])
+        ranks = set(self.events["Process"])
 
         # create a 2d numpy array that will be returned
         # at the end of the function
@@ -63,12 +63,12 @@ class Trace:
 
         # filter the dataframe by MPI Send and Isend events
         sender_dataframe = self.events.loc[
-            self.events["Event Type"].isin(["MpiSend", "MpiIsend"]),
-            ["Process ID", "Attributes"],
+            self.events["Name"].isin(["MpiSend", "MpiIsend"]),
+            ["Process", "Attributes"],
         ]
 
         # get the mpi ranks of all the sender processes
-        sender_ranks = sender_dataframe["Process ID"].to_list()
+        sender_ranks = sender_dataframe["Process"].to_list()
 
         # get the corresponding mpi ranks of the receivers
         receiver_ranks = (
