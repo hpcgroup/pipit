@@ -236,6 +236,7 @@ class OTF2Reader:
 
             trace.close()  # close event files
 
+<<<<<<< HEAD
         # returns dictionary with all events and their fields
         return {
             "Timestamp (ns)": timestamps,
@@ -245,6 +246,21 @@ class OTF2Reader:
             "Process": process_ids,
             "Attributes": event_attributes,
         }
+=======
+        # returns dataframe with all events and their fields
+        return pd.DataFrame(
+            {
+                "Event Type": event_types,
+                "Timestamp (ns)": timestamps,
+                "Name": names,
+                "Location ID": locs,
+                "Location Type": loc_types,
+                "Location Group ID": loc_groups,
+                "Location Group Type": loc_group_types,
+                "Attributes": event_attributes,
+            }
+        )
+>>>>>>> d964cef9f02dcb01f5cd14dbaa55e6aea6fd5e2f
 
     def read_definitions(self, trace):
         """
