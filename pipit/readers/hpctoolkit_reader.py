@@ -270,7 +270,7 @@ class HPCToolkitReader:
                         close_node = close_node.parent
 
                     # creating new rows for the new functions entered
-                    entry_list = node.get_node_list(intersect_level)
+                    enter_list = node.get_node_list(intersect_level)
                     # the list of nodes higher than interesect_level
                     # (the level of interesect_node)
 
