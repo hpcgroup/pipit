@@ -10,10 +10,10 @@ def comm_sum(trace):
 
     # Filter by sends
     events = trace.events
-    sends = events[events["Event"] == "MpiSend"]
+    sends = events[events["Event Type"] == "MpiSend"]
 
     messages = pd.DataFrame()
-    messages["From"] = sends["Location ID"]
+    messages["From"] = sends["Process ID"]
     messages["Size"] = sends["Attributes"].map(lambda x: x["msg_length"])
 
     messages_aggr = messages.groupby("From").sum().reset_index()

@@ -11,10 +11,15 @@ def comm_graph(trace):
 
     # Filter by sends/recvs
     events = trace.events
-    sends = events[events["Event"] == "MpiSend"]
+    sends = events[events["Event Type"] == "MpiSend"]
 
     messages = pd.DataFrame()
-    messages["From"] = sends["Location ID"]
+    messages["From"] = sends["Process ID"]
+    
+    if("Attributes" not in sends):
+        print("Sender/receiver information is not available in trace")
+        return
+    
     messages["To"] = sends["Attributes"].map(lambda x: x["receiver"])
     messages["Size"] = sends["Attributes"].map(lambda x: x["msg_length"])
 

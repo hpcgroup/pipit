@@ -4,8 +4,6 @@
 # SPDX-License-Identifier: MIT
 
 import numpy as np
-import holoviews as hv
-hv.extension("bokeh")
 
 
 class Trace:
@@ -19,12 +17,12 @@ class Trace:
         self.events = events
 
     @staticmethod
-    def from_otf2(dirname, num_parallel=None):
+    def from_otf2(dirname):
         """Read an OTF2 trace into a new Trace object."""
         # import this lazily to avoid circular dependencies
         from .readers.otf2_reader import OTF2Reader
 
-        return OTF2Reader(dirname, num_parallel).read()
+        return OTF2Reader(dirname).read()
 
     @staticmethod
     def from_hpctoolkit(dirname):
@@ -52,6 +50,7 @@ class Trace:
             """
             Two columns to be added to dataframe:
             "Matching Index" and "Matching Timestamp"
+
             Matches dataframe indices and timestamps
             between corresponding entry and exit rows.
             """
@@ -115,6 +114,7 @@ class Trace:
         """
         Three columns to be added to dataframe:
         "Depth", "Parent", and "Children"
+
         Depth is level in the call tree starting from 0.
         Parent is the dataframe index of a row's parent event.
         Children is a list of dataframe indices of a row's children events.
@@ -170,6 +170,7 @@ class Trace:
                         """
                         storing depth and parent in both entry and exit rows
                         since they are floats.
+
                         children stored as nan in exit row and can be found
                         using matching index for avoiding redundant memory.
                         """
@@ -218,14 +219,18 @@ class Trace:
     def comm_matrix(self, comm_type="bytes"):
         """
         Communication Matrix for Peer-to-Peer (P2P) MPI messages
+
         Arguments:
+
         1) comm_type -
         string to choose whether the communication volume should be measured
         by bytes transferred between two processes or the number of messages
         sent (two choices - "bytes" or "counts")
+
         Returns:
         A 2D Numpy Array that represents the communication matrix for all P2P
         messages of the given trace
+
         Note:
         The first dimension of the returned 2d array
         is senders and the second dimension is receivers
@@ -234,11 +239,7 @@ class Trace:
 
         # get the list of ranks/process ids
         # (mpi messages are sent between processes)
-        ranks = set(
-            self.events.loc[self.events["Location Group Type"] == "PROCESS"][
-                "Location Group ID"
-            ]
-        )
+        ranks = self.events["Process ID"].unique()
 
         # create a 2d numpy array that will be returned
         # at the end of the function
@@ -247,11 +248,11 @@ class Trace:
         # filter the dataframe by MPI Send and Isend events
         sender_dataframe = self.events.loc[
             self.events["Event Type"].isin(["MpiSend", "MpiIsend"]),
-            ["Location Group ID", "Attributes"],
+            ["Process ID", "Attributes"],
         ]
 
         # get the mpi ranks of all the sender processes
-        sender_ranks = sender_dataframe["Location Group ID"].to_list()
+        sender_ranks = sender_dataframe["Process ID"].to_list()
 
         # get the corresponding mpi ranks of the receivers
         receiver_ranks = (

@@ -7,16 +7,16 @@ def function_sum(trace):
     # Initialize vis
     vis_init()
 
-    # Match enter/leave rows
-    trace.calculate_inc_time()
-    trace.calculate_exc_time()
+    # Calculate inc/exc times
+    trace.calc_inc_time()
+    trace.calc_exc_time()
 
     # Filter by functions
     events = trace.events
-    funcs = events[events["Event"] == "Enter"][["Name", "Location ID", "Exc Time (ns)"]]
+    funcs = events[events["Event Type"] == "Entry"][["Name", "Process ID", "Exc Time"]]
 
     return (
-        hv.Bars(funcs, kdims=["Location ID", "Name"])
+        hv.Bars(funcs, kdims=["Process ID", "Name"])
         .aggregate(function=np.sum)
         .opts(
             width=800,

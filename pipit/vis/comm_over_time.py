@@ -16,18 +16,23 @@ def comm_over_time(trace, comm_type="counts", num_bins=48):
     """
     # Initialize vis
     vis_init()
-
+    
     # Filter by sends
     events = trace.events
     sends = events[
-        (events["Event"] == "MpiSend") | (events["Event"] == "MpiISend")
+        (events["Event Type"] == "MpiSend") | (events["Event Type"] == "MpiISend")
     ].copy(deep=False)
+    
+    if("Attributes" not in sends):
+        print("Message size information is not available in trace")
+        return
+    
     sends["Size"] = sends["Attributes"].map(lambda x: x["msg_length"])
     sends.drop(["Attributes"], axis=1)
 
     # Group into equal-sized bins
     sends["Bin"] = pd.cut(sends["Timestamp (ns)"], bins=num_bins, labels=False)
-    df = sends.groupby("Bin").sum().reset_index()[["Bin", "Size"]]
+    df = sends.groupby("Bin").sum(numeric_only=True).reset_index()[["Bin", "Size"]]
     df = df.set_index("Bin")
     df = df.reindex(range(num_bins)).fillna(0)
 

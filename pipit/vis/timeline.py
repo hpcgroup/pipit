@@ -25,10 +25,6 @@ FUNCTIONAL_EVENTS_TOOLTIPS = """
         <span style="font-weight: bold;">Inc Time (Total):</span>&nbsp;
         <span style="font-family: Monaco, monospace;">@{humanized_inc_time}</span>
     </div>
-    <div>
-        <span style="font-weight: bold;">Exc Time (Self):</span>&nbsp;
-        <span style="font-family: Monaco, monospace;">@{humanized_exc_time}</span>
-    </div>
 """
 
 COMMUNICATION_EVENTS_TOOLTIPS = """
@@ -37,7 +33,7 @@ COMMUNICATION_EVENTS_TOOLTIPS = """
 INSTANT_EVENTS_TOOLTIPS = """
     <div>
         <span style="font-weight: bold;">Type:</span>&nbsp;
-        <span style="font-family: Monaco, monospace;">@{Event}</span>
+        <span style="font-family: Monaco, monospace;">@{event_type}</span>
     </div>
     <div>
         <span style="font-weight: bold;">Timestamp:</span>&nbsp;
@@ -46,13 +42,12 @@ INSTANT_EVENTS_TOOLTIPS = """
 """
 
 STANDARD_COLS = [
-    "Event",
+    "Event Type",
     "Timestamp (ns)",
     "Name",
-    "Location ID",
-    "Inc Time (ns)",
-    "Exc Time (ns)",
-    "Matching Time",
+    "Process ID",
+    "Inc Time",
+    "Matching Timestamp",
 ]
 
 
@@ -69,7 +64,13 @@ def apply_bokeh_customizations(plot, _):
 
 
 def timeline(trace, palette=DEFAULT_PALETTE, ranks=None, max_ranks=16):
-    """Generates interactive timeline of events in a Trace instance.
+    """Renders interactive timeline of events in a Trace instance.
+
+    Overlays 3 types of HoloViews elements, each generated dynamically
+    based on current viewport:
+    1. hv.Rectangles for functional events
+    2. hv.Points for instant events
+    3. hv.Segments for communication events
 
     Args:
         trace: Trace instance whose events are being visualized
@@ -84,55 +85,57 @@ def timeline(trace, palette=DEFAULT_PALETTE, ranks=None, max_ranks=16):
     # Initialize vis
     vis_init()
 
-    # Calculate inc and exc times if not already done
-    if "Inc Time (ns)" not in trace.events:
-        trace.calculate_inc_time()
+    # Calculate matching rows and inc time
+    trace.match_rows()
+    trace.calc_inc_time()
 
-    if "Exc Time (ns)" not in trace.events:
-        trace.calculate_exc_time()
-
+    # Copy the trace events dataframe and modify it
     events = trace.events[STANDARD_COLS].copy(deep=False)
     events["Timestamp (ms)"] = events["Timestamp (ns)"] / 1e6
-    events["Matching Time"] = events["Matching Time"] / 1e6
+    events["Matching Timestamp"] = events["Matching Timestamp"] / 1e6
 
-    # Filter by ranks
-    n_ranks = events["Location ID"].astype("int").max() + 1
+    # Filter events by ranks based on `max_ranks`
+    n_ranks = events["Process ID"].astype("int").max() + 1
     dividend = max(1, round(n_ranks / max_ranks))
-    events = events[(events["Location ID"].astype("int")) % dividend == 0]
+    events = events[(events["Process ID"].astype("int")) % dividend == 0]
 
     # Initial viewport range
     default_x_min = events["Timestamp (ms)"].min()
     default_x_max = events["Timestamp (ms)"].max()
 
-    # Do some preprocessing for Holoviews elements
-    # Functional events
-    func = events[events["Event"] == "Enter"].copy(deep=False)
-    func["y"] = func["Location ID"].astype("int")
+    # Construct dataframes as required for HoloViews elements
+    # 1. Functional events -> hv.Rectangles
+    func = events[events["Event Type"] == "Entry"].copy(deep=False)
+    func["y"] = func["Process ID"].astype("int")
     func["y0"] = func["y"] - (dividend / 2)
     func["y1"] = func["y"] + (dividend / 2)
-    func["humanized_exc_time"] = func["Exc Time (ns)"].apply(humanize_timedelta)
-    func["humanized_inc_time"] = func["Inc Time (ns)"].apply(humanize_timedelta)
+    func["humanized_inc_time"] = func["Inc Time"].apply(humanize_timedelta)
 
     func_cmap = generate_cmap(func["Name"], palette, True)
 
-    # Communication events
-    send = events[(events["Event"] == "MpiSend") | (events["Event"] == "MpiIsend")]
-    recv = events[(events["Event"] == "MpiRecv") | (events["Event"] == "MpiIrecv")]
+    # 2. Instant events -> hv.Points
+    inst = events[
+        (events["Event Type"] != "Entry") & (events["Event Type"] != "Exit")
+    ].copy(deep=False)
+    inst["event_type"] = inst["Event Type"]
+    inst["humanized_timestamp"] = inst["Timestamp (ns)"].apply(humanize_timedelta)
+
+    # 3. Communication events -> hv.Segments
+    send = events[
+        (events["Event Type"] == "MpiSend") | (events["Event Type"] == "MpiIsend")
+    ]
+    recv = events[
+        (events["Event Type"] == "MpiRecv") | (events["Event Type"] == "MpiIrecv")
+    ]
 
     comm = pd.DataFrame()
     comm["x0"] = send["Timestamp (ns)"].values
-    comm["y0"] = send["Location ID"].values
+    comm["y0"] = send["Process ID"].values
     comm["x1"] = recv["Timestamp (ns)"].values
-    comm["y1"] = recv["Location ID"].values
-
-    # Instant events
-    inst = events[(events["Event"] != "Enter") & (events["Event"] != "Leave")].copy(
-        deep=False
-    )
-    inst["humanized_timestamp"] = inst["Timestamp (ns)"].apply(humanize_timedelta)
-    # inst_cmap = generate_cmap(inst["Event"], palette, True)
+    comm["y1"] = recv["Process ID"].values
 
     # DynamicMap callback
+    # Generate hv.Rectangles, hv.Segments, and hv.Points dynamically based on viewport
     def get_elements(x_range):
         if x_range is None or pd.isna(x_range[0]) or pd.isna(x_range[1]):
             x_range = (default_x_min, default_x_max)
@@ -144,7 +147,7 @@ def timeline(trace, palette=DEFAULT_PALETTE, ranks=None, max_ranks=16):
         x_max_buff = x_max + (viewport_size * 0.25)
         min_width = viewport_size * MIN_VIEWPORT_PERCENTAGE
 
-        # Filter dataframes based on x_range
+        # Filter dataframes constructed above based on current x_range
         inst_filtered = inst[
             (inst["Timestamp (ms)"] > x_min_buff)
             & (inst["Timestamp (ms)"] < x_max_buff)
@@ -154,39 +157,34 @@ def timeline(trace, palette=DEFAULT_PALETTE, ranks=None, max_ranks=16):
             inst_filtered = inst_filtered.sample(n=5000)
 
         func_filtered = func[
-            (func["Matching Time"] > x_min_buff)
+            (func["Matching Timestamp"] > x_min_buff)
             & (func["Timestamp (ms)"] < x_max_buff)
-            & (func["Exc Time (ns)"] * 1e-6 > min_width)
+            & (func["Inc Time"] * 1e-6 > min_width)
         ]
 
         if len(func_filtered) > 5000:
             func_filtered = func_filtered.sample(n=5000)
 
-        # comm_filtered = comm[
-        #     ((comm["x0"] < x_max_buff) & (comm["x1"] > x_min_buff))
-        #     & (comm["x1"] - comm["x0"] > min_width)
-        # ]
+        comm_filtered = comm[
+            ((comm["x0"] < x_max_buff) & (comm["x1"] > x_min_buff))
+            & (comm["x1"] - comm["x0"] > min_width)
+        ]
 
-        points = hv.Points(inst_filtered, ["Timestamp (ms)", "Location ID"])
+        # Generate HoloViews elements from filtered dataframes
         rects = hv.Rectangles(
-            func_filtered, ["Timestamp (ms)", "y0", "Matching Time", "y1"]
+            func_filtered, ["Timestamp (ms)", "y0", "Matching Timestamp", "y1"]
         )
-        # segments = hv.Segments(comm_filtered, ["x0", "y0", "x1", "y1"])
+        points = hv.Points(inst_filtered, ["Timestamp (ms)", "Process ID"])
+        segments = hv.Segments(comm_filtered, ["x0", "y0", "x1", "y1"])
 
-        return rects * points
+        return rects * points * segments
 
-    # Generate DynamicMap based on above callback
-    rangeX = streams.RangeX()
-    dmap = hv.DynamicMap(get_elements, streams=[rangeX])
-
+    # Return DynamicMap that uses above callback
+    dmap = hv.DynamicMap(get_elements, streams=[streams.RangeX()])
     return dmap.opts(
         opts.Points(
-            # color="Event",
-            # cmap=inst_cmap,
             size=6,
-            # line_color="rgba(0,0,0,0.8)",
             color="rgba(60, 60, 60, 0.3)",
-            # alpha=0.3,
             tools=[
                 HoverTool(tooltips=INSTANT_EVENTS_TOOLTIPS, point_policy="follow_mouse")
             ],
@@ -196,7 +194,7 @@ def timeline(trace, palette=DEFAULT_PALETTE, ranks=None, max_ranks=16):
             active_tools=["xwheel_zoom"],
             cmap=func_cmap,
             default_tools=["xpan", "xwheel_zoom"],
-            height=calculate_height(len(events["Location ID"].unique())),
+            height=calculate_height(len(events["Process ID"].unique())),
             invert_yaxis=True,
             line_width=0.2,
             line_color="white",
@@ -208,7 +206,7 @@ def timeline(trace, palette=DEFAULT_PALETTE, ranks=None, max_ranks=16):
             xlabel="",
             yformatter=PrintfTickFormatter(format="Process %d"),
             ylabel="",
-            yticks=events["Location ID"].astype("int").unique(),
+            yticks=events["Process ID"].astype("int").unique(),
             hooks=[apply_bokeh_customizations],
             show_grid=True,
             tools=[
