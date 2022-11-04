@@ -34,7 +34,7 @@ class NsightReader:
             for i in pid:
                 # Seeing where the PIDs match
                 mask = self.df["PID"] == i
-                # Grabbing the rows of the TIDs from distinct PID
+                # Grabbing the matching PID rows
                 sub = self.df[mask]
                 # Creating a set from the subset dataframe of the TIDs
                 tid = set(sub["TID"])
