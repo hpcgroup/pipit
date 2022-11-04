@@ -112,10 +112,10 @@ class Trace:
         (most granular location that event happened on)
         """
 
-        if "Thread ID" in self.events.columns:
-            return (set(self.events["Thread ID"]), "Thread ID")
-        elif "Process ID" in self.events.columns:
-            return (set(self.events["Process ID"]), "Process ID")
+        if "Thread" in self.events.columns:
+            return (set(self.events["Thread"]), "Thread")
+        elif "Process" in self.events.columns:
+            return (set(self.events["Process"]), "Process")
         else:
             return (set(), None)
 
@@ -126,21 +126,21 @@ class Trace:
             "Matching Index" and "Matching Timestamp"
 
             Matches dataframe indices and timestamps
-            between corresponding entry and exit rows.
+            between corresponding enter and leave rows.
             """
             matching_indices = [float("nan")] * len(self.events)
             matching_times = [float("nan")] * len(self.events)
 
             filter_set, filter_col = self.__event_locations()
 
-            entry_exit_df = self.events.loc[
-                self.events["Event Type"].isin(["Entry", "Exit"])
+            enter_leave_df = self.events.loc[
+                self.events["Event Type"].isin(["Enter", "Leave"])
             ]
 
-            # Filter by Thread/Process ID
+            # Filter by Thread/Process
             for id in filter_set:
                 if filter_col is not None:
-                    filtered_df = entry_exit_df.loc[entry_exit_df[filter_col] == id]
+                    filtered_df = enter_leave_df.loc[enter_leave_df[filter_col] == id]
 
                 stack = []
                 event_types = list(filtered_df["Event Type"])
@@ -156,19 +156,19 @@ class Trace:
                         event_types[i],
                     )
 
-                    if evt_type == "Entry":
+                    if evt_type == "Enter":
                         # Add current dataframe index and timestamp to stack
                         stack.append((curr_df_index, curr_timestamp))
                     else:
-                        # Pop corresponding entry event's dataframe index and timestamp
-                        entry_df_index, entry_timestamp = stack.pop()
+                        # Pop corresponding enter event's dataframe index and timestamp
+                        enter_df_index, enter_timestamp = stack.pop()
 
                         # Fill in the lists with the matching values
-                        matching_indices[entry_df_index] = curr_df_index
-                        matching_indices[curr_df_index] = entry_df_index
+                        matching_indices[enter_df_index] = curr_df_index
+                        matching_indices[curr_df_index] = enter_df_index
 
-                        matching_times[entry_df_index] = curr_timestamp
-                        matching_times[curr_df_index] = entry_timestamp
+                        matching_times[enter_df_index] = curr_timestamp
+                        matching_times[curr_df_index] = enter_timestamp
 
             self.events["Matching Index"] = matching_indices
             self.events["Matching Timestamp"] = matching_times
@@ -202,13 +202,13 @@ class Trace:
 
             filter_set, filter_col = self.__event_locations()
 
-            entry_exit_df = self.events.loc[
-                self.events["Event Type"].isin(["Entry", "Exit"])
+            enter_leave_df = self.events.loc[
+                self.events["Event Type"].isin(["Enter", "Leave"])
             ]
 
             for id in filter_set:
                 if filter_col is not None:
-                    filtered_df = entry_exit_df.loc[entry_exit_df[filter_col] == id]
+                    filtered_df = enter_leave_df.loc[enter_leave_df[filter_col] == id]
 
                 curr_depth, stack = 0, []
                 df_indices, event_types = list(filtered_df.index), list(
@@ -218,7 +218,7 @@ class Trace:
                 for i in range(len(filtered_df)):
                     curr_df_index, evt_type = df_indices[i], event_types[i]
 
-                    if evt_type == "Entry":
+                    if evt_type == "Enter":
                         if curr_depth > 0:  # if event is a child of some other event
                             parent_df_index = stack[-1]
 
@@ -236,20 +236,20 @@ class Trace:
                         depth[curr_df_index] = curr_depth
                         curr_depth += 1
 
-                        # add entry dataframe index to stack
+                        # add enter dataframe index to stack
                         stack.append(curr_df_index)
                     else:
-                        entry_df_index = stack.pop()
+                        enter_df_index = stack.pop()
 
                         """
-                        storing depth and parent in both entry and exit rows
+                        storing depth and parent in both enter and leave rows
                         since they are floats.
 
-                        children stored as nan in exit row and can be found
+                        children stored as nan in leave row and can be found
                         using matching index for avoiding redundant memory.
                         """
-                        depth[curr_df_index] = depth[entry_df_index]
-                        parent[curr_df_index] = parent[entry_df_index]
+                        depth[curr_df_index] = depth[enter_df_index]
+                        parent[curr_df_index] = parent[enter_df_index]
 
                         curr_depth -= 1
 
@@ -283,7 +283,7 @@ class Trace:
                     # Subtract child's inclusive time to update parent's exclusive time
                     exc_times[curr_parent_idx] -= inc_times[child_idx]
 
-            # Set exit rows exc times to matching entry rows
+            # Set leave rows exc times to matching enter rows
             matching_indices = list(filtered_df["Matching Index"])
             for i in range(len(filtered_df)):
                 exc_times[int(matching_indices[i])] = exc_times[parent_df_indices[i]]

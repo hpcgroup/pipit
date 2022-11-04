@@ -355,23 +355,6 @@ class OTF2Reader:
             }
         )
 
-        # removing unnecessary columns
-        # make this into a common function across readers?
-        num_process_ids, num_thread_ids = len(set(events_dataframe["Process ID"])), len(
-            set(events_dataframe["Thread ID"])
-        )
-
-        if num_process_ids > 1:
-            if num_process_ids == num_thread_ids:
-                # remove thread id column for multi-process, single-threaded trace
-                events_dataframe.drop(columns="Thread ID", inplace=True)
-        else:
-            # remove process id column for single-process trace
-            events_dataframe.drop(columns="Process ID", inplace=True)
-            if num_thread_ids == 1:
-                # remove thread id column for single-process, single-threaded trace
-                events_dataframe.drop(columns="Thread ID", inplace=True)
-
         return events_dataframe
 
     def read(self):
