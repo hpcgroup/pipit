@@ -44,8 +44,13 @@ class Trace:
         sent (two choices - "size" or "count")
 
         Returns:
-        A 2D Numpy Array that represents the communication matrix for all P2P
-        messages of the given trace
+        Creates three lists - sender ranks, receiver ranks, and message volume.
+        All of these lists are the length of the number of messages sent in the trace.
+        It then loops through these lists containing individual message pairs
+        and volume for those messages and updates the comm matrix.
+
+        Finally, a 2D Numpy Array that represents the communication matrix for all P2P
+        messages of the given trace is returned.
 
         Note:
         The first dimension of the returned 2d array
@@ -68,16 +73,21 @@ class Trace:
         ]
 
         # get the mpi ranks of all the sender processes
+        # the length of the list is the total number of messages sent
         sender_ranks = sender_dataframe["Process"].to_list()
 
         # get the corresponding mpi ranks of the receivers
+        # the length of the list is the total number of messages sent
         receiver_ranks = (
             sender_dataframe["Attributes"]
             .apply(lambda attrDict: attrDict["receiver"])
             .to_list()
         )
 
-        # number of bytes communicated
+        # the length of the message_volume list created below
+        # is the total number of messages sent
+
+        # number of bytes communicated for each message sent
         if output == "size":
             # (1 communication is a single row in the sender dataframe)
             message_volume = (
