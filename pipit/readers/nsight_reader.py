@@ -5,7 +5,6 @@
 
 import pandas as pd
 import pipit.trace
-import time
 
 
 class NsightReader:
@@ -27,10 +26,10 @@ class NsightReader:
         # Grab the sorted set of the column PID columns to see if
         # mutliprocess and convert to a list
         pid = set(self.df["PID"])
-        
+
         # check if PID and TID are NOT the same. singlethreaded or multithreaded
         if self.df["PID"].equals(self.df["TID"]) is False:
-            
+
             # Group the pids together and give each process it's own set of threads
             for i in pid:
                 # Seeing where the PIDs match
@@ -44,8 +43,7 @@ class NsightReader:
                 self.df.loc[mask, "Thread"] = self.df["TID"].map(tid_dict)
             # Converting Thread from float to int
             self.df["Thread"] = self.df["Thread"].astype(int)
-            
-            
+
         # check if PID set is > 1, if so multiprocess or single process
         if len(pid) > 1:
             # Set Process column to PID
