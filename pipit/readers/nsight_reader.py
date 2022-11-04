@@ -23,49 +23,49 @@ class NsightReader:
         # Read in csv
         self.df = pd.read_csv(self.file_name)
 
-        # Grab the set of the column PID columns to see if mutliprocess
-        pid = set(self.df["PID"])
+        # Grab the sorted set of the column PID columns to see if
+        # mutliprocess and convert to a list
+        pid = list(set(self.df["PID"]))
 
         # check if PID and TID are NOT the same. singlethreaded or multithreaded
         if self.df["PID"].equals(self.df["TID"]) is False:
-            # get the list of pid
-            pid_list = list(pid)
 
-            # group the pids together and give each process it's own set of threads
-            # Example
-            #       Process (8226) 0  Process (8227) 1
-            #       Thread (8226) 0   Thread (8227) 0
-            #       Thread (8227) 1   Thread (8228) 1
-            for i in pid_list:
-                # grabbing the TIDs from distinct PID
-                tid = self.df.loc[self.df.PID == i, "TID"]
+            # Group the pids together and give each process it's own set of threads
+            for i in pid:
+                # Seeing where the PIDs match
+                mask = self.df["PID"] == i
+                # Grabbing the rows of the TIDs from distinct PID
+                sub = self.df[mask]
+                # Creating a set from the subset dataframe of the TIDs
+                tid = set(sub["TID"])
+                # Getting the TID set, creating a dictionary,
+                # and increment the values (0,1,2,...)
+                tid_dict = dict(zip(tid, range(0, len(tid))))
+                # Setting the Thread column using the dictionary, mask and the TID
+                self.df.loc[mask, "Thread"] = self.df["TID"].map(tid_dict)
 
-                # Creating a dictionary and then incrementing each value
-                tid_dict = dict.fromkeys(tid, 0)
-                tid_dict.update((k, i) for i, k in enumerate(tid_dict))
-                # Setting the Thread ID using the dictionary and the TID
-                self.df.loc[self.df["PID"] == i, "Thread ID"] = self.df["TID"].map(
-                    tid_dict
-                )
-            # Converting Thread ID from float to int
-            self.df["Thread ID"] = self.df["Thread ID"].astype(int)
+            # Converting Thread from float to int
+            self.df["Thread"] = self.df["Thread"].astype(int)
 
         # check if PID set is > 1, if so multiprocess or single process
         if len(pid) > 1:
-            pid_dict = dict.fromkeys(pid, 0)
-            pid_dict.update((k, i) for i, k in enumerate(pid_dict))
-            self.df["Process ID"] = self.df["PID"]
-            self.df["Process ID"].replace(pid_dict, inplace=True)
+            # Set Process column to PID
+            self.df["Process"] = self.df["PID"]
+            # Getting the PID set, creating a dictionary,
+            # and increment the values (0,1,2,...)
+            pid_dict = dict(zip(pid, range(0, len(pid))))
+            # Using the dictionary to replace the Process values
+            self.df["Process"].replace(pid_dict, inplace=True)
 
-        # Copy self.df to create enter and exit rows
+        # Copy self.df to create enter and leave rows
         df2 = self.df.copy()
 
-        # Create new columns for self.df with start time to create entry rows
-        self.df["Event Type"] = "Entry"
+        # Create new columns for self.df with start time to create enter rows
+        self.df["Event Type"] = "Enter"
         self.df["Timestamp (ns)"] = self.df["Start (ns)"]
 
-        # Create new columns for df2 with end time to create exit rows
-        df2["Event Type"] = "Exit"
+        # Create new columns for df2 with end time to create leave rows
+        df2["Event Type"] = "Leave"
         df2["Timestamp (ns)"] = df2["End (ns)"]
 
         # Combine dataframes together
@@ -88,20 +88,20 @@ class NsightReader:
         )
 
         # Grabbing the list of columns and rearranging them to put
-        # Timestamp, Event Types, Name, Thread ID (potentially),
-        # Process ID(potentially) in the front of the dataframe
+        # Timestamp, Event Types, Name, Thread (potentially),
+        # Process(potentially) in the front of the dataframe
         cols = list(self.df)
         cols.insert(0, cols.pop(cols.index("Timestamp (ns)")))
         cols.insert(1, cols.pop(cols.index("Event Type")))
         cols.insert(2, cols.pop(cols.index("Name")))
 
-        if "Process ID" in self.df.columns:
-            cols.insert(3, cols.pop(cols.index("Process ID")))
-            if "Thread ID" in self.df.columns:
-                cols.insert(3, cols.pop(cols.index("Thread ID")))
+        if "Process" in self.df.columns:
+            cols.insert(3, cols.pop(cols.index("Process")))
+            if "Thread" in self.df.columns:
+                cols.insert(3, cols.pop(cols.index("Thread")))
 
-        elif "Thread ID" in self.df.columns:
-            cols.insert(3, cols.pop(cols.index("Thread ID")))
+        elif "Thread" in self.df.columns:
+            cols.insert(3, cols.pop(cols.index("Thread")))
 
         # Applying the column list to the dataframe to rearrange
         self.df = self.df.loc[:, cols]
