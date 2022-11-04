@@ -5,7 +5,21 @@ import numpy as np
 
 
 def comm_heatmap(trace, comm_type="counts", label_threshold=16, cmap="blues"):
-    """Generates interactive plot of comm_matrix"""
+    """Generates interactive heatmap of process-to-process communication volume.
+
+    Uses Trace.comm_matrix function for calculation.
+
+    Args:
+        trace: Trace instance whose communication data is being visualized
+        comm_type: Whether to compute volume by count ("counts") or by total
+            message size ("bytes")
+        label_threshold: Number of ranks above which labels are not displayed
+        cmap: Name of HoloViews colormap to use
+            (see https://holoviews.org/user_guide/Colormaps.html)
+
+    Returns:
+        hv.HoloMap: A HoloViews object that can be viewed in a notebook
+    """
 
     # Initialize vis
     vis_init()

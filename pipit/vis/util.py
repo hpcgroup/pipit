@@ -1,5 +1,6 @@
 import random
 import holoviews as hv
+from holoviews import opts
 
 hv.extension("bokeh", logo=False)
 
@@ -35,6 +36,8 @@ DEFAULT_PALETTE = [
     "rgb(180,122,195)",
     "rgb(203,144,152)",
 ]
+
+random.shuffle(DEFAULT_PALETTE)
 
 
 def in_notebook():
@@ -73,6 +76,23 @@ def vis_init():
         """
     )
 
+    defaults = dict(
+        fontsize={
+            "title": 10,
+            "legend": 8,
+        },
+    )
+
+    # Apply default opts for HoloViews elements
+    # See https://holoviews.org/user_guide/Applying_Customizations.html#session-specific-options # noqa: 501
+    opts.defaults(
+        opts.Rectangles(**defaults),
+        opts.Bars(**defaults),
+        opts.Image(**defaults),
+        opts.Labels(**defaults),
+        opts.Chord(**defaults),
+    )
+
 
 def humanize_timedelta(ns):
     """Converts timespan from ns to something more readable"""
@@ -91,11 +111,8 @@ def clamp(n, smallest, largest):
     return max(smallest, min(n, largest))
 
 
-def generate_cmap(series, palette=DEFAULT_PALETTE, randomize=False):
+def generate_cmap(series, palette=DEFAULT_PALETTE):
     names = series.unique().tolist()
-
-    if randomize:
-        random.shuffle(palette)
 
     cmap = {names[i]: palette[i] for i in range(len(names))}
     return cmap
