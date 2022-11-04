@@ -34,10 +34,8 @@ class NsightReader:
             for i in pid:
                 # Seeing where the PIDs match
                 mask = self.df["PID"] == i
-                # Grabbing the matching PID rows
-                sub = self.df[mask]
-                # Creating a set from the subset dataframe of the TIDs
-                tid = set(sub["TID"])
+                # Creating a set from the matching PID rows dataframe of the TIDs
+                tid = set(self.df[mask]["TID"])
                 # Getting the TID set, creating a dictionary,
                 # and increment the values (0,1,2,...)
                 tid_dict = dict(zip(tid, range(0, len(tid))))
