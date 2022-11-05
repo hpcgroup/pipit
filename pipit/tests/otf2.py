@@ -48,7 +48,7 @@ def test_definitions(otf2_dir):
     assert len(definitions_df) == 229
 
     # 17 unique definition types in trace
-    assert len(set(definitions_df["Definition Type"]) == 17)
+    assert len(set(definitions_df["Definition Type"])) == 17
 
     # 2 ranks, so 2 location definitions in the trace
     assert len(definitions_df.loc[definitions_df["Definition Type"] == "Location"] == 2)
