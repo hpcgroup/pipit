@@ -1,3 +1,8 @@
+# Copyright 2022 Parallel Software and Systems Group, University of Maryland.
+# See the top-level LICENSE file for details.
+#
+# SPDX-License-Identifier: MIT
+
 import numpy as np
 from pipit import Trace
 
@@ -51,7 +56,7 @@ def test_definitions(otf2_dir):
     assert len(set(definitions_df["Definition Type"])) == 17
 
     # 2 ranks, so 2 location definitions in the trace
-    assert len(definitions_df.loc[definitions_df["Definition Type"] == "Location"] == 2)
+    assert len(definitions_df.loc[definitions_df["Definition Type"] == "Location"]) == 2
 
     # communicator should evidently be present in the ping pong trace definitions
     assert "Comm" in set(definitions_df["Definition Type"])
