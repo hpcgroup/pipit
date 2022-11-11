@@ -7,8 +7,9 @@ import numpy as np
 from pipit import Trace
 
 
-def test_events(otf2_dir):
-    events_df = Trace.from_otf2(str(otf2_dir)).events
+def test_events(data_dir, ping_pong_otf2_trace):
+    trace = Trace.from_otf2(str(ping_pong_otf2_trace))
+    events_df = trace.events
 
     # 108 total events in ping pong trace
     assert len(events_df) == 108
@@ -47,8 +48,9 @@ def test_events(otf2_dir):
     assert (np.diff(events_df["Timestamp (ns)"]) > 0).all()
 
 
-def test_definitions(otf2_dir):
-    definitions_df = Trace.from_otf2(str(otf2_dir)).definitions
+def test_definitions(data_dir, ping_pong_otf2_trace):
+    trace = Trace.from_otf2(str(ping_pong_otf2_trace))
+    definitions_df = trace.definitions
 
     assert len(definitions_df) == 229
 

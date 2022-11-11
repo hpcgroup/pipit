@@ -34,9 +34,9 @@ def ping_pong_otf2_trace(data_dir, tmpdir):
     """Builds a temporary directory containing the ping-pong traces."""
     otf2_dir = os.path.join(data_dir, "ping-pong-otf2")
 
-    shutil.copytree(os.path.join(otf2_dir, "traces"), str(tmpdir))
-    shutil.copy(os.path.join(otf2_dir, "scorep.cfg"), str(tmpdir))
-    shutil.copy(os.path.join(otf2_dir, "traces.def"), str(tmpdir))
-    shutil.copy(os.path.join(otf2_dir, "traces.otf2"), str(tmpdir))
+    shutil.copytree(os.path.join(str(otf2_dir), "traces"), str(tmpdir))
+    shutil.copy(os.path.join(str(otf2_dir), "scorep.cfg"), str(tmpdir))
+    shutil.copy(os.path.join(str(otf2_dir), "traces.def"), str(tmpdir))
+    shutil.copy(os.path.join(str(otf2_dir), "traces.otf2"), str(tmpdir))
 
     return tmpdir
