@@ -16,32 +16,7 @@ MIN_VIEWPORT_PERCENTAGE = 1 / 1920
 MIN_ARROW_WIDTH = 0.5
 MAX_ARROW_WIDTH = 6
 
-FUNCTIONAL_EVENTS_TOOLTIPS = """
-    <div>
-        <span style="font-weight: bold;">Name:</span>&nbsp;
-        <span style="font-family: Monaco, monospace;">@Name</span>
-    </div>
-    <div>
-        <span style="font-weight: bold;">Inc Time (Total):</span>&nbsp;
-        <span style="font-family: Monaco, monospace;">@{humanized_inc_time}</span>
-    </div>
-"""
-
-COMMUNICATION_EVENTS_TOOLTIPS = """
-"""
-
-INSTANT_EVENTS_TOOLTIPS = """
-    <div>
-        <span style="font-weight: bold;">Type:</span>&nbsp;
-        <span style="font-family: Monaco, monospace;">@{event_type}</span>
-    </div>
-    <div>
-        <span style="font-weight: bold;">Timestamp:</span>&nbsp;
-        <span style="font-family: Monaco, monospace;">@{humanized_timestamp}</span>
-    </div>
-"""
-
-STANDARD_COLS = [
+COLUMNS = [
     "Event Type",
     "Timestamp (ns)",
     "Name",
@@ -100,7 +75,7 @@ def timeline(
     trace.calc_inc_time()
 
     # Copy the trace events dataframe and modify it
-    events = trace.events[STANDARD_COLS].copy(deep=False)
+    events = trace.events[COLUMNS].copy(deep=False)
     events["Timestamp (ms)"] = events["Timestamp (ns)"] / 1e6
     events["Matching Timestamp"] = events["Matching Timestamp"] / 1e6
 
@@ -209,7 +184,12 @@ def timeline(
             size=6,
             color="rgba(60, 60, 60, 0.3)",
             tools=[
-                HoverTool(tooltips=INSTANT_EVENTS_TOOLTIPS, point_policy="follow_mouse")
+                HoverTool(
+                    tooltips={
+                        "Event Type": "@{Event_Type}",
+                        "Timestamp": "@humanized_timestamp"
+                    }
+                )
             ],
         ),
         opts.Segments(color="black"),
@@ -222,7 +202,7 @@ def timeline(
             line_width=0.2,
             line_color="white",
             responsive=True,
-            title="Events Timeline",
+            title="Overview timeline",
             xformatter=DatetimeTickFormatter(),
             xaxis="top",
             legend_position="right",
@@ -234,7 +214,11 @@ def timeline(
             show_grid=True,
             tools=[
                 HoverTool(
-                    tooltips=FUNCTIONAL_EVENTS_TOOLTIPS, point_policy="follow_mouse"
+                    point_policy="follow_mouse",
+                    tooltips={
+                        "Name": "@Name",
+                        "Inc Time": "@humanized_inc_time"
+                    }
                 ),
                 "xbox_zoom",
                 "tap",

@@ -40,6 +40,14 @@ DEFAULT_PALETTE = [
 random.shuffle(DEFAULT_PALETTE)
 
 
+def apply_bokeh_customizations(plot, _):
+    plot.state.toolbar_location = "above"
+    plot.state.ygrid.visible = False
+    plot.state.legend.label_text_font_size = "8pt"
+    plot.state.legend.spacing = 0
+    plot.state.legend.location = "top"
+
+
 def in_notebook():
     """Determines if we are in a notebook environment"""
     try:
@@ -73,6 +81,13 @@ def vis_init():
             display:none !important;
         }
         div.bk { cursor: default !important; }
+        .bk.bk-tooltip-row-label {
+            color: black;
+            font-weight: bold;
+        }
+        .bk.bk-tooltip-row-value {
+            font-family: monospace;
+        }
         """
     )
 
@@ -81,6 +96,7 @@ def vis_init():
             "title": 10,
             "legend": 8,
         },
+        hooks=[apply_bokeh_customizations],
     )
 
     # Apply default opts for HoloViews elements
@@ -91,6 +107,8 @@ def vis_init():
         opts.Image(**defaults),
         opts.Labels(**defaults),
         opts.Chord(**defaults),
+        opts.Curve(**defaults),
+        opts.Area(**defaults)
     )
 
 
