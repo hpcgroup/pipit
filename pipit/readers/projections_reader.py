@@ -9,9 +9,12 @@ import pandas
 import pipit.trace
 
 class ProjectionsConstants:
-    # Projection constants are copied over from projections -- used to determine type of line in log files
+    """
+    Projection constants are copied over from projections -- used to
+    determine type of line in log files
+    """
 
-        # Message Creation po
+    # Message Creation po
     CREATION                 = 1;
 
     BEGIN_PROCESSING         = 2;
@@ -77,9 +80,6 @@ class ProjectionsConstants:
     #INIT_BARRIER_PHASE_2     = 19;
 
 class STSReader:
-
-
-
     def __init__(self, file_location):
         self.sts_file = open(file_location, 'r')# self.chares = {}
         
@@ -215,7 +215,6 @@ class STSReader:
 
         self.sts_file.close()
 
-            
 
 class ProjectionsReader:
     def __init__(self, executable_location: str) -> None:
