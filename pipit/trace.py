@@ -36,8 +36,8 @@ class Trace:
     def from_projections(dirname):
         """Read an HPCToolkit trace into a new Trace object."""
         # import this lazily to avoid circular dependencies
-        from .readers.projections_reader import ProjectionsReader, ProjectionsConstants
-        return ProjectionsReader(dirname).read_projections()
+        from .readers.projections_reader import ProjectionsReader
+        return ProjectionsReader(dirname).read()
 
     def comm_matrix(self, output="size"):
         """
