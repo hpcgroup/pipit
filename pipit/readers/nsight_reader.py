@@ -23,7 +23,7 @@ class NsightReader:
         # Read in csv
         self.df = pd.read_csv(self.file_name)
 
-        # Grab the sorted set of the column PID columns to see if
+        # Grab the set of the column PID columns to see if
         # mutliprocess and convert to a list
         pid = set(self.df["PID"])
 
@@ -32,14 +32,15 @@ class NsightReader:
 
             # Group the pids together and give each process it's own set of threads
             for i in pid:
-                # Seeing where the PIDs match
+                # Seeing where the rows of the PIDs match. Grabbing the rows in mask
                 mask = self.df["PID"] == i
                 # Creating a set from the matching PID rows dataframe of the TIDs
                 tid = set(self.df[mask]["TID"])
                 # Getting the TID set, creating a dictionary,
                 # and increment the values (0,1,2,...)
                 tid_dict = dict(zip(tid, range(0, len(tid))))
-                # Setting the Thread column using the dictionary, mask and the TID
+                # Grabbing the rows with mask and setting the thread column by
+                # mapping the tids with the tid_dict
                 self.df.loc[mask, "Thread"] = self.df["TID"].map(tid_dict)
             # Converting Thread from float to int
             self.df["Thread"] = self.df["Thread"].astype(int)
