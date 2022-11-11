@@ -4,6 +4,7 @@
 # SPDX-License-Identifier: MIT
 
 import numpy as np
+import pandas as pd
 
 
 class Trace:
@@ -44,6 +45,139 @@ class Trace:
             return (set(self.events["Process ID"]), "Process ID")
         else:
             return (set(), None)
+
+    def select(
+        self,
+        query=None,
+        events=None,
+        rank=None,
+        max_num_ranks=None,
+        min_time=None,
+        max_time=None,
+        min_matching_time=None,
+        max_matching_time=None,
+        event_type=None,
+        name=None,
+        group=None,
+        max_num_events=None,
+    ) -> pd.DataFrame:
+        """
+        Return events dataframe filtered with provided params
+
+        Args:
+            events: Events DataFrame to apply filters to
+            query: Pandas query to apply
+            rank: Rank, list of ranks, or dict with ranks to include/exclude
+            max_num_ranks: Maximum number of ranks
+            min_time: Starting timestamp
+            max_time: Ending timestamp
+            min_matching_time: Starting matching time
+            max_matching_time: Ending matching time
+            event_type: Event type, list, or dict
+            name: Name, list of names, or dict with names to include/exclude
+            group: Function group name, list, or dict
+            max_num_events: Maximum number of events
+
+        Returns: pd.DataFrame
+        """
+        if events is None:
+            events = self.events
+
+        df = events.copy(deep=False)
+
+        # Filter by Pandas query
+        # See https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.query.html
+        if query is not None:
+            df = df.query(query)
+
+        # Filter by rank
+        if rank is not None:
+            if isinstance(rank, int):
+                rank = [rank]
+
+            if type(rank) is list:
+                rank = {"include": rank}
+
+            if "include" in rank:
+                df = df[df["Process ID"].isin(rank["include"])]
+
+            if "exclude" in rank:
+                df = df[-df["Process ID"].isin(rank["exclude"])]
+
+        # Filter by max_num_ranks
+        if max_num_ranks is not None:
+            ranks = df["Process ID"].unique()
+            num_ranks = len(ranks)
+
+            if max_num_ranks < num_ranks:
+                # Select num_ranks ranks evenly from all the ranks
+                allowed_indices = np.round(
+                    np.linspace(0, num_ranks - 1, max_num_ranks)
+                ).astype(int)
+                allowed_ranks = ranks[allowed_indices]
+                df = df[df["Process ID"].isin(allowed_ranks)]
+
+        # Filter by min_time and max_time
+        if min_time is not None:
+            df = df[df["Timestamp (ns)"] > min_time]
+
+        if max_time is not None:
+            df = df[df["Timestamp (ns)"] < max_time]
+
+        # Filter by min_matching_time and max_matching_time
+        if min_matching_time is not None:
+            df = df[df["Matching Timestamp"] > min_matching_time]
+
+        if max_matching_time is not None:
+            df = df[df["Matching Timestamp"] < max_matching_time]
+
+        # Filter by event_type
+        if event_type is not None:
+            if isinstance(event_type, str):
+                event_type = [event_type]
+
+            if type(event_type) is list:
+                event_type = {"include": event_type}
+
+            if "include" in event_type:
+                df = df[df["Event Type"].isin(event_type["include"])]
+
+            if "exclude" in event_type:
+                df = df[-df["Event Type"].isin(event_type["exclude"])]
+
+        # Filter by name
+        if name is not None:
+            if isinstance(name, str):
+                name = [name]
+
+            if type(name) is list:
+                name = {"include": name}
+
+            if "include" in name:
+                df = df[df["Name"].isin(name["include"])]
+
+            if "exclude" in name:
+                df = df[-df["Name"].isin(name["exclude"])]
+
+        # Filter by function group name
+        if group is not None:
+            if isinstance(group, str):
+                group = [group]
+
+            if type(group) is list:
+                group = {"include": group}
+
+            if "include" in group:
+                df = df[df["Name"].startswith(tuple(name["include"]))]
+
+            if "exclude" in group:
+                df = df[-df["Name"].startswith(tuple(name["exclude"]))]
+
+        # Sample by max_num_events
+        if max_num_events is not None and len(df) > max_num_events:
+            df = df.sample(n=max_num_events)
+
+        return df
 
     def match_rows(self):
         if "Matching Index" not in self.events.columns:
