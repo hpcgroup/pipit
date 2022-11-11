@@ -6,12 +6,12 @@
 from pipit import Trace
 
 
-def test_comm_matrix(otf2_dir):
+def test_comm_matrix(data_dir, ping_pong_otf2_trace):
     # bytes sent between pairs of processes
-    size_comm_matrix = Trace.from_otf2(str(otf2_dir)).comm_matrix()
+    size_comm_matrix = Trace.from_otf2(str(ping_pong_otf2_trace)).comm_matrix()
 
     # number of messages sent between pairs of processes
-    count_comm_matrix = Trace.from_otf2(str(otf2_dir)).comm_matrix("count")
+    count_comm_matrix = Trace.from_otf2(str(ping_pong_otf2_trace)).comm_matrix("count")
 
     # 2 ranks in ping pong trace, so comm matrix should have shape 2 x 2
     assert size_comm_matrix.shape == size_comm_matrix.shape == (2, 2)
