@@ -307,9 +307,9 @@ class HPCToolkitReader:
                 close_node = close_node.parent
 
         trace_df = pd.DataFrame(data)
-
+        trace_df.rename_axis("index", inplace=True)
         trace_df.sort_values(
-            by="Timestamp (ns)", axis=0, ascending=True, inplace=True, ignore_index=True
+            by=["Timestamp (ns)", "index"], axis=0, ascending=True, inplace=True, ignore_index=True
         )
 
         trace_df = trace_df.astype(
