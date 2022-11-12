@@ -1,10 +1,6 @@
 import random
-import holoviews as hv
-from holoviews import opts
 
-hv.extension("bokeh", logo=False)
-
-DEFAULT_PALETTE = [
+FUNCTION_PALETTE = [
     "rgb(138,113,152)",
     "rgb(175,112,133)",
     "rgb(127,135,225)",
@@ -37,16 +33,7 @@ DEFAULT_PALETTE = [
     "rgb(203,144,152)",
 ]
 
-random.shuffle(DEFAULT_PALETTE)
-
-
-def apply_bokeh_customizations(plot, _):
-    plot.state.toolbar_location = "above"
-    plot.state.ygrid.visible = False
-    plot.state.legend.label_text_font_size = "8pt"
-    plot.state.legend.spacing = 0
-    plot.state.legend.location = "top"
-
+DEFAULT_PALETTE = FUNCTION_PALETTE
 
 def in_notebook():
     """Determines if we are in a notebook environment"""
@@ -62,58 +49,8 @@ def in_notebook():
     return True
 
 
-def css(css):
-    """Inject custom CSS to notebook"""
-    if in_notebook():
-        from IPython.display import HTML, display
-
-        display(HTML("<style>" + css + "</style>"))
-
-
-def vis_init():
-    """Initialize environment for visualization"""
-
-    # Apply css customizations, remove multiple tooltips for overlapping glyphs
-    css(
-        """
-        .container { width:90% !important; }
-        div.bk-tooltip > div.bk > div.bk:not(:last-child) {
-            display:none !important;
-        }
-        div.bk { cursor: default !important; }
-        .bk.bk-tooltip-row-label {
-            color: black;
-            font-weight: bold;
-        }
-        .bk.bk-tooltip-row-value {
-            font-family: monospace;
-        }
-        """
-    )
-
-    defaults = dict(
-        fontsize={
-            "title": 10,
-            "legend": 8,
-        },
-        hooks=[apply_bokeh_customizations],
-    )
-
-    # Apply default opts for HoloViews elements
-    # See https://holoviews.org/user_guide/Applying_Customizations.html#session-specific-options # noqa: 501
-    opts.defaults(
-        opts.Rectangles(**defaults),
-        opts.Bars(**defaults),
-        opts.Image(**defaults),
-        opts.Labels(**defaults),
-        opts.Chord(**defaults),
-        opts.Curve(**defaults),
-        opts.Area(**defaults)
-    )
-
-
-def humanize_timedelta(ns):
-    """Converts timespan from ns to something more readable"""
+def format_time(ns):
+    """Converts timestamp/timedelta from ns to something more readable"""
 
     if ns < 1e3:  # Less than 1us --> ns
         return str(round(ns)) + "ns"
@@ -129,7 +66,7 @@ def clamp(n, smallest, largest):
     return max(smallest, min(n, largest))
 
 
-def generate_cmap(series, palette=DEFAULT_PALETTE):
+def generate_cmap(series, palette=FUNCTION_PALETTE):
     names = series.unique().tolist()
 
     cmap = {names[i]: palette[i] for i in range(len(names))}

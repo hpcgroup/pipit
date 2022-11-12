@@ -3,10 +3,10 @@ import holoviews as hv
 from holoviews import opts, streams
 from bokeh.models import HoverTool, PrintfTickFormatter, DatetimeTickFormatter
 from pipit.vis.util import (
-    DEFAULT_PALETTE,
+    FUNCTION_PALETTE,
     clamp,
     generate_cmap,
-    humanize_timedelta,
+    format_time,
     vis_init,
 )
 
@@ -25,24 +25,14 @@ COLUMNS = [
     "Matching Timestamp",
 ]
 
-
 def calculate_height(num_ranks):
     return clamp(num_ranks * 30 + 100, 150, 1000)
-
-
-def apply_bokeh_customizations(plot, _):
-    plot.state.toolbar_location = "above"
-    plot.state.ygrid.visible = False
-    plot.state.legend.label_text_font_size = "8pt"
-    plot.state.legend.spacing = 0
-    plot.state.legend.location = "top"
-
 
 def timeline(
     trace,
     ranks=None,
     max_ranks=16,
-    palette=DEFAULT_PALETTE,
+    palette=FUNCTION_PALETTE,
     rects=True,
     points=True,
     segments=True,
@@ -95,7 +85,7 @@ def timeline(
         func["y"] = func["Process ID"].astype("int")
         func["y0"] = func["y"] - (dividend / 2)
         func["y1"] = func["y"] + (dividend / 2)
-        func["humanized_inc_time"] = func["Inc Time"].apply(humanize_timedelta)
+        func["humanized_inc_time"] = func["Inc Time"].apply(format_time)
 
         func_cmap = generate_cmap(func["Name"], palette)
 
@@ -105,7 +95,8 @@ def timeline(
             (events["Event Type"] != "Entry") & (events["Event Type"] != "Exit")
         ].copy(deep=False)
         inst["event_type"] = inst["Event Type"]
-        inst["humanized_timestamp"] = inst["Timestamp (ns)"].apply(humanize_timedelta)
+        inst["humanized_timestamp"] = inst["Timestamp (ns)"].apply(format_time)
+        inst["Timestamp"] = inst["Timestamp (ms)"]
 
     # 3. Communication events -> hv.Segments
     if segments:
@@ -187,7 +178,10 @@ def timeline(
                 HoverTool(
                     tooltips={
                         "Event Type": "@{Event_Type}",
-                        "Timestamp": "@humanized_timestamp"
+                        "Timestamp": "@Timestamp",
+                    },
+                    formatters={
+                        "Timestamp": "printf"
                     }
                 )
             ],
@@ -210,15 +204,11 @@ def timeline(
             yformatter=PrintfTickFormatter(format="Process %d"),
             ylabel="",
             yticks=events["Process ID"].astype("int").unique(),
-            hooks=[apply_bokeh_customizations],
             show_grid=True,
             tools=[
                 HoverTool(
                     point_policy="follow_mouse",
-                    tooltips={
-                        "Name": "@Name",
-                        "Inc Time": "@humanized_inc_time"
-                    }
+                    tooltips={"Name": "@Name", "Inc Time": "@humanized_inc_time"},
                 ),
                 "xbox_zoom",
                 "tap",
