@@ -15,9 +15,11 @@ class NsightReader:
         self.df = None
 
     def read(self):
-    """This read function directly takes in a csv of the trace report and
-    utilizes pandas to convert it from a csv into a dataframe.
-    """
+        """
+        This read function directly takes in a csv of the trace report and
+        utilizes pandas to convert it from a csv into a dataframe.
+        """
+        
         # Read in csv
         self.df = pd.read_csv(self.file_name)
 
