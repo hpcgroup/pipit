@@ -397,4 +397,8 @@ class OTF2Reader:
             # close the trace and open it later per process
             trace.close()
         self.events = self.read_events()  # events
-        return pipit.trace.Trace(self.definitions, self.events)
+
+        trace = pipit.trace.Trace(self.definitions, self.events, None)
+        trace.create_cct()  # create cct
+
+        return trace

@@ -9,13 +9,17 @@ class Node:
     referenced by any calling_context_id directly under it
     """
 
-    def __init__(self, name_id, name, parent) -> None:
+    def __init__(self, name_id, name, parent, level=None) -> None:
         self.calling_context_ids = []
         self.name_id = name_id
         self.name = name
         self.children = []
         self.parent = parent
-        self.level = self.__calculate_level()
+
+        if level is None:
+            self.level = self.__calculate_level()
+        else:
+            self.level = level
 
     def add_child(self, child_node):
         self.children.append(child_node)
@@ -32,7 +36,6 @@ class Node:
     def get_intersection(self, node: "Node"):
         """Given two nodes, this function returns the interesection of them
         starting from their root nodes
-
         If the two nodes do not share the same root node, their intersection
         would be None, otherwise it returns the nodes that they have in
         common (starting from the root) as a new Node
