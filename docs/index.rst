@@ -26,8 +26,8 @@ You can get pipit from its `GitHub repository
    :maxdepth: 2
    :caption: User Docs
 
-    getting_started
-    user_guide
+   getting_started
+   user_guide
 
 
 ##################
