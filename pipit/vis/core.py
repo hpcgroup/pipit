@@ -24,8 +24,6 @@ from .util import (
     size_hover_formatter,
 )
 
-import numpy as np
-
 
 class Vis:
     """Contains visualization data and functions for a Trace"""
@@ -243,7 +241,6 @@ class Vis:
                 opts(
                     height=clamp(len(self.ranks) * 30 + 100, 150, 1000),
                     invert_yaxis=True,
-                    responsive=True,
                     padding=(0, (0, 1)),
                     xaxis="top",
                     xformatter=time_tick_formatter,
@@ -281,7 +278,6 @@ class Vis:
                 opts(
                     xlabel="Time",
                     ylabel="% utilization",
-                    height=300,
                     xformatter=time_tick_formatter,
                     yformatter=NumeralTickFormatter(format="0%"),
                 ),
@@ -301,12 +297,13 @@ class Vis:
             .opts(
                 stacked=True,
                 xlabel="Time interval",
-                ylabel="Time contribution (ms)",
+                ylabel="Time contribution",
+                yformatter=time_tick_formatter,
                 cmap=self.cmap,
                 legend_position="right",
                 line_width=0.2,
                 line_color="white",
-                xformatter=None,
+                xformatter=PrintfTickFormatter(format=""),
                 tools=[
                     HoverTool(
                         tooltips={
@@ -317,7 +314,6 @@ class Vis:
                         formatters={"@time": time_hover_formatter},
                     )
                 ],
-                height=300,
             )
             .relabel("Excl. time contributed by each function per time interval")
         )
@@ -543,56 +539,94 @@ class Vis:
 
         return self._view(image * labels)
 
+    def print_cct(self):
+        visited = set()
+
+        def pc(node):
+            if node not in visited:
+                print("| " * node.get_level() + node.name)
+                for child in node.children:
+                    if child != node:
+                        pc(child)
+
+                visited.add(node)
+
+        for root in self.trace.cct.roots:
+            pc(root)
+
+        return visited
+
     def cct(self):
-        self.trace.match_rows()
-        self.trace.calc_inc_time()
-        self.trace.calc_exc_time()
+        # Nodes
+        name = []
+        depth = []
+        index = []
+        num_calls = []
 
-        df = self.trace.events[self.trace.events["Process ID"] == 0]
-        df = df[df["Event Type"] == "Entry"][["Name", "Depth"]]
-        df["Depth"] = df["Depth"].astype("int")
-        df = df.groupby(["Name"]).max().reset_index()
-        df = df.dropna()
+        # Edges
+        source = []
+        target = []
 
-        df.loc[len(df.index)] = ["main", -1]
+        visited = set()
 
-        df = df.sort_values(by="Depth", ignore_index=True)
+        def dfs(node):
+            if node not in visited:
+                name.append(node.name)
+                depth.append(node.get_level())
+                index.append(node.name_id)
+                num_calls.append(len(node.calling_context_ids))
 
-        idx = df.groupby("Depth").cumcount()
-        count = df.groupby("Depth")["Depth"].transform("count")
+                for child in node.children:
+                    if child != node:
+                        source.append(node.name_id)
+                        target.append(child.name_id)
 
-        df["x"] = idx - (count / 2) + 0.5
+                        dfs(child)
 
-        source = [0, 0, 0, 0]
-        target = [1, 2, 3, 4]
+                visited.add(node)
 
-        x = df["x"].values
-        y = df["Depth"].values
-        i = np.arange(0, 5)
-        label = df["Name"].values
+        for root in self.trace.cct.roots:
+            dfs(root)
 
-        nodes = hv.Nodes((x, y, i, label), vdims="Name")
-        graph = hv.Graph(((source, target), nodes))
-        label = hv.Labels(graph.nodes, ["x", "y"], "Name")
+        nodes = pd.DataFrame()
+        nodes["Name"] = name
+        nodes["Depth"] = depth
+        nodes["index"] = index
+        nodes["num_calls"] = num_calls
+
+        group_index = nodes.groupby("Depth").cumcount()
+        group_size = nodes.groupby("Depth")["Depth"].transform("count")
+        nodes["x"] = (group_index - (group_size / 2) + 0.5) * (1 / group_size) * 10
+
+        nodes = nodes.set_index("index")
+
+        hv_nodes = hv.Nodes(nodes, ["x", "Depth", "index"])
+        graph = hv.Graph(((source, target), hv_nodes))
+        label = hv.Labels(graph.nodes, ["x", "Depth"], "Name")
 
         return self._view(
             (graph * label)
             .opts(
                 opts.Graph(
                     invert_yaxis=True,
-                    responsive=True,
-                    height=200,
                     yaxis=None,
                     xaxis=None,
-                    padding=(1, 0.5),
-                    cmap=self.cmap,
+                    padding=(0.2, 0.3),
                     node_color="Name",
                     edge_line_width=1,
+                    invert_axes=True,
+                    cmap=self.cmap,
+                    height=group_size.max().item() * 35 + 10,
+                    edge_color="gray",
+                    tools=[
+                        HoverTool(
+                            tooltips={"Name": "@Name", "Call count": "@num_calls"}
+                        )
+                    ],
                 ),
                 opts.Labels(
-                    text_font_size="9pt",
-                    xoffset=0.08,
-                    text_align="left",
+                    text_font_size="8pt",
+                    yoffset=-0.2,
                 ),
             )
             .relabel("Calling context tree")
