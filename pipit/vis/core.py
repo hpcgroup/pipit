@@ -13,47 +13,42 @@ import pandas as pd
 from .util import (
     DEFAULT_PALETTE,
     generate_cmap,
-    in_notebook,
     time_series,
     clamp,
     fake_time_profile,
+    in_notebook,
 )
 
-hv.extension("bokeh", logo=False)
+import numpy as np
 
 
 class Vis:
     """Contains visualization data and functions for a Trace"""
 
-    def __init__(self, trace):
+    # TODO: aggregate common opts in __init__ (`defaults`)
+    def __init__(self, trace, server=(not in_notebook())):
         """Initialize environment for visualization"""
         self.trace = trace
+        self.server = server
 
-        # Apply css customizations, remove multiple tooltips for overlapping glyphs
-        if in_notebook():
-            from IPython.display import HTML, display
+        # Initialize holoviews and custom css
+        self.css = """
+            .container { width:90% !important; }
+            div.bk-tooltip > div.bk > div.bk:not(:last-child) {
+                display:none !important;
+            }
+            div.bk { cursor: default !important; }
+            .bk.bk-tooltip-row-label {
+                color: black;
+                font-weight: bold;
+            }
+            .bk.bk-tooltip-row-value {
+                font-family: monospace;
+                padding-left: 3px;
+            }
+        """
 
-            display(
-                HTML(
-                    """
-                <style>
-                    .container { width:90% !important; }
-                    div.bk-tooltip > div.bk > div.bk:not(:last-child) {
-                        display:none !important;
-                    }
-                    div.bk { cursor: default !important; }
-                    .bk.bk-tooltip-row-label {
-                        color: black;
-                        font-weight: bold;
-                    }
-                    .bk.bk-tooltip-row-value {
-                        font-family: monospace;
-                        padding-left: 3px;
-                    }
-                </style>
-                """
-                )
-            )
+        hv.extension("bokeh", logo=False, css=self.css)
 
         # Set some properties for easy access
         self.functions = trace.events[trace.events["Event Type"] == "Entry"][
@@ -82,6 +77,7 @@ class Vis:
             },
             hooks=[customize_plot],
             responsive=True,
+            height=300,
         )
 
         opts.defaults(
@@ -94,6 +90,7 @@ class Vis:
             opts.Curve(**defaults),
             opts.Distribution(**defaults),
             opts.Graph(**defaults),
+            opts.Histogram(**defaults),
             opts.Image(**defaults),
             opts.Labels(**defaults),
             opts.Points(**defaults),
@@ -103,6 +100,17 @@ class Vis:
             opts.Segments(**defaults),
         )
 
+    def _view(self, element):
+        """Launches server if `self.server`, else returns holoviews element"""
+        if self.server:
+            import panel as pn
+
+            pn.extension(raw_css=[self.css])
+            pn.panel(element).show()
+            return
+
+        return element
+
     def timeline(self, rects=True, segments=False, points=True):
         # Calculate matching rows and inc time
         self.trace.match_rows()
@@ -111,6 +119,7 @@ class Vis:
         # Get events dataframe
         events = self.trace.events.copy(deep=False)
         events = events.drop("Attributes", axis=1)
+        events = events.drop("Graph_Node", axis=1)
 
         # TODO: filter ranks
 
@@ -189,7 +198,7 @@ class Vis:
                 * (hv_segments if segments else hv.Curve([]))
             )
 
-        return (
+        return self._view(
             hv.DynamicMap(_callback, streams=[hv.streams.RangeX()])
             .opts(
                 opts.Points(
@@ -249,7 +258,7 @@ class Vis:
         area = hv.Area(data)
         curve = hv.Curve(data)
 
-        return (
+        return self._view(
             (curve * area)
             .opts(
                 opts.Curve(
@@ -270,7 +279,7 @@ class Vis:
         profile = fake_time_profile(samples=100, num_bins=64, functions=self.functions)
 
         # Generate bars
-        return (
+        return self._view(
             hv.Bars(profile, kdims=["bin", "function"])
             .sort()
             .aggregate(function=np.sum)
@@ -307,7 +316,7 @@ class Vis:
 
         # Generate bars
         # See https://holoviews.org/reference/elements/bokeh/Bars.html
-        return (
+        return self._view(
             hv.Bars(funcs, kdims=["Process ID", "Name"])
             .aggregate(function=np.sum)
             .opts(
@@ -349,7 +358,7 @@ class Vis:
 
         # Generate bars
         # See https://holoviews.org/reference/elements/bokeh/Bars.html
-        return (
+        return self._view(
             hv.Bars(funcs)
             .opts(
                 height=len(self.ranks) * 90,
@@ -378,8 +387,89 @@ class Vis:
             .relabel("Total excl. time per function")
         )
 
-    def histogram(self):
-        pass
+    def comm_summary(self):
+        """Bar graph of total message size sent by process
+
+        Similar to comm_heatmap but aggregated per process
+        """
+
+        # Get communication summary
+        messages = self.trace.events[
+            self.trace.events["Event Type"].isin(["MpiSend", "MpiIsend"])
+        ].copy(deep=False)
+        messages["size"] = messages["Attributes"].apply(lambda x: x["msg_length"])
+        processes = messages.groupby("Process ID")[["size"]].sum().reset_index()
+
+        # Generate bars
+        # See https://holoviews.org/reference/elements/bokeh/Bars.html
+        return self._view(
+            hv.Bars(processes)
+            .opts(
+                height=len(self.ranks) * 90,
+                cmap=self.cmap,
+                # color="Name",
+                # legend_position="right",
+                invert_axes=True,
+                invert_yaxis=True,
+                tools=[
+                    HoverTool(
+                        tooltips={
+                            "Process ID": "@{Process_ID}",
+                            "Total message size": "@{size}",
+                        },
+                        point_policy="follow_mouse",
+                    )
+                ],
+                default_tools=["xpan", "xwheel_zoom"],
+                active_tools=["xpan", "xwheel_zoom"],
+                line_width=0.2,
+                line_color="white",
+                ylabel="Total message",
+                xlabel="",
+                show_grid=True,
+                padding=2,
+                yformatter=PrintfTickFormatter(format="Process %d"),
+            )
+            .relabel("Total message size sent per process")
+        )
+
+    def message_size_hist(self):
+        messages = self.trace.events[
+            self.trace.events["Event Type"].isin(["MpiSend", "MpiIsend"])
+        ]
+        sizes = messages["Attributes"].map(lambda x: x["msg_length"])
+
+        freq, edges = np.histogram(sizes, 64)
+        return self._view(
+            hv.Histogram((edges, freq))
+            .opts(xlabel="Message size", ylabel="Number of messages", tools=["hover"])
+            .relabel("Histogram of message sizes")
+        )
+
+    def comm_over_time(self, weighted=True):
+        messages = self.trace.events[
+            self.trace.events["Event Type"].isin(["MpiSend", "MpiIsend"])
+        ]
+        times = messages["Timestamp (ns)"]
+        sizes = messages["Attributes"].map(lambda x: x["msg_length"])
+
+        freq, edges = np.histogram(times, 64, weights=(sizes if weighted else None))
+        return self._view(
+            hv.Histogram((edges, freq))
+            .opts(xlabel="Time", ylabel="Number of messages", tools=["hover"])
+            .relabel("Communication over time")
+        )
+
+    def occurence_over_time(self, name="MpiSend"):
+        events_filtered = self.trace.events[self.trace.events["Name"] == name]
+        times = events_filtered["Timestamp (ns)"]
+
+        freq, edges = np.histogram(times, 64)
+        return self._view(
+            hv.Histogram((edges, freq))
+            .opts(xlabel="Time", ylabel="Frequency", tools=["hover"])
+            .relabel("Occurence over time")
+        )
 
     def comm_heatmap(self, comm_type="counts", label_threshold=16, cmap="blues"):
         """Heatmap of process-to-process message volume"""
@@ -429,7 +519,59 @@ class Vis:
             text_font_size="8pt",
         )
 
-        return image * labels
+        return self._view(image * labels)
 
-    def tree(self):
-        pass
+    def cct(self):
+        self.trace.match_rows()
+        self.trace.calc_inc_time()
+        self.trace.calc_exc_time()
+
+        df = self.trace.events[self.trace.events["Process ID"] == 0]
+        df = df[df["Event Type"] == "Entry"][["Name", "Depth"]]
+        df["Depth"] = df["Depth"].astype("int")
+        df = df.groupby(["Name"]).max().reset_index()
+        df = df.dropna()
+
+        df.loc[len(df.index)] = ["main", -1]
+
+        df = df.sort_values(by="Depth", ignore_index=True)
+
+        idx = df.groupby("Depth").cumcount()
+        count = df.groupby("Depth")["Depth"].transform("count")
+
+        df["x"] = idx - (count / 2) + 0.5
+
+        source = [0, 0, 0, 0]
+        target = [1, 2, 3, 4]
+
+        x = df["x"].values
+        y = df["Depth"].values
+        i = np.arange(0, 5)
+        label = df["Name"].values
+
+        nodes = hv.Nodes((x, y, i, label), vdims="Name")
+        graph = hv.Graph(((source, target), nodes))
+        label = hv.Labels(graph.nodes, ["x", "y"], "Name")
+
+        return self._view(
+            (graph * label)
+            .opts(
+                opts.Graph(
+                    invert_yaxis=True,
+                    responsive=True,
+                    height=200,
+                    yaxis=None,
+                    xaxis=None,
+                    padding=(1, 0.5),
+                    cmap=self.cmap,
+                    node_color="Name",
+                    edge_line_width=1,
+                ),
+                opts.Labels(
+                    text_font_size="9pt",
+                    xoffset=0.08,
+                    text_align="left",
+                ),
+            )
+            .relabel("Calling context tree")
+        )
