@@ -1,4 +1,3 @@
-import random
 import numpy as np
 import pandas as pd
 
@@ -36,6 +35,7 @@ FUNCTION_PALETTE = [
 ]
 
 DEFAULT_PALETTE = FUNCTION_PALETTE
+
 
 def in_notebook():
     """Determines if we are in a notebook environment"""
@@ -85,6 +85,7 @@ def time_series(T=1, N=100, mu=1, sigma=0.3, S0=20):
     S = S0 * np.exp(X)  # geometric brownian motion
     return S
 
+
 def fake_time_profile(samples, num_bins, functions):
     bins = list(range(0, num_bins))
 
@@ -95,6 +96,7 @@ def fake_time_profile(samples, num_bins, functions):
     df = pd.DataFrame({"bin": bins_sample, "function": function_sample, "time": time})
 
     return df
+
 
 # from pipit.vis.timeline import timeline
 

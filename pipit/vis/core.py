@@ -4,7 +4,6 @@ import holoviews as hv
 import numpy as np
 from bokeh.models import (
     HoverTool,
-    DatetimeTickFormatter,
     AdaptiveTicker,
     PrintfTickFormatter,
 )
@@ -82,6 +81,7 @@ class Vis:
                 "legend": 8,
             },
             hooks=[customize_plot],
+            responsive=True,
         )
 
         opts.defaults(
@@ -214,7 +214,7 @@ class Vis:
                             point_policy="follow_mouse",
                             tooltips={
                                 "Name": "@Name",
-                                "Inc Time": "@humanized_inc_time",
+                                "Inc Time": "@{Inc_Time}",
                             },
                         ),
                         "xbox_zoom",
@@ -260,7 +260,7 @@ class Vis:
                         )
                     ]
                 ),
-                opts(width=800, xlabel="Time", ylabel="% utilization"),
+                opts(xlabel="Time", ylabel="% utilization", height=300),
             )
             .relabel("% CPU utilization over time (process 0)")
         )
@@ -276,7 +276,6 @@ class Vis:
             .aggregate(function=np.sum)
             .opts(
                 stacked=True,
-                width=800,
                 xlabel="Time interval",
                 ylabel="Time contribution (ms)",
                 cmap=self.cmap,
@@ -293,11 +292,12 @@ class Vis:
                         }
                     )
                 ],
+                height=300,
             )
-            .relabel("Exc time per function per time interval")
+            .relabel("Excl. time contributed by each function per time interval")
         )
 
-    def summary(self):
+    def process_summary(self):
         """Bar graph of total time spent by function per process"""
 
         # Get function summary
@@ -311,12 +311,13 @@ class Vis:
             hv.Bars(funcs, kdims=["Process ID", "Name"])
             .aggregate(function=np.sum)
             .opts(
-                width=800,
                 height=len(self.ranks) * 90,
                 stacked=True,
                 cmap=self.cmap,
                 legend_position="right",
                 invert_axes=True,
+                invert_yaxis=True,
+                yformatter=PrintfTickFormatter(format="Process %d"),
                 tools=[
                     HoverTool(
                         tooltips={
@@ -331,9 +332,50 @@ class Vis:
                 active_tools=["xpan", "xwheel_zoom"],
                 line_width=0.2,
                 line_color="white",
-                xformatter=DatetimeTickFormatter(),
+                ylabel="Time",
+                xlabel="",
+                show_grid=True,
             )
-            .relabel("Total exc time per function per process")
+            .relabel("Total excl. time per function per process")
+        )
+
+    def function_summary(self):
+        """Bar graph of total time spent by function per process"""
+
+        # Get function summary
+        funcs = self.trace.flat_profile(
+            metric="Exc Time", groupby_column=["Name"]
+        ).reset_index()
+
+        # Generate bars
+        # See https://holoviews.org/reference/elements/bokeh/Bars.html
+        return (
+            hv.Bars(funcs)
+            .opts(
+                height=len(self.ranks) * 90,
+                cmap=self.cmap,
+                color="Name",
+                legend_position="right",
+                invert_axes=True,
+                invert_yaxis=True,
+                tools=[
+                    HoverTool(
+                        tooltips={
+                            "Name": "@{Name}",
+                            "Total time": "@{Exc_Time}",
+                        },
+                        point_policy="follow_mouse",
+                    )
+                ],
+                default_tools=["xpan", "xwheel_zoom"],
+                active_tools=["xpan", "xwheel_zoom"],
+                line_width=0.2,
+                line_color="white",
+                ylabel="Time",
+                xlabel="",
+                show_grid=True,
+            )
+            .relabel("Total excl. time per function")
         )
 
     def histogram(self):
@@ -349,8 +391,10 @@ class Vis:
         # Generate heatmap image
         image = hv.Image(comm_matrix, bounds=bounds).opts(
             width=clamp(160 + num_ranks * 35, 300, 850),
-            height=clamp(65 + num_ranks * 25, 200, 650),
+            height=clamp(250 + num_ranks * 25, 200, 650),
+            responsive=False,
             colorbar=True,
+            colorbar_position="bottom",
             cmap=cmap,
             tools=[
                 HoverTool(

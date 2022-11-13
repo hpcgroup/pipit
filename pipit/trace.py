@@ -15,7 +15,7 @@ class Trace:
         """Create a new Trace object."""
         self.definitions = definitions
         self.events = events
-    
+
     def init_vis(self, **kwargs):
         """Create a new Vis object for this Trace."""
         from pipit.vis import Vis
@@ -222,7 +222,6 @@ class Trace:
 
             self.events["Exc Time"] = exc_times
 
-    
     """
     Note: Relies on Standardizing and Inc/Exc PRs to be merged first!
     """
@@ -278,7 +277,6 @@ class Trace:
             .groupby(groupby_column, observed=True)[[metric]]
             .sum()
         )
-
 
     def comm_matrix(self, comm_type="bytes"):
         """
