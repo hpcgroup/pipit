@@ -1,4 +1,6 @@
 import random
+import numpy as np
+import pandas as pd
 
 FUNCTION_PALETTE = [
     "rgb(138,113,152)",
@@ -72,6 +74,27 @@ def generate_cmap(series, palette=FUNCTION_PALETTE):
     cmap = {names[i]: palette[i] for i in range(len(names))}
     return cmap
 
+
+def time_series(T=1, N=100, mu=1, sigma=0.3, S0=20):
+    """Parameterized noisy time series"""
+    dt = float(T) / N
+    t = np.linspace(0, T, N)
+    W = np.random.standard_normal(size=N)
+    W = np.cumsum(W) * np.sqrt(dt)  # standard brownian motion
+    X = (mu - 0.5 * sigma**2) * t + sigma * W
+    S = S0 * np.exp(X)  # geometric brownian motion
+    return S
+
+def fake_time_profile(samples, num_bins, functions):
+    bins = list(range(0, num_bins))
+
+    bins_sample = np.random.choice(bins, samples)
+    function_sample = np.random.choice(functions, samples)
+    time = np.random.randint(1, 5, size=samples)
+
+    df = pd.DataFrame({"bin": bins_sample, "function": function_sample, "time": time})
+
+    return df
 
 # from pipit.vis.timeline import timeline
 
