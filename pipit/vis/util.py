@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from bokeh.models import FuncTickFormatter, CustomJSHover
 
 FUNCTION_PALETTE = [
     "rgb(138,113,152)",
@@ -51,6 +52,7 @@ def in_notebook():
     return True
 
 
+# Unit Formatters
 def format_time(ns):
     """Converts timestamp/timedelta from ns to something more readable"""
 
@@ -62,6 +64,90 @@ def format_time(ns):
         return str(round(ns / 1e6)) + "ms"
     else:
         return str(round(ns / 1e9, 3)) + "s"
+
+
+# `x` is the value being compared (in ns)
+# `y` is the value being formatted (in ns)
+# Based on `format_time` function above
+format_time_js = """
+    if(x < 1e3)
+        return Math.round(y) + "ns";
+    if(x < 1e6)
+        return Math.round(y / 1e3) + "us";
+    if(x < 1e9)
+        return Math.round(y / 1e6) + "ms";
+    else
+        return (y / 1e9).toFixed(3) + "s";
+"""
+
+# Based on format_time
+time_tick_formatter = FuncTickFormatter(
+    code=f"""
+        let x = Math.max(...ticks) - Math.min(...ticks);
+        let y = tick;
+        {format_time_js}
+    """
+)
+
+time_hover_formatter = CustomJSHover(
+    code=f"""
+        let x = value;
+        let y = value;
+        {format_time_js}
+    """
+)
+
+
+def format_size(b):
+    """Converts bytes to something more readable"""
+
+    if b < 1e3:  # Less than 1 KB -> byte
+        return f"{b:.2f} bytes"
+    if b < 1e6:  # Less than 1 MB -> KB
+        return f"{(b / 1e3):.2f} KB"
+    if b < 1e9:  # Less than 1 GB -> MB
+        return f"{(b / 1e6):.2f} MB"
+    if b < 1e12:  # Less than 1 TB -> GB
+        return f"{(b / 1e9):.2f} GB"
+    if b < 1e15:  # Less than 1 PB -> TB
+        return f"{(b / 1e12):.2f} TB"
+    else:
+        return f"{(b / 1e15):.2f} PB"
+
+
+# `x` is the value being compared (in ns)
+# `y` is the value being formatted (in ns)
+# Based on `format_size` function above
+format_size_js = """
+    if(x < 1e3)
+        return (y).toFixed(2) + " bytes";
+    if(x < 1e6)
+        return (y / 1e3).toFixed(2) + " KB";
+    if(x < 1e9)
+        return (y / 1e6).toFixed(2) + " MB";
+    if(x < 1e12)
+        return (y / 1e9).toFixed(2) + " GB";
+    if(x < 1e15)
+        return (y / 1e12).toFixed(2) + " TB";
+    else
+        return (y / 1e15).toFixed(2) + " PB";
+"""
+
+size_tick_formatter = FuncTickFormatter(
+    code=f"""
+        let x = Math.max(...ticks) - Math.min(...ticks);
+        let y = tick;
+        {format_size_js}
+    """
+)
+
+size_hover_formatter = CustomJSHover(
+    code=f"""
+        let x = value;
+        let y = value;
+        {format_size_js}
+    """
+)
 
 
 def clamp(n, smallest, largest):
@@ -96,8 +182,3 @@ def fake_time_profile(samples, num_bins, functions):
     df = pd.DataFrame({"bin": bins_sample, "function": function_sample, "time": time})
 
     return df
-
-
-# from pipit.vis.timeline import timeline
-
-# timeline()

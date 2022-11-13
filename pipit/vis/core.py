@@ -6,6 +6,7 @@ from bokeh.models import (
     HoverTool,
     AdaptiveTicker,
     PrintfTickFormatter,
+    NumeralTickFormatter,
 )
 from holoviews import opts
 import pandas as pd
@@ -17,6 +18,10 @@ from .util import (
     clamp,
     fake_time_profile,
     in_notebook,
+    time_tick_formatter,
+    time_hover_formatter,
+    size_tick_formatter,
+    size_hover_formatter,
 )
 
 import numpy as np
@@ -207,9 +212,10 @@ class Vis:
                     tools=[
                         HoverTool(
                             tooltips={
-                                "Event Type": "@{Event_Type}",
-                                "Timestamp": "@Timestamp",
+                                "Event type": "@{Event_Type}",
+                                "Timestamp": "@{Timestamp (ns)}{custom}",
                             },
+                            formatters={"@{Timestamp (ns)}": time_hover_formatter},
                         )
                     ],
                 ),
@@ -223,8 +229,9 @@ class Vis:
                             point_policy="follow_mouse",
                             tooltips={
                                 "Name": "@Name",
-                                "Inc Time": "@{Inc_Time}",
+                                "Incl. time": "@{Inc_Time}{custom}",
                             },
+                            formatters={"@{Inc_Time}": time_hover_formatter},
                         ),
                         "xbox_zoom",
                         "tap",
@@ -237,8 +244,9 @@ class Vis:
                     height=clamp(len(self.ranks) * 30 + 100, 150, 1000),
                     invert_yaxis=True,
                     responsive=True,
-                    padding=(0, (0, 0.5)),
+                    padding=(0, (0, 1)),
                     xaxis="top",
+                    xformatter=time_tick_formatter,
                     xlabel="",
                     ylabel="",
                     yformatter=PrintfTickFormatter(format="Process %d"),
@@ -265,11 +273,18 @@ class Vis:
                     tools=[
                         HoverTool(
                             mode="vline",
-                            tooltips={"Time": "@x", "Utilization": "@y{0.}%"},
+                            tooltips={"Time": "@x{custom}", "Utilization": "@y{0.}%"},
+                            formatters={"@x": time_hover_formatter},
                         )
                     ]
                 ),
-                opts(xlabel="Time", ylabel="% utilization", height=300),
+                opts(
+                    xlabel="Time",
+                    ylabel="% utilization",
+                    height=300,
+                    xformatter=time_tick_formatter,
+                    yformatter=NumeralTickFormatter(format="0%"),
+                ),
             )
             .relabel("% CPU utilization over time (process 0)")
         )
@@ -296,9 +311,10 @@ class Vis:
                     HoverTool(
                         tooltips={
                             "Name": "@function",
-                            "Time spent": "@time ns",
+                            "Time spent": "@time{custom}",
                             "Time interval": "@bin",
-                        }
+                        },
+                        formatters={"@time": time_hover_formatter},
                     )
                 ],
                 height=300,
@@ -331,9 +347,10 @@ class Vis:
                     HoverTool(
                         tooltips={
                             "Name": "@{Name}",
-                            "Total time": "@{Exc_Time}",
+                            "Total time": "@{Exc_Time}{custom}",
                             "Process ID": "@{Process_ID}",
                         },
+                        formatters={"@{Exc_Time}": time_hover_formatter},
                         point_policy="follow_mouse",
                     )
                 ],
@@ -343,6 +360,7 @@ class Vis:
                 line_color="white",
                 ylabel="Time",
                 xlabel="",
+                xformatter=time_tick_formatter,
                 show_grid=True,
             )
             .relabel("Total excl. time per function per process")
@@ -371,8 +389,9 @@ class Vis:
                     HoverTool(
                         tooltips={
                             "Name": "@{Name}",
-                            "Total time": "@{Exc_Time}",
+                            "Total time": "@{Exc_Time}{custom}",
                         },
+                        formatters={"@{Exc_Time}": time_hover_formatter},
                         point_policy="follow_mouse",
                     )
                 ],
@@ -382,6 +401,7 @@ class Vis:
                 line_color="white",
                 ylabel="Time",
                 xlabel="",
+                xformatter=time_tick_formatter,
                 show_grid=True,
             )
             .relabel("Total excl. time per function")
@@ -415,8 +435,9 @@ class Vis:
                     HoverTool(
                         tooltips={
                             "Process ID": "@{Process_ID}",
-                            "Total message size": "@{size}",
+                            "Total sent": "@{size}{custom}",
                         },
+                        formatters={"@{size}": size_hover_formatter},
                         point_policy="follow_mouse",
                     )
                 ],
@@ -424,8 +445,9 @@ class Vis:
                 active_tools=["xpan", "xwheel_zoom"],
                 line_width=0.2,
                 line_color="white",
-                ylabel="Total message",
+                ylabel="Size",
                 xlabel="",
+                xformatter=size_tick_formatter,
                 show_grid=True,
                 padding=2,
                 yformatter=PrintfTickFormatter(format="Process %d"),
