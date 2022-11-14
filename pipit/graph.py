@@ -82,6 +82,9 @@ class Node:
             + str(self.level)
         )
 
+    def __hash__(self):
+        return hash(str(self))
+
     def __calculate_level(self):
         """private function to get depth of node"""
         if self.parent is None:
