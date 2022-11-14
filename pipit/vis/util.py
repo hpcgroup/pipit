@@ -1,8 +1,13 @@
 import numpy as np
 import pandas as pd
-from bokeh.models import FuncTickFormatter, CustomJSHover
+from bokeh.models import FuncTickFormatter, CustomJSHover, PrintfTickFormatter
 
-FUNCTION_PALETTE = [
+# Constants
+
+# Default color palette to color-code functions by name
+# Based on Chrome Trace Viewer
+# https://chromium.googlesource.com/external/trace-viewer/+/bf55211014397cf0ebcd9e7090de1c4f84fc3ac0/tracing/tracing/ui/base/color_scheme.html
+DEFAULT_FUNCTION_PALETTE = [
     "rgb(138,113,152)",
     "rgb(175,112,133)",
     "rgb(127,135,225)",
@@ -35,40 +40,27 @@ FUNCTION_PALETTE = [
     "rgb(203,144,152)",
 ]
 
-DEFAULT_PALETTE = FUNCTION_PALETTE
+
+# Formatters
+process_tick_formatter = PrintfTickFormatter(format="Process %d")
 
 
-def in_notebook():
-    """Determines if we are in a notebook environment"""
-    try:
-        from IPython import get_ipython
-
-        if "IPKernelApp" not in get_ipython().config:  # pragma: no cover
-            return False
-    except ImportError:
-        return False
-    except AttributeError:
-        return False
-    return True
-
-
-# Unit Formatters
 def format_time(ns):
     """Converts timestamp/timedelta from ns to something more readable"""
 
     if ns < 1e3:  # Less than 1us --> ns
         return str(round(ns)) + "ns"
     if ns < 1e6:  # Less than 1ms --> us
-        return str(round(ns / 1e3)) + "μs"
+        return str(round(ns / 1e3)) + "us"
     if ns < 1e9:  # Less than 1s --> ms
         return str(round(ns / 1e6)) + "ms"
     else:
         return str(round(ns / 1e9, 3)) + "s"
 
 
-# `x` is the value being compared (in ns)
-# `y` is the value being formatted (in ns)
-# Based on `format_time` function above
+# JS expression equivalent to `format_time` function above; assumes:
+# - `x` is the value (in ns) being compared to determine units
+# - `y` is the value (in ns) actually being formatted
 format_time_js = """
     if(x < 1e3)
         return Math.round(y) + "ns";
@@ -80,7 +72,8 @@ format_time_js = """
         return (y / 1e9).toFixed(3) + "s";
 """
 
-# Based on format_time
+# Used to format ticks for time-based axes
+# https://docs.bokeh.org/en/2.4.1/docs/reference/models/formatters.html#functickformatter
 time_tick_formatter = FuncTickFormatter(
     code=f"""
         let x = Math.max(...ticks) - Math.min(...ticks);
@@ -89,6 +82,8 @@ time_tick_formatter = FuncTickFormatter(
     """
 )
 
+# Used to format tooltips for time-based values
+# https://docs.bokeh.org/en/latest/docs/reference/models/tools.html#bokeh.models.CustomJSHover
 time_hover_formatter = CustomJSHover(
     code=f"""
         let x = value;
@@ -115,9 +110,9 @@ def format_size(b):
         return f"{(b / 1e15):.2f} PB"
 
 
-# `x` is the value being compared (in ns)
-# `y` is the value being formatted (in ns)
-# Based on `format_size` function above
+# JS expression equivalent to `format_size` function above; assumes:
+# - `x` is the value (in bytes) being compared to determine units
+# - `y` is the value (in bytes) actually being formatted
 format_size_js = """
     if(x < 1e3)
         return (y).toFixed(2) + " bytes";
@@ -133,6 +128,8 @@ format_size_js = """
         return (y / 1e15).toFixed(2) + " PB";
 """
 
+# Used to format ticks for size-based axes
+# https://docs.bokeh.org/en/2.4.1/docs/reference/models/formatters.html#functickformatter
 size_tick_formatter = FuncTickFormatter(
     code=f"""
         let x = Math.max(...ticks) - Math.min(...ticks);
@@ -141,6 +138,8 @@ size_tick_formatter = FuncTickFormatter(
     """
 )
 
+# Used to format tooltips for size-based values
+# https://docs.bokeh.org/en/latest/docs/reference/models/tools.html#bokeh.models.CustomJSHover
 size_hover_formatter = CustomJSHover(
     code=f"""
         let x = value;
@@ -149,12 +148,28 @@ size_hover_formatter = CustomJSHover(
     """
 )
 
+# Other utility functions
+def in_notebook():
+    """Determines if we are in a notebook environment"""
+    try:
+        from IPython import get_ipython
+
+        if "IPKernelApp" not in get_ipython().config:  # pragma: no cover
+            return False
+    except ImportError:
+        return False
+    except AttributeError:
+        return False
+    return True
+
 
 def clamp(n, smallest, largest):
+    """Clamps a value between a min and max bound"""
     return max(smallest, min(n, largest))
 
 
-def generate_cmap(series, palette=FUNCTION_PALETTE):
+def generate_cmap(series, palette=DEFAULT_FUNCTION_PALETTE):
+    """Maps a categorical series to a color palette (list of css colors)"""
     names = series.unique().tolist()
 
     cmap = {names[i]: palette[i] for i in range(len(names))}
@@ -162,7 +177,7 @@ def generate_cmap(series, palette=FUNCTION_PALETTE):
 
 
 def time_series(T=1, N=100, mu=1, sigma=0.3, S0=20):
-    """Parameterized noisy time series"""
+    """Generates parameterized noisy time series"""
     dt = float(T) / N
     t = np.linspace(0, T, N)
     W = np.random.standard_normal(size=N)
@@ -173,6 +188,7 @@ def time_series(T=1, N=100, mu=1, sigma=0.3, S0=20):
 
 
 def fake_time_profile(samples, num_bins, functions):
+    """Generates sample time-profile data for vis testing"""
     bins = list(range(0, num_bins))
 
     bins_sample = np.random.choice(bins, samples)
@@ -182,3 +198,18 @@ def fake_time_profile(samples, num_bins, functions):
     df = pd.DataFrame({"bin": bins_sample, "function": function_sample, "time": time})
 
     return df
+
+
+def get_height(num_ys, max_height=600):
+    """Calculate optimal height for plot based on number of elements on the y-axis"""
+    return clamp(num_ys * 45, 150, max_height)
+
+
+def even_samples(list, n):
+    """Given a list of m elements, evenly sample n elements and return the sampled list"""
+    m = len(list)
+    if m > n:
+        idx = np.round(np.linspace(0, m, n)).astype(int)
+        return list[idx]
+    else:
+        return list

@@ -12,7 +12,7 @@ from holoviews import opts
 import pandas as pd
 
 from .util import (
-    DEFAULT_PALETTE,
+    DEFAULT_FUNCTION_PALETTE,
     generate_cmap,
     time_series,
     clamp,
@@ -22,6 +22,8 @@ from .util import (
     time_hover_formatter,
     size_tick_formatter,
     size_hover_formatter,
+    process_tick_formatter,
+    get_height,
 )
 
 
@@ -60,8 +62,8 @@ class Vis:
         self.ranks = trace.events["Process ID"].unique()
 
         # Initialize color map
-        random.shuffle(DEFAULT_PALETTE)
-        self.cmap = generate_cmap(self.functions, DEFAULT_PALETTE)
+        random.shuffle(DEFAULT_FUNCTION_PALETTE)
+        self.cmap = generate_cmap(self.functions, DEFAULT_FUNCTION_PALETTE)
 
         # Apply default opts for HoloViews elements
         # See https://holoviews.org/user_guide/Applying_Customizations.html#session-specific-options # noqa: 501
@@ -83,17 +85,19 @@ class Vis:
             height=300,
         )
 
+        self.default_color = "#E5AE38"
+
         opts.defaults(
-            opts.Area(**defaults),
-            opts.Bars(**defaults),
+            opts.Area(**defaults, color=self.default_color),
+            opts.Bars(**defaults, color=self.default_color),
             opts.Bivariate(**defaults),
             opts.BoxWhisker(**defaults),
             opts.Chord(**defaults),
             opts.Contours(**defaults),
-            opts.Curve(**defaults),
+            opts.Curve(**defaults, color=self.default_color),
             opts.Distribution(**defaults),
             opts.Graph(**defaults),
-            opts.Histogram(**defaults),
+            opts.Histogram(**defaults, color=self.default_color),
             opts.Image(**defaults),
             opts.Labels(**defaults),
             opts.Points(**defaults),
@@ -114,7 +118,7 @@ class Vis:
 
         return element
 
-    def timeline(self, rects=True, segments=False, points=True):
+    def timeline(self, max_num_ranks=17, rects=True, segments=False, points=True):
         # Calculate matching rows and inc time
         self.trace.match_rows()
         self.trace.calc_inc_time()
@@ -124,7 +128,11 @@ class Vis:
         events = events.drop("Attributes", axis=1)
         events = events.drop("Graph_Node", axis=1)
 
-        # TODO: filter ranks
+        # Sample ranks if needed
+        if len(self.ranks) > max_num_ranks:
+            idx = np.round(np.linspace(0, len(self.ranks), max_num_ranks)).astype(int)
+            idx[-1] -= 1
+            events = events[events["Process ID"].isin(self.ranks[idx])]
 
         # Construct element-specific dataframes
         if rects:
@@ -246,7 +254,7 @@ class Vis:
                     xformatter=time_tick_formatter,
                     xlabel="",
                     ylabel="",
-                    yformatter=PrintfTickFormatter(format="Process %d"),
+                    yformatter=process_tick_formatter,
                     yticks=self.ranks.astype("int"),
                     legend_position="right",
                     show_grid=True,
@@ -273,13 +281,17 @@ class Vis:
                             tooltips={"Time": "@x{custom}", "Utilization": "@y{0.}%"},
                             formatters={"@x": time_hover_formatter},
                         )
-                    ]
+                    ],
+                ),
+                opts.Area(
+                    alpha=0.2,
                 ),
                 opts(
                     xlabel="Time",
                     ylabel="% utilization",
                     xformatter=time_tick_formatter,
                     yformatter=NumeralTickFormatter(format="0%"),
+                    show_grid=True,
                 ),
             )
             .relabel("% CPU utilization over time (process 0)")
@@ -332,13 +344,13 @@ class Vis:
             hv.Bars(funcs, kdims=["Process ID", "Name"])
             .aggregate(function=np.sum)
             .opts(
-                height=len(self.ranks) * 90,
+                height=get_height(len(self.ranks)),
                 stacked=True,
                 cmap=self.cmap,
                 legend_position="right",
                 invert_axes=True,
                 invert_yaxis=True,
-                yformatter=PrintfTickFormatter(format="Process %d"),
+                yformatter=process_tick_formatter,
                 tools=[
                     HoverTool(
                         tooltips={
@@ -374,8 +386,9 @@ class Vis:
         # See https://holoviews.org/reference/elements/bokeh/Bars.html
         return self._view(
             hv.Bars(funcs)
+            .sort(["Exc Time"], reverse=True)
             .opts(
-                height=len(self.ranks) * 90,
+                height=get_height(len(self.functions)),
                 cmap=self.cmap,
                 color="Name",
                 legend_position="right",
@@ -421,7 +434,7 @@ class Vis:
         return self._view(
             hv.Bars(processes)
             .opts(
-                height=len(self.ranks) * 90,
+                height=get_height(len(self.ranks)),
                 cmap=self.cmap,
                 # color="Name",
                 # legend_position="right",
@@ -446,7 +459,7 @@ class Vis:
                 xformatter=size_tick_formatter,
                 show_grid=True,
                 padding=2,
-                yformatter=PrintfTickFormatter(format="Process %d"),
+                yformatter=process_tick_formatter,
             )
             .relabel("Total message size sent per process")
         )
@@ -464,6 +477,7 @@ class Vis:
                 xlabel="Message size",
                 xformatter=size_tick_formatter,
                 ylabel="Number of messages",
+                yformatter=NumeralTickFormatter(format="0a"),
                 tools=[
                     HoverTool(
                         tooltips={
@@ -521,20 +535,18 @@ class Vis:
                 xlabel="Time",
                 xformatter=time_tick_formatter,
                 ylabel="Frequency",
-                tools=[HoverTool(
-                    tooltips={
-                        "Bin": "@x{custom}",
-                        "Frequency": "@Frequency"
-                    },
-                    formatters={
-                        "@x": time_hover_formatter
-                    }
-                )]
-                )
+                yformatter=NumeralTickFormatter(format="0a"),
+                tools=[
+                    HoverTool(
+                        tooltips={"Bin": "@x{custom}", "Frequency": "@Frequency"},
+                        formatters={"@x": time_hover_formatter},
+                    )
+                ],
+            )
             .relabel("Occurence over time")
         )
 
-    def comm_heatmap(self, comm_type="counts", label_threshold=16, cmap="blues"):
+    def comm_heatmap(self, comm_type="counts", label_threshold=16, cmap="YlOrRd"):
         """Heatmap of process-to-process message volume"""
         comm_matrix = self.trace.comm_matrix(comm_type)
 
@@ -543,7 +555,7 @@ class Vis:
 
         # Generate heatmap image
         image = hv.Image(comm_matrix, bounds=bounds).opts(
-            width=clamp(160 + num_ranks * 35, 300, 850),
+            width=clamp(300 + num_ranks * 35, 400, 850),
             height=clamp(250 + num_ranks * 25, 200, 650),
             responsive=False,
             colorbar=True,
@@ -552,7 +564,8 @@ class Vis:
             tools=[
                 HoverTool(
                     tooltips={
-                        "Process IDs": "$x{0.} → $y{0.}",
+                        "Sender": "Process $x{0.}",
+                        "Receiver": "Process $y{0.}",
                         "Count": "@image messages",
                     }
                 )
@@ -561,10 +574,9 @@ class Vis:
             ylabel="Receiver",
             xticks=AdaptiveTicker(base=2, min_interval=1, max_interval=None),
             yticks=AdaptiveTicker(base=2, min_interval=1, max_interval=None),
-            padding=0,
-            title="Communication Heatmap",
-            yformatter=PrintfTickFormatter(format="Process %d"),
-            xformatter=PrintfTickFormatter(format="Process %d"),
+            title="Total message counts per process pair",
+            yformatter=process_tick_formatter,
+            xformatter=process_tick_formatter,
             xaxis="top",
             invert_yaxis=True,
             xrotation=60,
@@ -579,7 +591,7 @@ class Vis:
             text_color="z",
             color_levels=[0, max_val / 2, max_val],
             cmap=["black", "white"],
-            text_font_size="8pt",
+            text_font_size="9.5pt",
         )
 
         return self._view(image * labels)
@@ -649,6 +661,8 @@ class Vis:
         graph = hv.Graph(((source, target), hv_nodes))
         label = hv.Labels(graph.nodes, ["x", "Depth"], "Name")
 
+        max_row_count = group_size.max().item()
+
         return self._view(
             (graph * label)
             .opts(
@@ -656,12 +670,12 @@ class Vis:
                     invert_yaxis=True,
                     yaxis=None,
                     xaxis=None,
-                    padding=(0.2, 0.3),
+                    padding=(0.05, 0.3),
                     node_color="Name",
                     edge_line_width=1,
                     invert_axes=True,
                     cmap=self.cmap,
-                    height=group_size.max().item() * 35 + 10,
+                    height=clamp(max_row_count * 35 + 10, 270, 600),
                     edge_color="gray",
                     tools=[
                         HoverTool(
@@ -671,7 +685,7 @@ class Vis:
                 ),
                 opts.Labels(
                     text_font_size="8pt",
-                    yoffset=-0.2,
+                    yoffset=3 / max_row_count + 0.1,
                 ),
             )
             .relabel("Calling context tree")
