@@ -464,7 +464,22 @@ class Vis:
         freq, edges = np.histogram(sizes, 64)
         return self._view(
             hv.Histogram((edges, freq))
-            .opts(xlabel="Message size", ylabel="Number of messages", tools=["hover"])
+            .opts(
+                xlabel="Message size",
+                xformatter=size_tick_formatter,
+                ylabel="Number of messages",
+                tools=[
+                    HoverTool(
+                        tooltips={
+                            "Message size": "@x{custom}",
+                            "Frequency": "@Frequency",
+                        },
+                        formatters={
+                            "@x": size_hover_formatter,
+                        },
+                    )
+                ],
+            )
             .relabel("Histogram of message sizes")
         )
 
@@ -478,18 +493,48 @@ class Vis:
         freq, edges = np.histogram(times, 64, weights=(sizes if weighted else None))
         return self._view(
             hv.Histogram((edges, freq))
-            .opts(xlabel="Time", ylabel="Number of messages", tools=["hover"])
+            .opts(
+                xlabel="Time",
+                xformatter=time_tick_formatter,
+                ylabel="Message size",
+                yformatter=size_tick_formatter,
+                tools=[
+                    HoverTool(
+                        tooltips={
+                            "Bin": "@x{custom}",
+                            "Message size": "@Frequency{custom}",
+                        },
+                        formatters={
+                            "@x": time_hover_formatter,
+                            "@Frequency": size_hover_formatter,
+                        },
+                    )
+                ],
+            )
             .relabel("Communication over time")
         )
 
-    def occurence_over_time(self, name="MpiSend"):
-        events_filtered = self.trace.events[self.trace.events["Name"] == name]
+    def occurence_over_time(self):
+        events_filtered = self.trace.events
         times = events_filtered["Timestamp (ns)"]
 
         freq, edges = np.histogram(times, 64)
         return self._view(
             hv.Histogram((edges, freq))
-            .opts(xlabel="Time", ylabel="Frequency", tools=["hover"])
+            .opts(
+                xlabel="Time",
+                xformatter=time_tick_formatter,
+                ylabel="Frequency",
+                tools=[HoverTool(
+                    tooltips={
+                        "Bin": "@x{custom}",
+                        "Frequency": "@Frequency"
+                    },
+                    formatters={
+                        "@x": time_hover_formatter
+                    }
+                )]
+                )
             .relabel("Occurence over time")
         )
 
