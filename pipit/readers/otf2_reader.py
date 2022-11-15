@@ -13,9 +13,15 @@ import pipit.trace
 class OTF2Reader:
     """Reader for OTF2 trace files"""
 
-    def __init__(self, dir_name):
+    def __init__(self, dir_name, num_processes=None):
         self.dir_name = dir_name  # directory of otf2 file being read
         self.file_name = self.dir_name + "/traces.otf2"
+
+        num_cpus = mp.cpu_count()
+        if num_processes is None or num_processes < 1 or num_processes > num_cpus:
+            self.num_processes = math.floor(num_cpus * 0.75)
+        else:
+            self.num_processes = num_processes
 
     def field_to_val(self, field):
         """
@@ -81,7 +87,6 @@ class OTF2Reader:
         Note: all of the below cases handle the case where the data structure
         could be nested, which is always possibility depending on the trace's
         specific attributes
-
         """
 
         if isinstance(data, list):
@@ -230,15 +235,17 @@ class OTF2Reader:
 
             trace.close()  # close event files
 
-        # returns dictionary with all events and their fields
-        return {
-            "Timestamp (ns)": timestamps,
-            "Event Type": event_types,
-            "Name": names,
-            "Thread": thread_ids,
-            "Process": process_ids,
-            "Attributes": event_attributes,
-        }
+        # returns dataframe with all events and their fields
+        return pd.DataFrame(
+            {
+                "Timestamp (ns)": timestamps,
+                "Event Type": event_types,
+                "Name": names,
+                "Thread": thread_ids,
+                "Process": process_ids,
+                "Attributes": event_attributes,
+            }
+        )
 
     def read_definitions(self, trace):
         """
@@ -311,27 +318,18 @@ class OTF2Reader:
 
         # parallelizes the reading of events
         # using the multiprocessing library
-        pool_size = mp.cpu_count()
-        pool = mp.Pool(pool_size)
+        pool_size, pool = self.num_processes, mp.Pool(self.num_processes)
 
-        # confusing, but at this moment in time events_dict is actually a
-        # list of dicts that will be merged into one dictionary after this
-        events_dict = pool.map(
+        # list of dataframes returned by the processes pool
+        events_dataframes = pool.map(
             self.events_reader, [(rank, pool_size) for rank in range(pool_size)]
         )
 
         pool.close()
 
-        # combines the dictionaries returned from each
-        # process to generate a full trace
-        for i in range(len(events_dict) - 1):
-            for key, value in events_dict[0].items():
-                value.extend(events_dict[1][key])
-            del events_dict[1]
-        events_dict = events_dict[0]
-
-        # returns the events as a DataFrame
-        events_dataframe = pd.DataFrame(events_dict)
+        # merges the dataframe into one events dataframe
+        events_dataframe = pd.concat(events_dataframes)
+        del events_dataframes
 
         # accessing the clock properties of the trace using the definitions
         clock_properties = self.definitions.loc[
