@@ -351,6 +351,16 @@ class OTF2Reader:
             by="Timestamp (ns)", axis=0, ascending=True, inplace=True, ignore_index=True
         )
 
+        # convert these to ints
+        # (sometimes they get converted to floats
+        #  while concatenating dataframes)
+        events_dataframe = events_dataframe.astype(
+            {
+                "Thread": "int32",
+                "Process": "int32"
+            }
+        )
+
         # using categorical dtypes for memory optimization
         # (only efficient when used for categorical data)
         events_dataframe = events_dataframe.astype(
