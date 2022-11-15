@@ -30,13 +30,12 @@ from .util import (
 class Vis:
     """Contains visualization data and functions for a Trace"""
 
-    # TODO: aggregate common opts in __init__ (`defaults`)
     def __init__(self, trace, server=(not in_notebook())):
-        """Initialize environment for visualization"""
+        """Initialize environment for visualization."""
         self.trace = trace
         self.server = server
 
-        # Initialize holoviews and custom css
+        # Initialize HoloViews with and Bokeh backend and custom css
         self.css = """
             .container { width:90% !important; }
             div.bk-tooltip > div.bk > div.bk:not(:last-child) {
@@ -66,7 +65,8 @@ class Vis:
         self.cmap = generate_cmap(self.functions, DEFAULT_FUNCTION_PALETTE)
 
         # Apply default opts for HoloViews elements
-        # See https://holoviews.org/user_guide/Applying_Customizations.html#session-specific-options # noqa: 501
+        # https://holoviews.org/user_guide/Applying_Customizations.html#session-specific-options # noqa: 501
+        # https://holoviews.org/user_guide/Customizing_Plots.html#plot-hooks
         def customize_plot(plot, _):
             plot.state.toolbar_location = "above"
             plot.state.ygrid.visible = False
@@ -108,7 +108,10 @@ class Vis:
         )
 
     def _view(self, element):
-        """Launches server if `self.server`, else returns holoviews element"""
+        """Internal function used to wrap return values in vis functions.
+
+        Launches server for element if `self.server`, otherwise returns element.
+        """
         if self.server:
             import panel as pn
 
@@ -119,6 +122,16 @@ class Vis:
         return element
 
     def timeline(self, max_num_ranks=17, rects=True, segments=False, points=True):
+        """Generates overview timeline of trace events.
+
+        Requires live Python kernel for full functionality.
+
+        Args:
+            max_num_ranks (int): Maximum number of ranks to display
+            rects (bool): Whether to generate hv.Rectangles for functions
+            segments (bool): Whether to generate hv.Segments for messages
+            points (bool): Whether to generate hv.Points for instant events
+        """
         # Calculate matching rows and inc time
         self.trace.match_rows()
         self.trace.calc_inc_time()
@@ -153,6 +166,7 @@ class Vis:
             comm["x1"] = recvs["Timestamp (ns)"].values
             comm["y1"] = recvs["Process ID"].values
 
+        # https://holoviews.org/reference/containers/bokeh/DynamicMap.html
         def _callback(x_range):
             if x_range is None or pd.isna(x_range[0]) or pd.isna(x_range[1]):
                 x_range = (
@@ -167,8 +181,7 @@ class Vis:
             x_max_buff = x_max + (viewport_size * 0.25)
             min_width = viewport_size * (1 / 1920)
 
-            # Filter dataframes constructed above based on current
-            # x_range, and generate HoloViews elements
+            # Filter dataframes based on x_range, generate HoloViews elements
             if rects:
                 func_filtered = func[
                     (func["Matching Timestamp"] > x_min_buff)
@@ -209,6 +222,7 @@ class Vis:
                 * (hv_segments if segments else hv.Curve([]))
             )
 
+        # https://holoviews.org/user_guide/Custom_Interactivity.html
         return self._view(
             hv.DynamicMap(_callback, streams=[hv.streams.RangeX()])
             .opts(
@@ -264,8 +278,7 @@ class Vis:
         )
 
     def utilization(self):
-        """Shows value of certain metric over time (timeseries)"""
-
+        """Generates line chart showing CPU utilization over time."""
         data = time_series()
 
         area = hv.Area(data)
@@ -298,6 +311,10 @@ class Vis:
         )
 
     def time_profile(self):
+        """Generates bar graph of function durations per time interval.
+
+        Uses :func:`~pipit.Trace.time_profile` for calculation.
+        """
         # Compute time profile from API function
         profile = fake_time_profile(samples=100, num_bins=64, functions=self.functions)
 
@@ -331,15 +348,16 @@ class Vis:
         )
 
     def process_summary(self):
-        """Bar graph of total time spent by function per process"""
+        """Generates bar graph of function durations per process.
 
+        Uses :func:`~pipit.Trace.flat_profile` for calculation.
+        """
         # Get function summary
         funcs = self.trace.flat_profile(
             metric="Exc Time", groupby_column=["Name", "Process ID"]
         ).reset_index()
 
         # Generate bars
-        # See https://holoviews.org/reference/elements/bokeh/Bars.html
         return self._view(
             hv.Bars(funcs, kdims=["Process ID", "Name"])
             .aggregate(function=np.sum)
@@ -375,15 +393,16 @@ class Vis:
         )
 
     def function_summary(self):
-        """Bar graph of total time spent by function per process"""
+        """Generates bar graph of total duration for each function.
 
+        Uses :func:`~pipit.Trace.flat_profile` for calculation.
+        """
         # Get function summary
         funcs = self.trace.flat_profile(
             metric="Exc Time", groupby_column=["Name"]
         ).reset_index()
 
         # Generate bars
-        # See https://holoviews.org/reference/elements/bokeh/Bars.html
         return self._view(
             hv.Bars(funcs)
             .sort(["Exc Time"], reverse=True)
@@ -417,11 +436,7 @@ class Vis:
         )
 
     def comm_summary(self):
-        """Bar graph of total message size sent by process
-
-        Similar to comm_heatmap but aggregated per process
-        """
-
+        """Generates bar graph of total message size sent per process"""
         # Get communication summary
         messages = self.trace.events[
             self.trace.events["Event Type"].isin(["MpiSend", "MpiIsend"])
@@ -430,7 +445,6 @@ class Vis:
         processes = messages.groupby("Process ID")[["size"]].sum().reset_index()
 
         # Generate bars
-        # See https://holoviews.org/reference/elements/bokeh/Bars.html
         return self._view(
             hv.Bars(processes)
             .opts(
@@ -465,6 +479,7 @@ class Vis:
         )
 
     def message_size_hist(self):
+        """Generates histogram of message frequency per size."""
         messages = self.trace.events[
             self.trace.events["Event Type"].isin(["MpiSend", "MpiIsend"])
         ]
@@ -494,6 +509,11 @@ class Vis:
         )
 
     def comm_over_time(self, weighted=True):
+        """Generates histogram of message frequency per time interval.
+
+        Args:
+            weighted (bool): Whether to weigh histogram by message size.
+        """
         messages = self.trace.events[
             self.trace.events["Event Type"].isin(["MpiSend", "MpiIsend"])
         ]
@@ -525,6 +545,7 @@ class Vis:
         )
 
     def occurence_over_time(self):
+        """Generates histogram of event occurence per time interval."""
         events_filtered = self.trace.events
         times = events_filtered["Timestamp (ns)"]
 
@@ -547,7 +568,15 @@ class Vis:
         )
 
     def comm_heatmap(self, comm_type="counts", label_threshold=16, cmap="YlOrRd"):
-        """Heatmap of process-to-process message volume"""
+        """Generates heatmap of process-to-process message volume.
+
+        Uses :func:`~pipit.Trace.comm_matrix` function for calculation.
+
+        Args:
+            comm_type (str): "counts" or "bytes"
+            label_threshold (int): Number of ranks, above which labels are not displayed
+            cmap (str): Name of HoloViews colormap to use
+        """
         comm_matrix = self.trace.comm_matrix(comm_type)
 
         num_ranks = comm_matrix.shape[0]
@@ -596,24 +625,11 @@ class Vis:
 
         return self._view(image * labels)
 
-    def print_cct(self):
-        visited = set()
-
-        def pc(node):
-            if node not in visited:
-                print("| " * node.get_level() + node.name)
-                for child in node.children:
-                    if child != node:
-                        pc(child)
-
-                visited.add(node)
-
-        for root in self.trace.cct.roots:
-            pc(root)
-
-        return visited
-
     def cct(self):
+        """Generates visualization of trace's calling context tree.
+
+        Uses :py:`~pipit.Trace.cct`.
+        """
         # Nodes
         name = []
         depth = []
@@ -624,6 +640,7 @@ class Vis:
         source = []
         target = []
 
+        # Perform depth-first search to populate above arrays
         visited = set()
 
         def dfs(node):
@@ -645,18 +662,22 @@ class Vis:
         for root in self.trace.cct.roots:
             dfs(root)
 
+        # Construct df for HoloViews `Nodes` element
         nodes = pd.DataFrame()
         nodes["Name"] = name
         nodes["Depth"] = depth
         nodes["index"] = index
         nodes["num_calls"] = num_calls
 
+        # Calculate position for each node
         group_index = nodes.groupby("Depth").cumcount()
         group_size = nodes.groupby("Depth")["Depth"].transform("count")
         nodes["x"] = (group_index - (group_size / 2) + 0.5) * (1 / group_size) * 10
 
         nodes = nodes.set_index("index")
 
+        # Generate hv elements
+        # https://holoviews.org/user_guide/Network_Graphs.html
         hv_nodes = hv.Nodes(nodes, ["x", "Depth", "index"])
         graph = hv.Graph(((source, target), hv_nodes))
         label = hv.Labels(graph.nodes, ["x", "Depth"], "Name")

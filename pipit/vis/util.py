@@ -148,6 +148,7 @@ size_hover_formatter = CustomJSHover(
     """
 )
 
+
 # Other utility functions
 def in_notebook():
     """Determines if we are in a notebook environment"""
@@ -203,13 +204,3 @@ def fake_time_profile(samples, num_bins, functions):
 def get_height(num_ys, max_height=600):
     """Calculate optimal height for plot based on number of elements on the y-axis"""
     return clamp(num_ys * 45, 150, max_height)
-
-
-def even_samples(list, n):
-    """Given a list of m elements, evenly sample n elements and return the sampled list"""
-    m = len(list)
-    if m > n:
-        idx = np.round(np.linspace(0, m, n)).astype(int)
-        return list[idx]
-    else:
-        return list
