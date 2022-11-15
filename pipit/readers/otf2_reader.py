@@ -355,10 +355,7 @@ class OTF2Reader:
         # (sometimes they get converted to floats
         #  while concatenating dataframes)
         events_dataframe = events_dataframe.astype(
-            {
-                "Thread": "int32",
-                "Process": "int32"
-            }
+            {"Thread": "int32", "Process": "int32"}
         )
 
         # using categorical dtypes for memory optimization
