@@ -236,7 +236,7 @@ class OTF2Reader:
 
             trace.close()  # close event files
 
-        # returns dictionary with all events and their fields
+        # returns dataframe with all events and their fields
         return pd.DataFrame(
             {
                 "Timestamp (ns)": timestamps,
