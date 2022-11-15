@@ -13,15 +13,15 @@ import pipit.trace
 class OTF2Reader:
     """Reader for OTF2 trace files"""
 
-    def __init__(self, dir_name, num_parallel=None):
+    def __init__(self, dir_name, num_processes=None):
         self.dir_name = dir_name  # directory of otf2 file being read
         self.file_name = self.dir_name + "/traces.otf2"
 
         num_cpus = mp.cpu_count()
-        if num_parallel is None or num_parallel < 1 or num_parallel > num_cpus:
-            self.num_parallel = math.floor(num_cpus * 0.75)
+        if num_processes is None or num_processes < 1 or num_processes > num_cpus:
+            self.num_processes = math.floor(num_cpus * 0.75)
         else:
-            self.num_parallel = num_parallel
+            self.num_processes = num_processes
 
     def field_to_val(self, field):
         """
@@ -319,7 +319,7 @@ class OTF2Reader:
 
         # parallelizes the reading of events
         # using the multiprocessing library
-        pool_size, pool = self.num_parallel, mp.Pool(self.num_parallel)
+        pool_size, pool = self.num_processes, mp.Pool(self.num_processes)
 
         # list of dataframes returned by the processes pool
         events_dataframes = pool.map(
