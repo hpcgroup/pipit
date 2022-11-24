@@ -3,7 +3,6 @@
 #
 # SPDX-License-Identifier: MIT
 
-import math
 import otf2
 import pandas as pd
 import multiprocessing as mp
@@ -19,7 +18,8 @@ class OTF2Reader:
 
         num_cpus = mp.cpu_count()
         if num_processes is None or num_processes < 1 or num_processes > num_cpus:
-            self.num_processes = math.floor(num_cpus * 0.75)
+            # uses all processes to parallelize reading by default
+            self.num_processes = num_cpus
         else:
             self.num_processes = num_processes
 
@@ -158,12 +158,35 @@ class OTF2Reader:
             # of the trace
             rank, size = rank_size[0], rank_size[1]
             locations = list(trace.definitions._locations)
+            num_locations = len(locations)
 
-            # calculates how many locations to read per process
-            # and determines starting and ending indices to select
-            # for the current process
-            per_process = math.floor(len(locations) / size)
-            begin_int, end_int = int(rank * per_process), int((rank + 1) * per_process)
+            # base number of locations read by each process
+            per_process = int(num_locations // size)
+
+            # remainder number of locations to be split evenly
+            remainder = int(num_locations % size)
+
+            if rank < remainder:
+                """
+                Example:
+                For the reading of 30 locations split over 14 processes,
+                first 2 processes will read 3 locations each since the remainder
+                is 2.
+                """
+                begin_int = rank * (per_process + 1)
+                end_int = (rank + 1) * (per_process + 1)
+            else:
+                """
+                Example:
+                For the reading of 30 locations split over 14 processes,
+                last 12 processes will read 2 locations each. The starting index
+                accounts for the fact that the first two will read 3 locations each.
+                """
+                begin_int = (rank * per_process) + remainder
+                end_int = ((rank + 1) * per_process) + remainder
+
+            # select the locations to read based on above calculations
+            loc_events = list(trace.events(locations[begin_int:end_int]).__iter__())
 
             # columns of the DataFrame
             timestamps, event_types, event_attributes, names = [], [], [], []
@@ -172,14 +195,6 @@ class OTF2Reader:
             # 1. The below lists are for storing logical ids.
             # 2. Support for GPU events has to be added and unified across readers.
             process_ids, thread_ids = [], []
-
-            # selects a subset of all trace locations to
-            # read based on the current rank
-            loc_events = []
-            if rank == size - 1:
-                loc_events = list(trace.events(locations[begin_int:]).__iter__())
-            elif len(locations[begin_int:end_int]) != 0:
-                loc_events = list(trace.events(locations[begin_int:end_int]).__iter__())
 
             # iterates through the events and processes them
             for loc_event in loc_events:
@@ -380,7 +395,17 @@ class OTF2Reader:
 
         with otf2.reader.open(self.file_name) as trace:
             self.definitions = self.read_definitions(trace)  # definitions
+
+            # if a trace has n locations, we should only parallelize
+            # the reading of events over a number of processes
+            # equal to n at a maximum
+            num_locations = len(trace.definitions._locations)
+            if self.num_processes > num_locations:
+                self.num_processes = num_locations
+
             # close the trace and open it later per process
             trace.close()
+
         self.events = self.read_events()  # events
+
         return pipit.trace.Trace(self.definitions, self.events)
