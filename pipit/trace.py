@@ -237,7 +237,12 @@ class Trace:
 
                         curr_depth -= 1
 
-            self.events["Depth"] = depth
-            self.events = self.events.astype({"Depth": "category"})
+            self.events["Depth"], self.events["Parent"], self.events["Children"] = (
+                depth,
+                parent,
+                children,
+            )
 
-            self.events["Parent"], self.events["Children"] = parent, children
+            self.events = self.events.astype(
+                {"Depth": "category", "Parent": "category"}
+            )
