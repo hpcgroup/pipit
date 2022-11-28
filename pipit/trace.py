@@ -119,3 +119,125 @@ class Trace:
             ]
 
         return communication_matrix
+
+    def match_rows(self):
+        if "Matching Index" not in self.events.columns:
+            """
+            Two columns to be added to dataframe:
+            "Matching Index" and "Matching Timestamp"
+
+            Matches dataframe indices and timestamps
+            between corresponding enter and leave rows.
+            """
+            matching_indices = [float("nan")] * len(self.events)
+            matching_times = [float("nan")] * len(self.events)
+
+            enter_leave_df = self.events.loc[
+                self.events["Event Type"].isin(["Enter", "Leave"])
+            ]
+
+            # Filter by Thread/Process
+            for id in set(enter_leave_df["Thread"]):
+                filtered_df = enter_leave_df.loc[enter_leave_df["Thread"] == id]
+
+                stack = []
+                event_types = list(filtered_df["Event Type"])
+                df_indices, timestamps = list(filtered_df.index), list(
+                    filtered_df["Timestamp (ns)"]
+                )
+
+                # Iterate through all events of filtered DataFrame
+                for i in range(len(filtered_df)):
+                    curr_df_index, curr_timestamp, evt_type = (
+                        df_indices[i],
+                        timestamps[i],
+                        event_types[i],
+                    )
+
+                    if evt_type == "Enter":
+                        # Add current dataframe index and timestamp to stack
+                        stack.append((curr_df_index, curr_timestamp))
+                    else:
+                        # Pop corresponding enter event's dataframe index and timestamp
+                        enter_df_index, enter_timestamp = stack.pop()
+
+                        # Fill in the lists with the matching values
+                        matching_indices[enter_df_index] = curr_df_index
+                        matching_indices[curr_df_index] = enter_df_index
+
+                        matching_times[enter_df_index] = curr_timestamp
+                        matching_times[curr_df_index] = enter_timestamp
+
+            self.events["Matching Index"] = matching_indices
+            self.events["Matching Timestamp"] = matching_times
+
+    def calling_relationships(self):
+        """
+        Three columns to be added to dataframe:
+        "Depth", "Parent", and "Children"
+
+        Depth is level in the call tree starting from 0.
+        Parent is the dataframe index of a row's parent event.
+        Children is a list of dataframe indices of a row's children events.
+        """
+
+        if "Children" not in self.events.columns:
+            children = [None] * len(self.events)
+            depth, parent = [float("nan")] * len(self.events), [float("nan")] * len(
+                self.events
+            )
+
+            enter_leave_df = self.events.loc[
+                self.events["Event Type"].isin(["Enter", "Leave"])
+            ]
+
+            for id in set(enter_leave_df["Thread"]):
+                filtered_df = enter_leave_df.loc[enter_leave_df["Thread"] == id]
+
+                curr_depth, stack = 0, []
+                df_indices, event_types = list(filtered_df.index), list(
+                    filtered_df["Event Type"]
+                )
+
+                for i in range(len(filtered_df)):
+                    curr_df_index, evt_type = df_indices[i], event_types[i]
+
+                    if evt_type == "Enter":
+                        if curr_depth > 0:  # if event is a child of some other event
+                            parent_df_index = stack[-1]
+
+                            if children[parent_df_index] is None:
+                                """
+                                create a new list of children for the parent if
+                                the current event is the first child being added
+                                """
+                                children[parent_df_index] = [curr_df_index]
+                            else:
+                                children[parent_df_index].append(curr_df_index)
+
+                            parent[curr_df_index] = parent_df_index
+
+                        depth[curr_df_index] = curr_depth
+                        curr_depth += 1
+
+                        # add enter dataframe index to stack
+                        stack.append(curr_df_index)
+                    else:
+                        enter_df_index = stack.pop()
+
+                        """
+                        storing depth and parent in both enter and leave rows
+                        since they are floats.
+
+                        children stored as nan in leave row and can be found
+                        using matching index for avoiding redundant memory.
+                        """
+                        depth[curr_df_index] = depth[enter_df_index]
+                        parent[curr_df_index] = parent[enter_df_index]
+
+                        curr_depth -= 1
+
+            self.events["Depth"] = depth
+            self.events = self.events.astype({"Depth": "category"})
+
+            self.events["Parent"], self.events["Children"] = parent, children
