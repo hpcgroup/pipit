@@ -7,6 +7,7 @@
 import gzip
 import pandas
 import pipit.trace
+import os
 
 class ProjectionsConstants:
     """
@@ -217,10 +218,30 @@ class STSReader:
 
 
 class ProjectionsReader:
-    def __init__(self, executable_location: str) -> None:
-        self.executable_location = executable_location
+    def __init__(self, projections_directory: str) -> None:
+        if not os.path.isdir(projections_directory):
+            raise ValueError('Not a valid directory.')
+
+        # iterate through files in the directory to find sts file
+        directory_contents = os.listdir(projections_directory)
+        for file in directory_contents:
+            if file.endswith('.sts'):
+                if(hasattr(self, 'executable_location')):
+                    raise ValueError('Invalid directory for projections - multiple sts files found.')
+                else:
+                    executable_name = file[0:-4]
+                    self.executable_location =  os.path.join(projections_directory, executable_name)
+        
+        # read sts file and get number of PEs
         self.sts_reader = STSReader(self.executable_location + '.sts')
         self.num_pes = self.sts_reader.num_pes
+        
+        # make sure all the log files exist
+        for i in range (self.num_pes):
+            log_file = executable_name + '.' + str(i) + '.log.gz'
+            if not log_file in directory_contents:
+                raise ValueError('Invalid directory for projections - the sts file states that there are ' + str(i) + ' PEs, but log file ' + log_file + ' is missing.')
+            
 
     # Returns an empty dict, used for reading log file into dataframe
     @staticmethod
