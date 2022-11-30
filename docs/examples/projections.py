@@ -13,4 +13,3 @@ if __name__ == "__main__":
 
     # Printout the DataFrame component of the Trace.
     print(trace.events)
-

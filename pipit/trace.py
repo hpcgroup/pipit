@@ -119,4 +119,3 @@ class Trace:
             ]
 
         return communication_matrix
-
