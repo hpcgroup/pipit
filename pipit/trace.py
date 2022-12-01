@@ -33,6 +33,14 @@ class Trace:
         return HPCToolkitReader(dirname).read()
 
     @staticmethod
+    def from_projections(dirname):
+        """Read a Projections trace into a new Trace object."""
+        # import this lazily to avoid circular dependencies
+        from .readers.projections_reader import ProjectionsReader
+
+        return ProjectionsReader(dirname).read()
+
+    @staticmethod
     def from_nsight(filename):
         """Read an Nsight trace into a new Trace object."""
         # import this lazily to avoid circular dependencies
