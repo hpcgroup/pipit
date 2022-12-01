@@ -151,7 +151,7 @@ class OTF2Reader:
         to a dataframe
         """
 
-        with otf2.reader.open(self.file_name) as trace:
+        with otf2.reader.open(self.file_name) as trace:  # noqa: F821
             # extracts the rank and size
             # and gets all the locations
             # of the trace
@@ -392,7 +392,7 @@ class OTF2Reader:
         events DataFrame as its primary attributes
         """
 
-        with otf2.reader.open(self.file_name) as trace:
+        with otf2.reader.open(self.file_name) as trace:  # noqa: F821
             self.definitions = self.read_definitions(trace)  # definitions
 
             # if a trace has n locations, we should only parallelize
