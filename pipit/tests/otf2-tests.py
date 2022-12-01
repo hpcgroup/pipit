@@ -4,6 +4,7 @@
 # SPDX-License-Identifier: MIT
 
 import numpy as np
+import pytest
 from pipit import Trace
 
 @pytest.mark.xfail(reason="Allow this to fail until otf2 has a pip package.")
