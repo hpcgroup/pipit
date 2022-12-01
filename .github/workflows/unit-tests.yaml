@@ -42,6 +42,15 @@ jobs:
           black --diff --check .
           flake8
 
+      - name: Update coverage
+        if: ${{ matrix.python-version == 3.9 }}
+        run: |
+          pip install --upgrade coverage
+
+      - name: Basic Test with pytest
+        run: |
+          PYTHONPATH=. coverage run $(which pytest)
+
   macos:
     runs-on: macos-latest
     strategy:
@@ -60,3 +69,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install flake8 pytest
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Basic Test with pytest
+        run: |
+          PYTHONPATH=. pytest
+
