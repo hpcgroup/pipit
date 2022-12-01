@@ -17,12 +17,12 @@ class Trace:
         self.events = events
 
     @staticmethod
-    def from_otf2(dirname):
+    def from_otf2(dirname, num_processes=None):
         """Read an OTF2 trace into a new Trace object."""
         # import this lazily to avoid circular dependencies
         from .readers.otf2_reader import OTF2Reader
 
-        return OTF2Reader(dirname).read()
+        return OTF2Reader(dirname, num_processes).read()
 
     @staticmethod
     def from_hpctoolkit(dirname):
