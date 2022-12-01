@@ -7,6 +7,7 @@ import numpy as np
 import pytest
 from pipit import Trace
 
+
 @pytest.mark.xfail(reason="Allow this to fail until otf2 has a pip package.")
 def test_events(data_dir, ping_pong_otf2_trace):
     trace = Trace.from_otf2(str(ping_pong_otf2_trace))
