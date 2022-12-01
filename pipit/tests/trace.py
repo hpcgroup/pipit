@@ -6,6 +6,7 @@
 from pipit import Trace
 
 
+@pytest.mark.xfail(reason="Allow this to fail until otf2 has a pip package.")
 def test_comm_matrix(data_dir, ping_pong_otf2_trace):
     # bytes sent between pairs of processes
     size_comm_matrix = Trace.from_otf2(str(ping_pong_otf2_trace)).comm_matrix()
