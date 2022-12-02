@@ -2,8 +2,8 @@ from pipit import Trace
 import pandas as pd
 import pytest
 
-def test_events(data_dir, nbody_nvtx):
-    events_df = Trace.from_nsight(str(nbody_nvtx+'/trace.csv')).events
+def test_events(nbody_nvtx):
+    events_df = Trace.from_nsight(str(nbody_nvtx)+"/trace.csv").events
     
     # 262 events in nbody trace
     assert len(events_df) == 262
