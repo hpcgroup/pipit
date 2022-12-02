@@ -34,7 +34,7 @@ class Trace:
         from .readers.hpctoolkit_reader import HPCToolkitReader
 
         return HPCToolkitReader(dirname).read()
-       
+
     @staticmethod
     def from_projections(dirname):
         """Read a Projections trace into a new Trace object."""
@@ -101,7 +101,7 @@ class Trace:
             .apply(lambda attrDict: attrDict["receiver"])
             .to_list()
         )
-        
+
         # the length of the message_volume list created below
         # is the total number of messages sent
 
@@ -154,19 +154,20 @@ class Trace:
             ]  # list of nodes in the DataFrame
             node_id = 0  # each node has a unique id
 
+            # Filter the DataFrame to only Enter/Leave
+            enter_leave_df = self.events.loc[
+                self.events["Event Type"].isin(["Enter", "Leave"])
+            ]
+
             """
-            Iterate through each Location ID which is analagous to a thread
-            and iterate over its events using a stack to add to the cct
+            Iterate through each Thread and iterate over
+            its events using a stack to add to the cct
             """
-            for location_id in set(self.events["Location ID"]):
+            for thread_id in set(self.events["Thread"]):
                 """
-                Filter the DataFrame by Location ID and
-                events that are only of type Enter/Leave.
+                Filter the DataFrame by Thread
                 """
-                location_df = self.events.loc[
-                    (self.events["Name"] != "N/A")
-                    & (self.events["Location ID"] == location_id)
-                ]
+                thread_df = enter_leave_df.loc[enter_leave_df["Thread"] == thread_id]
 
                 curr_depth = 0
                 callpath = ""
@@ -176,15 +177,15 @@ class Trace:
                 we save them as lists and iterate over those as
                 that is more efficient.
                 """
-                df_indices = list(location_df.index)
-                function_names = list(location_df["Name"])
-                event_types = list(location_df["Event Type"])
+                df_indices = list(thread_df.index)
+                function_names = list(thread_df["Name"])
+                event_types = list(thread_df["Event Type"])
 
                 # stacks used to iterate through the trace and add nodes to the cct
                 functions_stack, nodes_stack = [], []
 
-                # iterating over the events of the current location id's trace
-                for i in range(len(location_df)):
+                # iterating over the events of the current thread's trace
+                for i in range(len(thread_df)):
                     curr_df_index, evt_type, function_name = (
                         df_indices[i],
                         event_types[i],
