@@ -40,3 +40,9 @@ def ping_pong_otf2_trace(data_dir, tmpdir):
     shutil.copy(os.path.join(str(otf2_dir), "traces.otf2"), str(tmpdir))
 
     return tmpdir
+
+@pytest.fixture
+def nbody_nvtx(data_dir, tmpdir):
+    nsight_dir = os.path.join(data_dir, "nbody-nvtx")
+    
+    shutil.copy(os.path.join(nsight_dir, "trace.csv"), str(tmpdir))
