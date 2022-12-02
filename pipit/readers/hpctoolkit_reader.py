@@ -180,12 +180,13 @@ class HPCToolkitReader:
         # print("hdr_size: ", hdr_size)
 
         data = {
-            "Function Name": [],
+            "Timestamp (ns)": [],
             "Event Type": [],
-            "Time": [],
+            "Name": [],
+            "Thread": [],
             "Process": [],
-            "Graph_Node": [],
-            "Level": [],
+            "Host": [],
+            "Node": [],
         }
         min_max_time = experiment_reader.get_min_max_time()
 
@@ -242,7 +243,7 @@ class HPCToolkitReader:
 
                     # updating the trace_db
 
-                    node = graph.get_node(calling_context_id)  # the node in the CCT
+                    node = graph.get_node(calling_context_id)  # the node in the Graph
 
                     # closing functions exited
                     close_node = last_node
@@ -259,12 +260,13 @@ class HPCToolkitReader:
                         close_node is not None
                         and close_node.get_level() > intersect_level
                     ):
-                        data["Function Name"].append(close_node.name)
-                        data["Event Type"].append("Exit")
-                        data["Time"].append(timestamp)
-                        data["Process"].append(proc_num)
-                        data["Graph_Node"].append(close_node)
-                        data["Level"].append(close_node.get_level())
+                        data["Name"].append(close_node.name)
+                        data["Event Type"].append("Leave")
+                        data["Timestamp (ns)"].append(timestamp)
+                        data["Process"].append(proc_num[1][1])
+                        data["Thread"].append(proc_num[2][1])
+                        data["Host"].append(proc_num[0][1])
+                        data["Node"].append(close_node)
                         close_node = close_node.parent
 
                     # creating new rows for the new functions entered
@@ -276,12 +278,13 @@ class HPCToolkitReader:
                     # function since the last poll so we want to create entries
                     # in the data for the Enter event
                     for enter_node in enter_list[::-1]:
-                        data["Function Name"].append(enter_node.name)
+                        data["Name"].append(enter_node.name)
                         data["Event Type"].append("Enter")
-                        data["Time"].append(timestamp)
-                        data["Process"].append(proc_num)
-                        data["Graph_Node"].append(enter_node)
-                        data["Level"].append(enter_node.get_level())
+                        data["Timestamp (ns)"].append(timestamp)
+                        data["Process"].append(proc_num[1][1])
+                        data["Thread"].append(proc_num[2][1])
+                        data["Host"].append(proc_num[0][1])
+                        data["Node"].append(enter_node)
                     last_node = node
 
                 last_id = calling_context_id  # updating last_id
@@ -290,21 +293,44 @@ class HPCToolkitReader:
             close_node = last_node
 
             # after reading through all the trace lines, some Enter events will
-            # not have matching Exit events, as the functions were still
-            # running in the last poll.  Here we are adding Exit events to all
+            # not have matching Leave events, as the functions were still
+            # running in the last poll.  Here we are adding Leave events to all
             # of the remaining unmatched Enter events
             while close_node is not None:
-                data["Function Name"].append(close_node.name)
-                data["Event Type"].append("Exit")
-                data["Time"].append(min_max_time[1] - min_max_time[0])
-                data["Process"].append(proc_num)
-                data["Graph_Node"].append(close_node)
-                data["Level"].append(close_node.get_level())
+                data["Name"].append(close_node.name)
+                data["Event Type"].append("Leave")
+                data["Timestamp (ns)"].append(min_max_time[1] - min_max_time[0])
+                data["Process"].append(proc_num[1][1])
+                data["Thread"].append(proc_num[2][1])
+                data["Host"].append(proc_num[0][1])
+                data["Node"].append(close_node)
                 close_node = close_node.parent
 
         trace_df = pd.DataFrame(data)
+        # Need to sort df by timestamp then index
+        # (since many events occur at the same timestamp)
+
+        # rename the index axis, so we can sort with it
+        trace_df.rename_axis("index", inplace=True)
+
+        # sort by timestamp then index
         trace_df.sort_values(
-            by="Time", axis=0, ascending=True, inplace=True, ignore_index=True
+            by=["Timestamp (ns)", "index"],
+            axis=0,
+            ascending=True,
+            inplace=True,
+            ignore_index=True,
         )
+
+        trace_df = trace_df.astype(
+            {
+                "Event Type": "category",
+                "Name": "category",
+                "Thread": "category",
+                "Process": "category",
+                "Host": "category",
+            }
+        )
+
         self.trace_df = trace_df
         return pipit.trace.Trace(None, trace_df, graph)
