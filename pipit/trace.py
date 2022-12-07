@@ -4,6 +4,7 @@
 # SPDX-License-Identifier: MIT
 
 import numpy as np
+from pipit.vis import Vis
 
 
 class Trace:
@@ -15,6 +16,7 @@ class Trace:
         """Create a new Trace object."""
         self.definitions = definitions
         self.events = events
+        self.vis = Vis(self)
 
     @staticmethod
     def from_otf2(dirname, num_processes=None):
@@ -47,6 +49,9 @@ class Trace:
         from .readers.nsight_reader import NsightReader
 
         return NsightReader(filename).read()
+
+    def query(self, qu3ry):
+        return self.events.query(qu3ry)
 
     def comm_matrix(self, output="size"):
         """
