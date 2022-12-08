@@ -16,7 +16,6 @@ class Trace:
         """Create a new Trace object."""
         self.definitions = definitions
         self.events = events
-        self.vis = Vis(self)
 
     @staticmethod
     def from_otf2(dirname, num_processes=None):
@@ -49,9 +48,6 @@ class Trace:
         from .readers.nsight_reader import NsightReader
 
         return NsightReader(filename).read()
-
-    def query(self, qu3ry):
-        return self.events.query(qu3ry)
 
     def comm_matrix(self, output="size"):
         """
@@ -89,7 +85,8 @@ class Trace:
 
         # filter the dataframe by MPI Send and Isend events
         sender_dataframe = self.events.loc[
-            self.events["Name"].isin(["MpiSend", "MpiIsend"]),
+            # TODO: dev purposes only, revert change
+            self.events["Event Type"].isin(["MpiSend", "MpiIsend"]),
             ["Process", "Attributes"],
         ]
 
@@ -132,3 +129,13 @@ class Trace:
             ]
 
         return communication_matrix
+
+    def init_vis(self):
+        """Create a new Vis instance for this Trace."""
+        if not hasattr(self, "vis"):
+            self.vis = Vis(self)
+
+    def comm_heatmap(self, **kwargs):
+        """Wrapper for :func:`~pipit.vis.Vis.comm_heatmap`"""
+        self.init_vis()
+        return self.vis.comm_heatmap(**kwargs)

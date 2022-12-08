@@ -4,14 +4,10 @@
 # SPDX-License-Identifier: MIT
 
 import numpy as np
-import pandas as pd
 import holoviews as hv
 from holoviews import opts
 
-from bokeh.models import (
-    AdaptiveTicker, 
-    HoverTool
-)
+from bokeh.models import AdaptiveTicker, HoverTool, NumeralTickFormatter
 
 import random
 
@@ -22,17 +18,21 @@ from .util import (
     generate_cmap,
     clamp,
     process_tick_formatter,
+    size_tick_formatter,
+    size_hover_formatter,
+    format_size,
 )
 
+
 class Vis:
-    """Contains data and functions related to visualization for a specific Trace instance"""
+    """Contains visualization state and methods for a Trace instance"""
 
     def __init__(self, trace, server=(not in_notebook())):
         """Initialize environment for initialization.
-        
+
         Args:
             trace (Trace): Trace instance that this Vis object is associated with
-            server (bool): Whether to launch an HTTP server and display views in a browser
+            server (bool): Whether to launch HTTP server and display in browser
         """
         self.trace = trace
         self.server = server
@@ -42,7 +42,9 @@ class Vis:
 
         # Set some properties for easy access
         # Maybe these should be moved to the Trace class
-        self.functions = trace.events[trace.events["Event Type"] == "Enter"]["Name"].unique()
+        self.functions = trace.events[trace.events["Event Type"] == "Enter"][
+            "Name"
+        ].unique()
         self.ranks = trace.events["Process"].unique()
 
         # Initialize color map for functions
@@ -92,10 +94,9 @@ class Vis:
             opts.Segments(**defaults),
         )
 
-
     def _view(self, element):
         """Internal function used to wrap return values in visualization functions.
-        
+
         Launches HTTP server for element if `self.server` is true, else returns element.
         """
         if self.server:
@@ -109,11 +110,11 @@ class Vis:
 
     def comm_heatmap(self, output="size", label_threshold=16, cmap="YlOrRd"):
         """Generates heatmap of process-to-process message volume.
-        
+
         Uses :func:`~pipit.Trace.comm_matrix` function for calculation.
 
         Args:
-            output (str): Whether communication volume should be determined by "size" or "count"
+            output (str): "size" or "count" - see :func:`~pipit.Trace.comm_matrix
             label_threshold (int): Number of ranks above which labels are not displayed
             cmap (str): Name of HoloViews colormap to use
         """
@@ -123,7 +124,7 @@ class Vis:
         bounds = (-0.5, -0.5, num_ranks - 0.5, num_ranks - 0.5)
 
         # Generate image
-        image = hv.Image(comm_matrix, bounds=bounds).opts(
+        image = hv.Image(np.flip(comm_matrix, 0), bounds=bounds).opts(
             width=clamp(300 + num_ranks * 35, 400, 850),
             height=clamp(250 + num_ranks * 25, 200, 650),
             responsive=False,
@@ -135,34 +136,47 @@ class Vis:
                     tooltips={
                         "Sender": "Process $x{0.}",
                         "Receiver": "Process $y{0.}",
-                        "Count": "@image messages",
-                    }
+                        output.capitalize(): "@image{custom}",
+                    },
+                    formatters={"@image": size_hover_formatter},
                 )
             ],
             xlabel="Sender",
             ylabel="Receiver",
             xticks=AdaptiveTicker(base=2, min_interval=1, max_interval=None),
             yticks=AdaptiveTicker(base=2, min_interval=1, max_interval=None),
-            title="Total message counts per process pair",
+            title="Process-to-process message volume",
             yformatter=process_tick_formatter,
             xformatter=process_tick_formatter,
             xaxis="top",
             invert_yaxis=True,
             xrotation=60,
+            cformatter=size_tick_formatter
+            if output == "size"
+            else NumeralTickFormatter(),
         )
 
+        # If label threshold isn't met, don't generate labels -- just return image
         if num_ranks > label_threshold:
             return self._view(image)
 
-        # If label threshold is met, generate labels
         max_val = np.amax(comm_matrix)
-        labels = hv.Labels(image).opts(
-            text_color="z",
+
+        # Convert matrix from 2D array to 1D array containing (x, y, volume) values
+        unrolled = []
+        for i in range(num_ranks):
+            for j in range(num_ranks):
+                unrolled.append((i, j, comm_matrix[i, j]))
+
+        # Generate labels
+        # https://holoviews.org/reference/elements/bokeh/Labels.html
+        volume_dim = hv.Dimension("volume", value_format=format_size)
+
+        labels = hv.Labels(unrolled, vdims=volume_dim).opts(
+            text_color="volume",
             color_levels=[0, max_val / 2, max_val],
             cmap=["black", "white"],
             text_font_size="9.5pt",
         )
 
         return self._view(image * labels)
-
-

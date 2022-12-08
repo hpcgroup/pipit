@@ -1,11 +1,12 @@
+# Copyright 2022 Parallel Software and Systems Group, University of Maryland.
+# See the top-level LICENSE file for details.
+#
+# SPDX-License-Identifier: MIT
+
 import pandas as pd
 import numpy as np
 
-from bokeh.models import (
-    PrintfTickFormatter,
-    FuncTickFormatter,
-    CustomJSHover
-)
+from bokeh.models import PrintfTickFormatter, FuncTickFormatter, CustomJSHover
 
 # Constants
 
@@ -21,7 +22,7 @@ CSS = """
 
     /* Change hover cursor */
     div.bk { cursor: default !important; }
-    
+
     /* Tooltip text styling */
     .bk.bk-tooltip-row-label {
         color: black;
