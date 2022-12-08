@@ -128,7 +128,7 @@ class Trace:
 
         return communication_matrix
 
-    def match_rows(self):
+    def pair_enter_leave(self):
         if "Matching Index" not in self.events.columns:
             """
             Two columns to be added to dataframe:
@@ -144,11 +144,20 @@ class Trace:
                 self.events["Event Type"].isin(["Enter", "Leave"])
             ]
 
-            # Filter by Thread/Process
+            # TO DO:
+            # filter by both thread and process (have to change otf2 reader first)
             for id in set(enter_leave_df["Thread"]):
                 filtered_df = enter_leave_df.loc[enter_leave_df["Thread"] == id]
 
                 stack = []
+
+                """
+                Note:
+                The reason that we are creating lists that are copies of the dataframe
+                columns below and iterating over those instead of using pandas iterrows
+                is due to an observed improvement in performance when using lists.
+                """
+
                 event_types = list(filtered_df["Event Type"])
                 df_indices, timestamps = list(filtered_df.index), list(
                     filtered_df["Timestamp (ns)"]
