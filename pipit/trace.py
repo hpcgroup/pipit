@@ -85,8 +85,7 @@ class Trace:
 
         # filter the dataframe by MPI Send and Isend events
         sender_dataframe = self.events.loc[
-            # TODO: dev purposes only, revert change
-            self.events["Event Type"].isin(["MpiSend", "MpiIsend"]),
+            self.events["Name"].isin(["MpiSend", "MpiIsend"]),
             ["Process", "Attributes"],
         ]
 
