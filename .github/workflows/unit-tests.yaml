@@ -54,7 +54,7 @@ jobs:
       - name: Install Python packages
         run: |
           pip install --upgrade pip
-          pip install --upgrade numpy pandas pytest
+          pip install --upgrade numpy pandas holoviews pytest
 
       - name: Basic test with pytest
         run: |
