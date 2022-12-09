@@ -8,6 +8,7 @@ import gzip
 import pandas
 import pipit.trace
 import os
+import multiprocessing as mp
 
 
 class ProjectionsConstants:
@@ -268,15 +269,20 @@ class ProjectionsReader:
             "Details": [],
         }
 
-    def read(self):
+    def read(self, read_in_parallel: bool = True):
 
         if self.num_pes < 1:
             return None
 
-        # Read each log file and store as list of dataframes
-        dataframes_list = []
-        for i in range(self.num_pes):
-            dataframes_list.append(self.__read_log_file(i))
+        if read_in_parallel:
+            pool = mp.Pool(self.num_pes)
+            dataframes_list = pool.map(self.__read_log_file, range(self.num_pes))
+
+        else:    
+            # Read each log file and store as list of dataframes
+            dataframes_list = []
+            for i in range(self.num_pes):
+                dataframes_list.append(self.__read_log_file(i))
 
         # Concatinate the dataframes list into dataframe containing entire trace
         trace_df = pandas.concat(dataframes_list, ignore_index=True)
