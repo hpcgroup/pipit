@@ -3,6 +3,7 @@
 #
 # SPDX-License-Identifier: MIT
 
+import otf2
 import pandas as pd
 import multiprocessing as mp
 import pipit.trace
@@ -206,8 +207,13 @@ class OTF2Reader:
                 # TO DO:
                 # need to add support for accelerator and metric locations
                 if str(loc.type)[13:] == "CPU_THREAD":
-                    thread_ids.append(loc._ref)
-                    process_ids.append(loc.group._ref)
+                    process_id = loc.group._ref
+                    process_ids.append(process_id)
+
+                    # subtract the minimum location number of a process
+                    # from the location number to get threads numbered
+                    # 0 to (num_threads per process - 1) for each process.
+                    thread_ids.append(loc._ref - self.process_threads_map[process_id])
 
                     # type of event - enter, leave, or other types
                     event_type = str(type(event))[20:-2]
@@ -267,6 +273,11 @@ class OTF2Reader:
         DataFrame
         """
 
+        # OTF2 stores locations numbered from 0 to the (total number of threads - 1)
+        # across all processes. This dict will help us convert those to be orderered
+        # from 0 to (number of threads for each process - 1) per process instead.
+        self.process_threads_map = dict()
+
         # ids are the _ref attribute of an object
         # all objects stored in a reference registry
         # (such as regions) have such an id
@@ -296,6 +307,24 @@ class OTF2Reader:
                 then def_object is a single region being looked at
                 """
                 for def_object in def_attribute.__iter__():
+                    # add to process threads map dict if you encounter a new location
+                    if (
+                        key == "_locations"
+                        and str(def_object.type) == "LocationType.CPU_THREAD"
+                    ):
+                        location_num, process_num = (
+                            def_object._ref,
+                            def_object.group._ref,
+                        )
+
+                        # each process (location group) will be mapped to a set of its
+                        # location numbers, which we will use to number threads
+                        # appropriately
+                        if process_num not in self.process_threads_map:
+                            self.process_threads_map[process_num] = set([location_num])
+                        else:
+                            self.process_threads_map[process_num].add(location_num)
+
                     if hasattr(def_object, "_ref"):
                         # only add ids for those definitions that have it
                         def_id.append(def_object._ref)
@@ -320,6 +349,13 @@ class OTF2Reader:
         definitions_dataframe = definitions_dataframe.astype(
             {"Definition Type": "category"}
         )
+
+        # Change the process_threads_map to map each process number
+        # to the minimum of all its location numbers. We can subtract
+        # this minimum from the location numbers to order thread numbers
+        # from 0 to (number of threads - 1) when we read events.
+        for process_num, process_locations in self.process_threads_map.items():
+            self.process_threads_map[process_num] = min(process_locations)
 
         return definitions_dataframe
 
