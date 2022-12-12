@@ -3,7 +3,6 @@
 #
 # SPDX-License-Identifier: MIT
 
-import otf2
 import pandas as pd
 import multiprocessing as mp
 import pipit.trace
@@ -317,13 +316,13 @@ class OTF2Reader:
                             def_object.group._ref,
                         )
 
-                        # each process (location group) will be mapped to a set of its
-                        # location numbers, which we will use to number threads
-                        # appropriately
+                        # each process (location group) will be mapped to its
+                        # minimum location number, which we will use to number threads
+                        # appropriately by subtracting that min from its location nums
                         if process_num not in self.process_threads_map:
-                            self.process_threads_map[process_num] = set([location_num])
-                        else:
-                            self.process_threads_map[process_num].add(location_num)
+                            self.process_threads_map[process_num] = location_num
+                        elif location_num < self.process_threads_map[process_num]:
+                            self.process_threads_map[process_num] = location_num
 
                     if hasattr(def_object, "_ref"):
                         # only add ids for those definitions that have it
@@ -349,13 +348,6 @@ class OTF2Reader:
         definitions_dataframe = definitions_dataframe.astype(
             {"Definition Type": "category"}
         )
-
-        # Change the process_threads_map to map each process number
-        # to the minimum of all its location numbers. We can subtract
-        # this minimum from the location numbers to order thread numbers
-        # from 0 to (number of threads - 1) when we read events.
-        for process_num, process_locations in self.process_threads_map.items():
-            self.process_threads_map[process_num] = min(process_locations)
 
         return definitions_dataframe
 
