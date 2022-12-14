@@ -28,6 +28,7 @@ def ping_pong_hpct_trace(data_dir, tmpdir):
 
     return tmpdir
 
+
 @pytest.fixture
 def ping_pong_projections_trace(data_dir, tmpdir):
     """Builds a temporary directory containing the ping-pong traces."""
