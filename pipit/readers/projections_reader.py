@@ -237,6 +237,10 @@ class ProjectionsReader:
                         projections_directory, executable_name
                     )
 
+        if not hasattr(self, "executable_location"): 
+            raise ValueError(
+                "Invalid directory for projections - no sts files found."
+            )
         # read sts file and get number of PEs
         self.sts_reader = STSReader(self.executable_location + ".sts")
         self.num_pes = self.sts_reader.num_pes

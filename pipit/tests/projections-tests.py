@@ -6,8 +6,8 @@
 from pipit import Trace
 
 
-def test_events(data_dir, projections_directory):
-    trace = Trace.from_projections(str(projections_directory))
+def test_events(data_dir, ping_pong_projections_trace):
+    trace = Trace.from_projections(str(ping_pong_projections_trace))
     events_df = trace.events
 
     # 108 total events in ping pong trace
@@ -33,6 +33,8 @@ def test_events(data_dir, projections_directory):
     assert len(events_df.loc[events_df["Name"] == "Create"]) == 145
 
     # Each log file starts/ends with a Computation Event
-    assert events_df.loc[events_df["Process ID"] == 1].loc[
-        events_df["Name"] == "Computation"
-    ]
+    assert events_df.loc[events_df["Process ID"] == 1].iloc[0]['Name'] == "Computation"
+    assert events_df.loc[events_df["Process ID"] == 1].iloc[-1]['Name'] == "Computation"
+
+    assert events_df.loc[events_df["Process ID"] == 0].iloc[0]['Name'] == "Computation"
+    assert events_df.loc[events_df["Process ID"] == 0].iloc[-1]['Name'] == "Computation"
