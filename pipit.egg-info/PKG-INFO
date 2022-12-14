@@ -1,0 +1,10 @@
+Metadata-Version: 2.1
+Name: pipit
+Version: 0.0.1
+Summary: A Python library for analyzing parallel execution traces
+Home-page: https://github.com/hpcgroup/pipit
+Author: Abhinav Bhatele
+Author-email: bhatele@cs.umd.edu
+Keywords: distributed computing,parallel computing
+Classifier: Development Status :: 2 - Pre-Alpha
+License-File: LICENSE
