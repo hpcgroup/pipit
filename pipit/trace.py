@@ -127,3 +127,217 @@ class Trace:
             ]
 
         return communication_matrix
+
+    def match_rows(self):
+        if "Matching Index" not in self.events.columns:
+            """
+            Two columns to be added to dataframe:
+            "Matching Index" and "Matching Timestamp"
+            Matches dataframe indices and timestamps
+            between corresponding enter and leave rows.
+            """
+            matching_indices = [float("nan")] * len(self.events)
+            matching_times = [float("nan")] * len(self.events)
+
+            enter_leave_df = self.events.loc[
+                self.events["Event Type"].isin(["Enter", "Leave"])
+            ]
+
+            # Filter by Thread/Process
+            for id in set(enter_leave_df["TID"]):
+                filtered_df = enter_leave_df.loc[enter_leave_df["TID"] == id]
+
+                stack = []
+                event_types = list(filtered_df["Event Type"])
+                df_indices, timestamps = list(filtered_df.index), list(
+                    filtered_df["Timestamp (ns)"]
+                )
+
+                # Iterate through all events of filtered DataFrame
+                for i in range(len(filtered_df)):
+                    curr_df_index, curr_timestamp, evt_type = (
+                        df_indices[i],
+                        timestamps[i],
+                        event_types[i],
+                    )
+
+                    if evt_type == "Enter":
+                        # Add current dataframe index and timestamp to stack
+                        stack.append((curr_df_index, curr_timestamp))
+                    else:
+                        # Pop corresponding enter event's dataframe index and timestamp
+                        enter_df_index, enter_timestamp = stack.pop()
+
+                        # Fill in the lists with the matching values
+                        matching_indices[enter_df_index] = curr_df_index
+                        matching_indices[curr_df_index] = enter_df_index
+
+                        matching_times[enter_df_index] = curr_timestamp
+                        matching_times[curr_df_index] = enter_timestamp
+
+            self.events["Matching Index"] = matching_indices
+            self.events["Matching Timestamp"] = matching_times
+
+
+    def binary(self, arr, low, high, x, start):
+        mid = (high + low) // 2
+        if high >= low:
+
+            if arr[mid] == x:
+                return mid
+
+            elif arr[mid] > x:
+                return self.binary(arr, low, mid - 1, x, start)
+
+            else:
+                return self.binary(arr, mid + 1, high, x, start)
+
+        else:
+            if start is True:
+                return mid
+            if start is False:
+                return mid + 1
+
+    """
+    Time Profile for showing function times in time intervals
+
+    Arguments:
+
+    1) start_time (inclusive) -
+    Input an int to choose where you want the trace to start
+
+    2) end time (inclusive) -
+    Input an int to choose where you want the trace to end
+
+    3) time_interval -
+    Input an int to choose how big you want the bins to be.
+    Recommended you stay at 1000000ns
+
+    Returns:
+    A dictionary of arrays containing nodes containing the function
+    names, process id, duration in bin, and graph node.
+    """
+
+    def time_profile(self, start_time=1689900254, end_time=1794961473, time_interval=10000000):        
+        if time_interval <= 0:
+            raise Exception("Not Valid Time Interval")
+        if start_time >= end_time or start_time < 0:
+            raise Exception("Invalid start/end time")
+        
+        # Match the rows
+        self.match_rows()
+        
+        # dict of bin times
+        # {bin interval times: array of dictionarys}
+        # Node contains name, pid, duration of how long in bin, graph node
+        bins = np.arange(start_time, end_time, time_interval).tolist()
+        
+        bins = {key: [] for key in bins}
+        
+        keys_list = list(bins.keys())
+        keys_list.append(end_time)
+        
+        # Create a sublist from trace events.
+        sub = self.events.loc[(self.events['Event Type'] == 'Enter')]
+        
+        p = 'Process' if 'Process' in sub.columns else 'PID'
+        t = 'Thread' if 'Thread' in sub.columns else 'TID'
+        
+        for index, row in sub.iterrows():    
+            start_t = row['Timestamp (ns)']
+            end_t = row['Matching Timestamp']
+            
+            # Case 1: Function extends whole time frame
+            if start_t < start_time and end_t > end_time:
+                # start bin
+                bins[keys_list[0]].append(
+                    {'Function Name': row['Name'], 'Time': keys_list[1] - start_time, p: row[p], t: row[t],'RangeID': row['RangeId']}
+                )
+                
+                # middle bins
+                for i in range(1, len(keys_list)-2):
+                    bins[keys_list[i]].append(
+                        {'Function Name': row['Name'], 'Time': time_interval, p: row[p], t: row[t],'RangeID': row['RangeId']}
+                    )
+                    
+                # end bin
+                bins[keys_list[len(keys_list)-2]].append( 
+                    {'Function Name': row['Name'], 'Time': end_time - keys_list[len(keys_list) - 2], p: row[p], t: row[t],'RangeID': row['RangeId']}
+                )
+                
+                
+            # Case 2: Function starts before start_time and ends before end_time
+            if start_t < start_time and end_t < end_time and end_t > start_time:
+                # find end time bin
+                end_bound = self.binary(
+                    keys_list, 0, len(keys_list) - 1, end_t, False
+                )
+                
+                # Add time to bin
+                bins[keys_list[end_bound - 1]].append(
+                    {'Function Name': row['Name'], 'Time': end_t - keys_list[end_bound - 1], p: row[p], t: row[t],'RangeID': row['RangeId']}
+                )
+                
+                # Add time down the other bins if needed
+                # -1 is need due to end range being exclusive
+                for i in range(end_bound - 2, -1, -1):
+                    bins[keys_list[i]].append(
+                        {'Function Name': row['Name'], 'Time': time_interval, p: row[p], t: row[t],'RangeID': row['RangeId']}
+                    )
+            
+            # Case 3: Function starts before end_time and continues past
+            if start_t > start_time and end_t > end_time and start_t < end_time:
+                
+                # Find start and end bins for where the nodes need to be added
+                start_bound = self.binary(
+                    keys_list, 0, len(keys_list) - 1, start_t, True
+                )
+                
+                # starting off the 
+                bins[keys_list[start_bound]].append(
+                    {'Function Name': row['Name'], 'Time': keys_list[start_bound + 1] - start_t, p: row[p], t: row[t],'RangeID': row['RangeId']}
+                )
+                
+                # add to the rest of bins
+                for i in range(start_bound + 1, len(keys_list) - 1):
+                    if i == len(keys_list) - 2:
+                        bins[keys_list[i]].append(
+                            {'Function Name': row['Name'], 'Time': keys_list[len(keys_list) - 1] - keys_list[len(keys_list) - 2], p: row[p], t: row[t],'RangeID': row['RangeId']}
+                        )
+                    else:
+                        bins[keys_list[i]].append(
+                            {'Function Name': row['Name'], 'Time': time_interval, p: row[p], t: row[t],'RangeID': row['RangeId']}
+                        )
+            
+            # Case 4: Function in between start and end time
+            if start_t > start_time and end_t < end_time:
+                print(row)
+                
+                 # Find start and end bins for where the nodes need to be added
+                start_bound = self.binary(
+                    keys_list, 0, len(keys_list) - 1, start_t, True
+                )
+
+                end_bound = self.binary(
+                    keys_list, 0, len(keys_list) - 1, end_t, False
+                )
+                
+                # If the function time fits in one bin
+                if start_bound == end_bound - 1:
+                    bins[keys_list[start_bound]].append(
+                        {'Function Name': row['Name'], 'Time': end_t - start_t, p: row[p], t: row[t],'RangeID': row['RangeId']}
+                    )
+                else:
+                    bins[keys_list[start_bound]].append(
+                        {'Function Name': row['Name'], 'Time': keys_list[start_bound + 1] - start_t, p: row[p], t: row[t],'RangeID': row['RangeId']}
+                    )
+                    bins[keys_list[end_bound - 1]].append(
+                        {'Function Name': row['Name'], 'Time': end_t - keys_list[end_bound - 1], p: row[p], t: row[t], 'RangeID': row['RangeId']}
+                    )
+                    for i in range(start_bound + 1, end_bound - 1):
+                        bins[keys_list[i]].append(
+                            {'Function Name': row['Name'], 'Time': time_interval, p: row[p], t: row[t], 'RangeID': row['RangeId']}
+                        )
+    
+        print(bins)
+        print(keys_list)
