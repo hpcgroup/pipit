@@ -140,55 +140,63 @@ class Trace:
             matching_indices = [float("nan")] * len(self.events)
             matching_times = [float("nan")] * len(self.events)
 
+            # only pairing enter and leave rows
             enter_leave_df = self.events.loc[
                 self.events["Event Type"].isin(["Enter", "Leave"])
             ]
 
-            # TO DO:
-            # filter by both thread and process (have to change otf2 reader first)
-            for id in set(enter_leave_df["Thread"]):
-                filtered_df = enter_leave_df.loc[enter_leave_df["Thread"] == id]
+            for process in set(enter_leave_df["Process"]):
+                curr_process_df = enter_leave_df.loc[
+                    enter_leave_df["Process"] == process
+                ]
+                for thread in set(curr_process_df["Thread"]):
+                    # filter by both process and thread
+                    filtered_df = curr_process_df.loc[
+                        curr_process_df["Thread"] == thread
+                    ]
 
-                stack = []
+                    stack = []
 
-                """
-                Note:
-                The reason that we are creating lists that are copies of the dataframe
-                columns below and iterating over those instead of using pandas iterrows
-                is due to an observed improvement in performance when using lists.
-                """
+                    """
+                    Note:
+                    The reason that we are creating lists that are copies of the
+                    dataframecolumns below and iterating over those instead of using
+                    pandas iterrows is due to an observed improvement in performance
+                    when using lists.
+                    """
 
-                event_types = list(filtered_df["Event Type"])
-                df_indices, timestamps = list(filtered_df.index), list(
-                    filtered_df["Timestamp (ns)"]
-                )
-
-                # Iterate through all events of filtered DataFrame
-                for i in range(len(filtered_df)):
-                    curr_df_index, curr_timestamp, evt_type = (
-                        df_indices[i],
-                        timestamps[i],
-                        event_types[i],
+                    event_types = list(filtered_df["Event Type"])
+                    df_indices, timestamps = list(filtered_df.index), list(
+                        filtered_df["Timestamp (ns)"]
                     )
 
-                    if evt_type == "Enter":
-                        # Add current dataframe index and timestamp to stack
-                        stack.append((curr_df_index, curr_timestamp))
-                    else:
-                        # Pop corresponding enter event's dataframe index and timestamp
-                        enter_df_index, enter_timestamp = stack.pop()
+                    # Iterate through all events of filtered DataFrame
+                    for i in range(len(filtered_df)):
+                        curr_df_index, curr_timestamp, evt_type = (
+                            df_indices[i],
+                            timestamps[i],
+                            event_types[i],
+                        )
 
-                        # Fill in the lists with the matching values
-                        matching_indices[enter_df_index] = curr_df_index
-                        matching_indices[curr_df_index] = enter_df_index
+                        if evt_type == "Enter":
+                            # Add current dataframe index and timestamp to stack
+                            stack.append((curr_df_index, curr_timestamp))
+                        else:
+                            # Pop corresponding enter event's dataframe index
+                            # and timestamp
+                            enter_df_index, enter_timestamp = stack.pop()
 
-                        matching_times[enter_df_index] = curr_timestamp
-                        matching_times[curr_df_index] = enter_timestamp
+                            # Fill in the lists with the matching values
+                            matching_indices[enter_df_index] = curr_df_index
+                            matching_indices[curr_df_index] = enter_df_index
+
+                            matching_times[enter_df_index] = curr_timestamp
+                            matching_times[curr_df_index] = enter_timestamp
 
             self.events["Matching Index"] = matching_indices
             self.events["Matching Timestamp"] = matching_times
 
-    def calling_relationships(self):
+    def gen_calling_relationships(self):
         """
         Three columns to be added to dataframe:
         "Depth", "Parent", and "Children"
@@ -204,55 +212,67 @@ class Trace:
                 self.events
             )
 
+            # only using enter and leave rows
+            # to determine calling relationships
             enter_leave_df = self.events.loc[
                 self.events["Event Type"].isin(["Enter", "Leave"])
             ]
 
-            for id in set(enter_leave_df["Thread"]):
-                filtered_df = enter_leave_df.loc[enter_leave_df["Thread"] == id]
+            for process in set(enter_leave_df["Process"]):
+                curr_process_df = enter_leave_df.loc[
+                    enter_leave_df["Process"] == process
+                ]
+                for thread in set(curr_process_df["Thread"]):
+                    # filter by both process and thread
+                    filtered_df = curr_process_df.loc[
+                        curr_process_df["Thread"] == thread
+                    ]
 
-                curr_depth, stack = 0, []
-                df_indices, event_types = list(filtered_df.index), list(
-                    filtered_df["Event Type"]
-                )
+                    # Depth is the level in the
+                    # Call Tree starting from 0
+                    curr_depth = 0
 
-                for i in range(len(filtered_df)):
-                    curr_df_index, evt_type = df_indices[i], event_types[i]
+                    stack = []
+                    df_indices, event_types = list(filtered_df.index), list(
+                        filtered_df["Event Type"]
+                    )
 
-                    if evt_type == "Enter":
-                        if curr_depth > 0:  # if event is a child of some other event
-                            parent_df_index = stack[-1]
+                    # loop through the events of the filtered dataframe
+                    for i in range(len(filtered_df)):
+                        curr_df_index, evt_type = df_indices[i], event_types[i]
 
-                            if children[parent_df_index] is None:
-                                """
-                                create a new list of children for the parent if
-                                the current event is the first child being added
-                                """
-                                children[parent_df_index] = [curr_df_index]
-                            else:
-                                children[parent_df_index].append(curr_df_index)
+                        if evt_type == "Enter":
+                            if (
+                                curr_depth > 0
+                            ):  # if event is a child of some other event
+                                parent_df_index = stack[-1]
 
-                            parent[curr_df_index] = parent_df_index
+                                if children[parent_df_index] is None:
+                                    """
+                                    create a new list of children for the parent if
+                                    the current event is the first child being added
+                                    """
+                                    children[parent_df_index] = [curr_df_index]
+                                else:
+                                    children[parent_df_index].append(curr_df_index)
 
-                        depth[curr_df_index] = curr_depth
-                        curr_depth += 1
+                                parent[curr_df_index] = parent_df_index
 
-                        # add enter dataframe index to stack
-                        stack.append(curr_df_index)
-                    else:
-                        enter_df_index = stack.pop()
+                            depth[curr_df_index] = curr_depth
+                            curr_depth += 1
 
-                        """
-                        storing depth and parent in both enter and leave rows
-                        since they are floats.
+                            # add enter dataframe index to stack
+                            stack.append(curr_df_index)
+                        else:
+                            # pop event off stack once matching leave found
+                            stack.pop()
 
-                        children stored as nan in leave row and can be found
-                        using matching index for avoiding redundant memory.
-                        """
-                        depth[curr_df_index] = depth[enter_df_index]
-                        parent[curr_df_index] = parent[enter_df_index]
+                            curr_depth -= 1
 
-                        curr_depth -= 1
+                            """
+                            depth, parent, and children for a leave row can be found
+                            using the matching index that corresponds to the enter row
+                            """
 
             self.events["Depth"], self.events["Parent"], self.events["Children"] = (
                 depth,
