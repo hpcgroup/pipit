@@ -128,7 +128,7 @@ class Trace:
 
         return communication_matrix
 
-    def pair_enter_leave(self):
+    def __pair_enter_leave(self):
         if "Matching Index" not in self.events.columns:
             """
             Two columns to be added to dataframe:
@@ -196,7 +196,7 @@ class Trace:
             self.events["Matching Index"] = matching_indices
             self.events["Matching Timestamp"] = matching_times
 
-    def gen_calling_relationships(self):
+    def __gen_calling_relationships(self):
         """
         Three columns to be added to dataframe:
         "Depth", "Parent", and "Children"
