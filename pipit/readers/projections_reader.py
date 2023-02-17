@@ -167,7 +167,6 @@ class STSReader:
 
             # add to self.entries
             elif line_arr[0] == "ENTRY":
-
                 # Need to concat entry_name
                 while not line_arr[3].endswith('"'):
                     line_arr[3] = line_arr[3] + " " + line_arr[4]
@@ -269,7 +268,6 @@ class ProjectionsReader:
         }
 
     def read(self):
-
         if self.num_pes < 1:
             return None
 
@@ -284,7 +282,6 @@ class ProjectionsReader:
         return pipit.trace.Trace(None, trace_df)
 
     def __read_log_file(self, pe_num: int) -> pandas.DataFrame:
-
         # has information needed in sts file
         sts_reader = self.sts_reader
 
