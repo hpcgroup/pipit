@@ -127,3 +127,14 @@ class Trace:
             ]
 
         return communication_matrix
+
+    def message_size_hist(self, bins=64, **kwargs):
+        """Generates histogram of message frequency per size."""
+
+        # Filter by send events
+        messages = self.events[self.events["Name"].isin(["MpiSend", "MpiIsend"])]
+
+        # Get message sizes
+        sizes = messages["Attributes"].map(lambda x: x["msg_length"])
+
+        return np.histogram(sizes, bins=bins, **kwargs)
