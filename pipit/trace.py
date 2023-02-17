@@ -5,6 +5,8 @@
 
 import numpy as np
 
+from pipit.query import QueryBuilder, SimpleQuery
+
 
 class Trace:
     """A trace dataset is read into an object of this type, which includes one
@@ -127,3 +129,8 @@ class Trace:
             ]
 
         return communication_matrix
+
+    def where(self, field, operator, value):
+        return QueryBuilder(
+            SimpleQuery(field, operator, value, self.events), events=self.events
+        )
