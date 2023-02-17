@@ -132,7 +132,7 @@ class Trace:
         # Adds "Inc Time" column
         if "Inc Time" not in self.events.columns:
             if "Matching Timestamp" not in self.events.columns:
-                self.match_rows()
+                self.__pair_enter_leave()
 
             # Uses matching timestamp to calculate the inclusive time
             self.events["Inc Time"] = (
@@ -144,16 +144,17 @@ class Trace:
             if "Inc Time" not in self.events.columns:
                 self.calc_inc_time()
             if "Children" not in self.events.columns:
-                self.calling_relationships()
+                self.__gen_calling_relationships()
 
             # start out with exc times being a copy of inc times
-            exc_times = list(self.events["Inc Time"])
-            inc_times = list(self.events["Inc Time"])
+            exc_times = self.events["Inc Time"].to_list()
+            inc_times = self.events["Inc Time"].to_list()
 
             # Filter to events that have children
             filtered_df = self.events.loc[self.events["Children"].notnull()]
-            parent_df_indices, children = list(filtered_df.index), list(
-                filtered_df["Children"]
+            parent_df_indices, children = (
+                list(filtered_df.index),
+                filtered_df["Children"].to_list(),
             )
 
             # Iterate through the events that are parents
