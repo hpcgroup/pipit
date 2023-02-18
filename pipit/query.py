@@ -1,3 +1,5 @@
+import pandas as pd
+
 class Where:
     def __init__(self, field, operator, value):
         self.field = field
@@ -102,7 +104,7 @@ class Limit:
 
 
 class QueryBuilder:
-    def __init__(self, where=None, orderBy=None, limit=None, trace=None):
+    def __init__(self, where=None, orderBy=[], limit=None, trace=None):
         self._where = where
         self._orderBy = orderBy
         self._limit = limit
@@ -125,7 +127,7 @@ class QueryBuilder:
         return self
 
     def orderBy(self, field, direction="asc"):
-        self._orderBy = OrderBy(field, direction)
+        self._orderBy.append((field, direction))
         return self
 
     def limit(self, num, strategy="head"):
@@ -133,10 +135,22 @@ class QueryBuilder:
         return self
 
     def get(self, trace=None):
+        df = pd.DataFrame()
+
         if trace is not None:
-            return trace.events[self._where.evaluate(trace.events)]
+            df = trace.events[self._where.evaluate(trace.events)]
 
         if self.trace is not None:
-            return self.trace.events[self._where.evaluate(self.trace.events)]
+            df = self.trace.events[self._where.evaluate(self.trace.events)]
 
-        return "Error"
+        by = []
+        ascending = []
+
+        for orderBy in self._orderBy:
+            by.append(orderBy[0])
+            ascending.append(orderBy[1] == "asc")
+
+        df = df.sort_values(by=by, ascending=ascending)
+
+
+        return df
