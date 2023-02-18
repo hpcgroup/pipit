@@ -236,11 +236,9 @@ class OTF2Reader:
                         # iterates through the event's attributes
                         # (ex: region, bytes sent, etc)
                         for key, value in vars(event).items():
-
                             # only adds non-empty attributes
                             # and ignores time so there isn't a duplicate time
                             if value is not None and key != "time":
-
                                 # uses field_to_val to convert all data types
                                 # and ensure that there are no pickling errors
                                 attributes_dict[
