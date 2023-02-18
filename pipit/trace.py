@@ -5,7 +5,7 @@
 
 import numpy as np
 
-from pipit.query import QueryBuilder, SimpleQuery
+from pipit.query import QueryBuilder
 
 
 class Trace:
@@ -130,7 +130,8 @@ class Trace:
 
         return communication_matrix
 
+    def get(self, query):
+        return query.get(trace=self)
+
     def where(self, field, operator, value):
-        return QueryBuilder(
-            SimpleQuery(field, operator, value, self.events), events=self.events
-        )
+        return QueryBuilder(trace=self).where(field, operator, value)
