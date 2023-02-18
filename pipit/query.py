@@ -1,4 +1,9 @@
-class Where:
+class Query:
+    def apply(self, df, queries):
+        return df
+
+
+class Where(Query):
     def __init__(self, field=None, operator=None, value=None, query=None):
         self.field = field
         self.operator = operator
@@ -39,6 +44,9 @@ class Where:
                 f"Where {self.field.__repr__()} {self.operator} {self.value.__repr__()}"
             )
 
+    def apply(self, df, queries):
+        return df.query(self.get_pandas_query())
+
 
 class And(Where):
     def __init__(self, *args):
@@ -73,7 +81,7 @@ class Not(Where):
         return f"Not ({self.where.__repr__()})"
 
 
-class OrderBy:
+class OrderBy(Query):
     def __init__(self, field, direction):
         self.field = field
         self.direction = direction
@@ -81,14 +89,32 @@ class OrderBy:
     def __repr__(self):
         return f"OrderBy {self.field.__repr__()} {self.direction}"
 
+    def apply(self, df, queries):
+        orders_so_far = []
 
-class Limit:
+        for query in queries:
+            if isinstance(query, OrderBy):
+                orders_so_far.append(query)
+
+            if query == self:
+                break
+
+        return df.sort_values(
+            by=[x.field for x in orders_so_far],
+            ascending=[x.direction == "asc" for x in orders_so_far],
+        )
+
+
+class Limit(Query):
     def __init__(self, num, strategy):
         self.num = num
         self.strategy = strategy
 
     def __repr__(self):
         return f"Limit {self.num} {self.strategy}"
+
+    def apply(self, df, queries):
+        return df.head(self.num)
 
 
 class QueryBuilder:
@@ -131,23 +157,11 @@ class QueryBuilder:
             trace = self.trace
 
         df = trace.events
-        orders_so_far = []
 
         for query in self._queries:
-            if isinstance(query, Where):
-                df = df.query(query.get_pandas_query())
-
-            elif isinstance(query, OrderBy):
-                orders_so_far.append(query)
-                df = df.sort_values(
-                    by=[x.field for x in orders_so_far],
-                    ascending=[x.direction == "asc" for x in orders_so_far],
-                )
-
-            elif isinstance(query, Limit):
-                df = df.head(query.num)
+            df = query.apply(df, self._queries)
 
         return df
 
     def __repr__(self):
-        return "Query " + self._queries.__repr__()
+        return "QueryBuilder " + self._queries.__repr__()
