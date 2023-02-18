@@ -1,94 +1,76 @@
-import pandas as pd
-
 class Where:
-    def __init__(self, field, operator, value):
+    def __init__(self, field=None, operator=None, value=None, query=None):
         self.field = field
         self.operator = operator
         self.value = value
+        self.query = query
+
+    def get_pandas_query(self):
+        query = self.query
+
+        if self.operator in ["==", "<", "<=", ">", ">=", "!="]:
+            query = f"`{self.field}` {self.operator} {self.value.__repr__()}"
+        elif self.operator == "in":
+            query = f"`{self.field}`.isin({self.value.__repr__()})"
+        elif self.operator == "not-in":
+            query = f"-`{self.field}`.isin({self.value.__repr__()})"
+        elif self.operator == "between":
+            query = (
+                f"(`{self.field}` >= {self.value[0].__repr__()})"
+                f"& (`{self.field}` <= {self.value[1].__repr__()})"
+            )
+
+        return query
+
+    def __and__(self, w2):
+        return And(self, w2)
+
+    def __or__(self, w2):
+        return Or(self, w2)
+
+    def __invert__(self):
+        return Not(self)
 
     def __repr__(self):
-        return str(self.field) + " " + str(self.operator) + " " + str(self.value)
-
-    def __and__(self, where2):
-        return And(self, where2)
-
-    def __or__(self, where2):
-        return Or(self, where2)
-
-    def evaluate(self, events):
-        if self.operator == "==":
-            return events[self.field] == self.value
-        elif self.operator == "<":
-            return events[self.field] < self.value
-        elif self.operator == "<=":
-            return events[self.field] <= self.value
-        elif self.operator == ">":
-            return events[self.field] > self.value
-        elif self.operator == ">=":
-            return events[self.field] >= self.value
-        elif self.operator == "!=":
-            return events[self.field] != self.value
-        elif self.operator == "in":
-            return events[self.field].isin(self.value)
-        elif self.operator == "not-in":
-            return -events[self.field].isin(self.value)
-        elif self.operator == "between":
-            return (events[self.field] >= self.value[0]) & (
-                events[self.field] <= self.value[1]
+        if self.query is not None:
+            return f"Where {self.query}"
+        else:
+            return (
+                f"Where {self.field.__repr__()} {self.operator} {self.value.__repr__()}"
             )
 
 
-class And:
-    def __init__(self, where1, where2):
-        self.where1 = where1
-        self.where2 = where2
+class And(Where):
+    def __init__(self, *args):
+        self.wheres = args
 
-    def __and__(self, where2):
-        return And(self, where2)
-
-    def __or__(self, where2):
-        return Or(self, where2)
+    def get_pandas_query(self):
+        return " & ".join(f"({where.get_pandas_query()})" for where in self.wheres)
 
     def __repr__(self):
-        return f"({self.where1.__repr__()}) && ({self.where2.__repr__()})"
-
-    def evaluate(self, events):
-        return self.where1.evaluate(events) & self.where2.evaluate(events)
+        return " And ".join(f"({x.__repr__()})" for x in self.wheres)
 
 
-class Or:
-    def __init__(self, where1, where2):
-        self.where1 = where1
-        self.where2 = where2
+class Or(Where):
+    def __init__(self, *args):
+        self.wheres = args
 
-    def __and__(self, where2):
-        return And(self, where2)
-
-    def __or__(self, where2):
-        return Or(self, where2)
+    def get_pandas_query(self):
+        return " | ".join(f"({where.get_pandas_query()})" for where in self.wheres)
 
     def __repr__(self):
-        return f"({self.where1.__repr__()}) || ({self.where2.__repr__()})"
-
-    def evaluate(self, events):
-        return self.where1.evaluate(events) | self.where2.evaluate(events)
+        return " Or ".join(f"({x.__repr__()})" for x in self.wheres)
 
 
-class Not:
+class Not(Where):
     def __init__(self, where):
         self.where = where
 
-    def __and__(self, where2):
-        return And(self, where2)
-
-    def __or__(self, where2):
-        return Or(self, where2)
+    def get_pandas_query(self):
+        return f"!({self.where.get_pandas_query()})"
 
     def __repr__(self):
-        return f"~({self.where.__repr__()})"
-
-    def evaluate(self, events):
-        return -self.where.evaluate(events)
+        return f"Not ({self.where.__repr__()})"
 
 
 class OrderBy:
@@ -96,61 +78,76 @@ class OrderBy:
         self.field = field
         self.direction = direction
 
+    def __repr__(self):
+        return f"OrderBy {self.field.__repr__()} {self.direction}"
+
 
 class Limit:
     def __init__(self, num, strategy):
         self.num = num
         self.strategy = strategy
 
+    def __repr__(self):
+        return f"Limit {self.num} {self.strategy}"
+
 
 class QueryBuilder:
-    def __init__(self, where=None, orderBy=[], limit=None, trace=None):
-        self._where = where
-        self._orderBy = orderBy
-        self._limit = limit
+    def __init__(self, trace=None):
+        self._queries = []
         self.trace = trace
 
     def where(self, field, operator, value):
-        tmp = Where(field, operator, value)
-        self._where = And(self._where, tmp) if self._where is not None else tmp
+        self._queries.append(Where(field, operator, value))
         return self
 
-    def __repr__(self):
-        return self._where.__repr__() if self._where is not None else "querybuilder"
+    def __and__(self, q2):
+        # Filter by wheres
+        q1_wheres = [query for query in self._queries if isinstance(query, Where)]
+        q2_wheres = [query for query in q2._queries if isinstance(query, Where)]
 
-    def __and__(self, q):
-        self._where = And(self._where, q._where)
+        # Concat wheres
+        self._queries = q1_wheres + q2_wheres
         return self
 
-    def __or__(self, q):
-        self._where = Or(self._where, q._where)
+    def __or__(self, q2):
+        # Filter by wheres
+        q1_wheres = [query for query in self._queries if isinstance(query, Where)]
+        q2_wheres = [query for query in q2._queries if isinstance(query, Where)]
+
+        # Or wheres
+        self._queries = [Or(*(q1_wheres + q2_wheres))]
         return self
 
     def orderBy(self, field, direction="asc"):
-        self._orderBy.append((field, direction))
+        self._queries.append(OrderBy(field, direction))
         return self
 
     def limit(self, num, strategy="head"):
-        self._limit = Limit(num, strategy)
+        self._queries.append(Limit(num, strategy))
         return self
 
     def get(self, trace=None):
-        df = pd.DataFrame()
+        if trace is None:
+            trace = self.trace
 
-        if trace is not None:
-            df = trace.events[self._where.evaluate(trace.events)]
+        df = trace.events
+        orders_so_far = []
 
-        if self.trace is not None:
-            df = self.trace.events[self._where.evaluate(self.trace.events)]
+        for query in self._queries:
+            if isinstance(query, Where):
+                df = df.query(query.get_pandas_query())
 
-        by = []
-        ascending = []
+            elif isinstance(query, OrderBy):
+                orders_so_far.append(query)
+                df = df.sort_values(
+                    by=[x.field for x in orders_so_far],
+                    ascending=[x.direction == "asc" for x in orders_so_far],
+                )
 
-        for orderBy in self._orderBy:
-            by.append(orderBy[0])
-            ascending.append(orderBy[1] == "asc")
-
-        df = df.sort_values(by=by, ascending=ascending)
-
+            elif isinstance(query, Limit):
+                df = df.head(query.num)
 
         return df
+
+    def __repr__(self):
+        return "Query " + self._queries.__repr__()
