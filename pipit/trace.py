@@ -130,17 +130,17 @@ class Trace:
 
         return communication_matrix
 
-    def where(self, field, operator, value):
-        """Creates a QueryBuilder with a Where query."""
-        return QueryBuilder(trace=self).where(field, operator, value)
+    def filter(self, *args, **kwargs):
+        """Creates a QueryBuilder with a Filter query."""
+        return QueryBuilder(trace=self).filter(*args, **kwargs)
 
-    def orderBy(self, field, direction):
-        """Creates a QueryBuilder with an OrderBy query."""
-        return QueryBuilder(trace=self).orderBy(field, direction)
+    def sort(self, *args, **kwargs):
+        """Creates a QueryBuilder with an Sort query."""
+        return QueryBuilder(trace=self).sort(*args, **kwargs)
 
-    def limit(self, num, strategy):
+    def limit(self, *args, **kwargs):
         """Creates a QueryBuilder with a Limit query."""
-        return QueryBuilder(trace=self).limit(num, strategy)
+        return QueryBuilder(trace=self).limit(*args, **kwargs)
 
     def query(self, *queries):
         """Apply queries to this `Trace` instance."""
