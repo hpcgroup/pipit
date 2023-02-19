@@ -5,7 +5,7 @@
 
 import numpy as np
 
-from pipit.query import QueryBuilder
+from pipit.query import QueryBuilder, Select
 
 
 class Trace:
@@ -150,10 +150,15 @@ class Trace:
         """Creates a QueryBuilder with a Limit query."""
         return QueryBuilder(trace=self).limit(*args, **kwargs)
 
-    def query(self, *queries):
+    def get(self, *queries):
         """Apply queries to this `Trace` instance."""
+        # Apply each query to events DataFrame
         df = self.events
         for query in queries:
             df = query.apply(df, list(queries))
+
+        # If there are no `Select` queries, then select defaults
+        if not any(isinstance(query, Select) for query in queries):
+            df = Select("defaults").apply(df)
 
         return df
