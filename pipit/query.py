@@ -1,12 +1,13 @@
 class Query:
-    """Base query class"""
+    """Base query class. A `Query` is anything that, when applied to a DataFrame,
+    returns a subset of that DataFrame (without necessarily maintaining order)."""
 
     def apply(self, df, queries):
         """Given a DataFrame, apply the current query"""
         return df
 
 
-class Where(Query):
+class Filter(Query):
     """Filters events based on field values, like `Name` or `Process`. Can operate on
     any field that exists in the `events` DataFrame. Supports basic comparisons
     (`==`, `<`, `>`, `<=`, `>=`, `!=`), as well as other operations, like `in`,
@@ -14,7 +15,7 @@ class Where(Query):
     it will be filtered out.
     """
 
-    def __init__(self, field=None, operator=None, value=None, query=None):
+    def __init__(self, field=None, operator=None, value=None, expr=None, func=None):
         """
         Parameters
         ----------
@@ -35,105 +36,123 @@ class Where(Query):
             list of any size. For `between`, this must be a list of size 2. For all
             other operators, must be a scalar value, like `"MPI_Init"` or `1.5e+8`.
 
-        query: str, optional
+        expr: str, optional
             Instead of providing the `field`, `operator`, and `value`, you may provide
-            a Pandas query string to evaluate and filter with.
+            a Pandas expression to evaluate and filter with.
             See https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.query.html. # noqa: E501
+
+        func: callable[row], optional
+            Instead of providing the `field`, `operator`, and `value`, or providing
+            a Pandas query string, you may provide a function that is applied to each
+            row of the DataFrame, that returns `True` or `False`. This uses the
+            `DataFrame.apply` function, which is not a vectorized operation, resulting
+            in a significantly slower runtime.
         """
         self.field = field
         self.operator = operator
         self.value = value
-        self.query = query
+        self.expr = expr
+        self.func = func
 
-    def get_pandas_query(self):
+    def get_pandas_expr(self):
         """
-        Converts the query into a Pandas query string that can be fed into
+        Converts the query into a Pandas expression that can be fed into
         `DataFrame.query` for efficient evaluation.
         See https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.query.html.
         """
-        query = self.query
+        expr = self.expr
 
         if self.operator in ["==", "<", "<=", ">", ">=", "!="]:
-            query = f"`{self.field}` {self.operator} {self.value.__repr__()}"
+            expr = f"`{self.field}` {self.operator} {self.value.__repr__()}"
         elif self.operator == "in":
-            query = f"`{self.field}`.isin({self.value.__repr__()})"
+            expr = f"`{self.field}`.isin({self.value.__repr__()})"
         elif self.operator == "not-in":
-            query = f"-`{self.field}`.isin({self.value.__repr__()})"
+            expr = f"-`{self.field}`.isin({self.value.__repr__()})"
         elif self.operator == "between":
-            query = (
+            expr = (
                 f"(`{self.field}` >= {self.value[0].__repr__()})"
                 f"& (`{self.field}` <= {self.value[1].__repr__()})"
             )
 
-        return query
+        return expr
 
-    def __and__(self, w2):
-        return And(self, w2)
+    def __and__(self, other):
+        return And(self, other)
 
-    def __or__(self, w2):
-        return Or(self, w2)
+    def __or__(self, other):
+        return Or(self, other)
 
     def __invert__(self):
         return Not(self)
 
     def __repr__(self):
-        if self.query is not None:
-            return f"Where {self.query}"
+        if self.expr is not None:
+            return f"Filter {self.expr.__repr__()}"
+
+        elif self.func is not None:
+            return f"Filter {self.func.__repr__()}"
+
         else:
             return (
-                f"Where {self.field.__repr__()} {self.operator} {self.value.__repr__()}"
+                f"Filter {self.field.__repr__()}"
+                + f"{self.operator} {self.value.__repr__()}"
             )
 
     def apply(self, df, queries):
-        """Use `DataFrame.query` to evaluate the query and filter the DataFrame."""
-        return df.query(self.get_pandas_query())
+        """
+        Use either `DataFrame.query` or `DataFrame.apply` to evaluate the query
+        and filter the DataFrame.
+        """
+        if self.func is None:
+            return df.query(self.get_pandas_expr())
+        else:
+            return df[df.apply(self.func, axis=1)]
 
 
-class And(Where):
-    """Combines multiple Where queries with a logical `AND`, such that all of the
+class And(Filter):
+    """Combines multiple `Filter` queries with a logical `AND`, such that all of the
     conditions must be met. If an event does not meet all conditions, it will be
     filtered out."""
 
     def __init__(self, *args):
-        self.wheres = args
+        self.filters = args
 
-    def get_pandas_query(self):
-        return " & ".join(f"({where.get_pandas_query()})" for where in self.wheres)
+    def get_pandas_expr(self):
+        return " & ".join(f"({filter.get_pandas_expr()})" for filter in self.filters)
 
     def __repr__(self):
-        return " And ".join(f"({x.__repr__()})" for x in self.wheres)
+        return " And ".join(f"({x.__repr__()})" for x in self.filters)
 
 
-class Or(Where):
-    """Combines multiple Where queries with a logical `OR`, such that any of the
+class Or(Filter):
+    """Combines multiple `Filter` queries with a logical `OR`, such that any of the
     conditions must be met. If an event does not meet any of the conditions, it will
     be filtered out."""
 
     def __init__(self, *args):
-        self.wheres = args
+        self.filters = args
 
-    def get_pandas_query(self):
-        return " | ".join(f"({where.get_pandas_query()})" for where in self.wheres)
+    def get_pandas_expr(self):
+        return " | ".join(f"({filter.get_pandas_expr()})" for filter in self.filters)
 
     def __repr__(self):
-        return " Or ".join(f"({x.__repr__()})" for x in self.wheres)
+        return " Or ".join(f"({x.__repr__()})" for x in self.filters)
 
-
-class Not(Where):
-    """Inverts a Where query with a logical `NOT`, such that the condition must not be
+class Not(Filter):
+    """Inverts a `Filter` query with a logical `NOT`, such that the condition must not be
     met."""
 
-    def __init__(self, where):
-        self.where = where
+    def __init__(self, filter):
+        self.filter = filter
 
-    def get_pandas_query(self):
-        return f"!({self.where.get_pandas_query()})"
+    def get_pandas_expr(self):
+        return f"!({self.filter.get_pandas_expr()})"
 
     def __repr__(self):
-        return f"Not ({self.where.__repr__()})"
+        return f"Not ({self.filter.__repr__()})"
 
 
-class OrderBy(Query):
+class Sort(Query):
     """Sorts events by any field."""
 
     def __init__(self, field, direction="asc"):
@@ -150,23 +169,23 @@ class OrderBy(Query):
         self.direction = direction
 
     def __repr__(self):
-        return f"OrderBy {self.field.__repr__()} {self.direction}"
+        return f"Sort {self.field.__repr__()} {self.direction}"
 
     def apply(self, df, queries):
-        # Combine the OrderBy queries so far
-        orders_so_far = []
+        # Combine the Sort queries so far
+        sorts_so_far = []
 
         for query in queries:
-            if isinstance(query, OrderBy):
-                orders_so_far.append(query)
+            if isinstance(query, Sort):
+                sorts_so_far.append(query)
 
             if query == self:
                 break
 
         # Apply the queries so far
         return df.sort_values(
-            by=[x.field for x in orders_so_far],
-            ascending=[x.direction == "asc" for x in orders_so_far],
+            by=[x.field for x in sorts_so_far],
+            ascending=[x.direction == "asc" for x in sorts_so_far],
         )
 
 
@@ -209,54 +228,54 @@ class QueryBuilder:
         self.trace = trace
         self.queries = list(queries)
 
-    def where(self, field, operator, value):
-        """Adds a Where query, used to filter events by field values."""
-        self.queries.append(Where(field, operator, value))
+    def filter(self, *args, **kwargs):
+        """Adds a Filter query, used to filter events by field values."""
+        self.queries.append(Filter(*args, **kwargs))
         return self
 
-    def orderBy(self, field, direction="asc"):
-        """Adds an OrderBy query, used to sort the events."""
-        self.queries.append(OrderBy(field, direction))
+    def sort(self, *args, **kwargs):
+        """Adds a Sort query, used to sort the events."""
+        self.queries.append(Sort(*args, **kwargs))
         return self
 
-    def limit(self, num, strategy="head"):
+    def limit(self, *args, **kwargs):
         """Adds a Limit query, used to downsample the number of events."""
-        self.queries.append(Limit(num, strategy))
+        self.queries.append(Limit(*args, **kwargs))
         return self
 
-    def __and__(self, q2):
-        """Override the default behavior for `&` to concatenate two Where queries"""
-        # Filter by Where queries
-        # Behavior for OrderBy and Limit queries is undefined
-        wheres = [query for query in self.queries if isinstance(query, Where)]
-        wheres2 = [query for query in q2.queries if isinstance(query, Where)]
+    def __and__(self, other):
+        """Override the default behavior for `&` to concatenate all Filter queries"""
+        # Filter by Filter queries
+        # Behavior for Sort and Limit queries is undefined
+        filters = [query for query in self.queries if isinstance(query, Filter)]
+        filters2 = [query for query in other.queries if isinstance(query, Filter)]
 
-        # Concatenate Where queries into one large array
-        self.queries = wheres + wheres2
+        # Concatenate Filter queries into one large list
+        self.queries = filters + filters2
         return self
 
-    def __or__(self, q2):
+    def __or__(self, other):
         """Override the default behavior for `|` to combine into an Or query"""
-        # Filter by Where queries
-        # Behavior for OrderBy and Limit queries is undefined
-        wheres = [query for query in self.queries if isinstance(query, Where)]
-        wheres2 = [query for query in q2.queries if isinstance(query, Where)]
+        # Filter by Filter queries
+        # Behavior for Sort and Limit queries is undefined
+        filters = [query for query in self.queries if isinstance(query, Filter)]
+        filters2 = [query for query in other.queries if isinstance(query, Filter)]
 
-        # Combine Where queries under an Or query
-        self.queries = [Or(*(wheres + wheres2))]
+        # Combine Filter queries under an Or query
+        self.queries = [Or(*(filters + filters2))]
         return self
 
     def __invert__(self):
         """Override the default behavior for `~` to combine turn into a Not query"""
-        # Filter by Where queries
-        # Behavior for OrderBy and Limit queries is undefined
-        wheres = [query for query in self.queries if isinstance(query, Where)]
+        # Filter by Filter queries
+        # Behavior for Sort and Limit queries is undefined
+        filters = [query for query in self.queries if isinstance(query, Filter)]
 
-        # Combine Where queries under a Not query
-        self.queries = [Not(*wheres)]
+        # Combine Filter queries under a Not query
+        self.queries = [Not(*filters)]
         return self
 
-    def get(self, trace=None):
+    def apply(self, trace=None):
         """Apply all queries to a `Trace` instance and return the filtered/sorted events
         DataFrame. If `trace` parameter is not provided, apply queries to default
         `Trace` passed in during initialization of this `QueryBuilder`.
