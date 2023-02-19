@@ -130,8 +130,22 @@ class Trace:
 
         return communication_matrix
 
-    def get(self, query):
-        return query.get(trace=self)
-
     def where(self, field, operator, value):
+        """Creates a QueryBuilder with a Where query."""
         return QueryBuilder(trace=self).where(field, operator, value)
+
+    def orderBy(self, field, direction):
+        """Creates a QueryBuilder with an OrderBy query."""
+        return QueryBuilder(trace=self).orderBy(field, direction)
+
+    def limit(self, num, strategy):
+        """Creates a QueryBuilder with a Limit query."""
+        return QueryBuilder(trace=self).limit(num, strategy)
+
+    def query(self, *queries):
+        """Apply queries to this `Trace` instance."""
+        df = self.events
+        for query in queries:
+            df = query.apply(df, list(queries))
+
+        return df
