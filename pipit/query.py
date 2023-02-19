@@ -19,6 +19,9 @@ class Select(Query):
         "Thread",
         "Process",
         "Attributes",
+        "Matching Timestamp",
+        "Inc Time",
+        "Exc Time",
     ]
 
     def __init__(self, *args):
@@ -43,7 +46,7 @@ class Select(Query):
         return df.loc[:, df.columns.isin(list(raw_columns))]
 
 
-class Exclude(Query):
+class Exclude(Select):
     """Used to select which columns to exclude."""
 
     def __init__(self, *args):
@@ -143,7 +146,7 @@ class Filter(Query):
 
         else:
             return (
-                f"Filter {self.field.__repr__()}"
+                f"Filter {self.field.__repr__()} "
                 + f"{self.operator} {self.value.__repr__()}"
             )
 
@@ -335,7 +338,7 @@ class QueryBuilder:
         self.queries = [Not(*filters)]
         return self
 
-    def apply(self, trace=None):
+    def get(self, trace=None):
         """Apply all queries to a `Trace` instance and return the filtered/sorted events
         DataFrame. If `trace` parameter is not provided, apply queries to default
         `Trace` passed in during initialization of this `QueryBuilder`.
@@ -343,7 +346,7 @@ class QueryBuilder:
         if trace is None:
             trace = self.trace
 
-        return trace.query(*self.queries)
+        return trace.get(*self.queries)
 
     def __repr__(self):
         return "QueryBuilder " + self.queries.__repr__()
