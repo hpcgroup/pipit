@@ -1,10 +1,59 @@
 class Query:
-    """Base query class. A `Query` is anything that, when applied to a DataFrame,
-    returns a subset of that DataFrame (without necessarily maintaining order)."""
+    """Base query class. A `Query` is anything that, when applied to a `DataFrame`,
+    returns a subset of that DataFrame (without necessarily maintaining order).
+    Queries provide a nice abstraction over native Pandas `DataFrame` methods like
+    `loc` and `sort_values`."""
 
-    def apply(self, df, queries):
+    def apply(self, df, queries=[]):
         """Given a DataFrame, apply the current query"""
         return df
+
+
+class Select(Query):
+    """Used to select which columns to include."""
+
+    DEFAULTS = [
+        "Timestamp (ns)",
+        "Event Type",
+        "Name",
+        "Thread",
+        "Process",
+        "Attributes",
+    ]
+
+    def __init__(self, *args):
+        self.columns = list(args)
+
+    def __repr__(self):
+        return f"Select {self.columns.__repr__()}"
+
+    def apply(self, df, queries=[]):
+        if "all" in self.columns:
+            return df
+
+        raw_columns = set()
+
+        for column in self.columns:
+            if column == "defaults":
+                for default in self.DEFAULTS:
+                    raw_columns.add(default)
+            else:
+                raw_columns.add(column)
+
+        return df.loc[:, df.columns.isin(list(raw_columns))]
+
+
+class Exclude(Query):
+    """Used to select which columns to exclude."""
+
+    def __init__(self, *args):
+        self.columns = list(args)
+
+    def __repr__(self):
+        return f"Exclude {self.columns.__repr__()}"
+
+    def apply(self, df, queries=[]):
+        return df.loc[:, ~df.columns.isin(self.columns)]
 
 
 class Filter(Query):
@@ -98,7 +147,7 @@ class Filter(Query):
                 + f"{self.operator} {self.value.__repr__()}"
             )
 
-    def apply(self, df, queries):
+    def apply(self, df, queries=[]):
         """
         Use either `DataFrame.query` or `DataFrame.apply` to evaluate the query
         and filter the DataFrame.
@@ -138,9 +187,10 @@ class Or(Filter):
     def __repr__(self):
         return " Or ".join(f"({x.__repr__()})" for x in self.filters)
 
+
 class Not(Filter):
-    """Inverts a `Filter` query with a logical `NOT`, such that the condition must not be
-    met."""
+    """Inverts a `Filter` query with a logical `NOT`, such that the condition must not
+    be met."""
 
     def __init__(self, filter):
         self.filter = filter
@@ -171,7 +221,7 @@ class Sort(Query):
     def __repr__(self):
         return f"Sort {self.field.__repr__()} {self.direction}"
 
-    def apply(self, df, queries):
+    def apply(self, df, queries=[]):
         # Combine the Sort queries so far
         sorts_so_far = []
 
@@ -208,7 +258,7 @@ class Limit(Query):
     def __repr__(self):
         return f"Limit {self.num} {self.strategy}"
 
-    def apply(self, df, queries):
+    def apply(self, df, queries=[]):
         return df.head(self.num)
 
 
@@ -227,6 +277,16 @@ class QueryBuilder:
         """
         self.trace = trace
         self.queries = list(queries)
+
+    def select(self, *args, **kwargs):
+        """Adds a Select query, used to select certain columns."""
+        self.queries.append(Select(*args, **kwargs))
+        return self
+
+    def exclude(self, *args, **kwargs):
+        """Adds a Select query, used to select certain columns."""
+        self.queries.append(Exclude(*args, **kwargs))
+        return self
 
     def filter(self, *args, **kwargs):
         """Adds a Filter query, used to filter events by field values."""

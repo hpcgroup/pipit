@@ -130,12 +130,20 @@ class Trace:
 
         return communication_matrix
 
+    def select(self, *args, **kwargs):
+        """Creates a QueryBuilder with a Select query."""
+        return QueryBuilder(trace=self).select(*args, **kwargs)
+
+    def exclude(self, *args, **kwargs):
+        """Creates a QueryBuilder with an Exclude query."""
+        return QueryBuilder(trace=self).exclude(*args, **kwargs)
+
     def filter(self, *args, **kwargs):
         """Creates a QueryBuilder with a Filter query."""
         return QueryBuilder(trace=self).filter(*args, **kwargs)
 
     def sort(self, *args, **kwargs):
-        """Creates a QueryBuilder with an Sort query."""
+        """Creates a QueryBuilder with a Sort query."""
         return QueryBuilder(trace=self).sort(*args, **kwargs)
 
     def limit(self, *args, **kwargs):
