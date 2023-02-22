@@ -208,14 +208,13 @@ class Trace:
             },
             inplace=True,
         )
-        all["time"] = all.end - all.start  # Inclusive time
 
         # Create equal-sized bins
         edges = np.linspace(0, all.end.max(), num_bins + 1)
         bins = [(edges[i], edges[i + 1]) for i in range(num_bins)]
         functions = []
 
-        for [start, end] in bins:
+        for start, end in bins:
             # Find all functions that belong in this bin
             func = all[~((all.start > end) | (all.end < start))].copy(deep=False)
 
@@ -238,7 +237,9 @@ class Trace:
             func.loc[
                 (func.start >= start) & (func.end <= end),
                 "time_in_bin",
-            ] = func["time"]
+            ] = (
+                func["end"] - func["start"]
+            )
 
             # Sum across processes
             agg = func.groupby("name")["time_in_bin"].sum()
