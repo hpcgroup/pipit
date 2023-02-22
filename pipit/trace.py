@@ -238,7 +238,7 @@ class Trace:
                 (func.start >= start) & (func.end <= end),
                 "time_in_bin",
             ] = (
-                func["end"] - func["start"]
+                func.end - func.start
             )
 
             # Sum across processes
