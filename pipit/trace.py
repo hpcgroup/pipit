@@ -244,5 +244,4 @@ class Trace:
             agg = func.groupby("name")["time_in_bin"].sum()
             functions.append(agg.to_dict())
 
-        # Convert bins into dataframe
         return (bins, functions)
