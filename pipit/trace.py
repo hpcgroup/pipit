@@ -127,3 +127,122 @@ class Trace:
             ]
 
         return communication_matrix
+
+    def __pair_enter_leave(self):
+        if "Matching Index" not in self.events.columns:
+            """
+            Two columns to be added to dataframe:
+            "Matching Index" and "Matching Timestamp"
+            Matches dataframe indices and timestamps
+            between corresponding enter and leave rows.
+            """
+            matching_indices = [float("nan")] * len(self.events)
+            matching_times = [float("nan")] * len(self.events)
+
+            # only pairing enter and leave rows
+            enter_leave_df = self.events.loc[
+                self.events["Event Type"].isin(["Enter", "Leave"])
+            ]
+
+            for process in set(enter_leave_df["Process"]):
+                curr_process_df = enter_leave_df.loc[
+                    enter_leave_df["Process"] == process
+                ]
+                for thread in set(curr_process_df["Thread"]):
+                    # filter by both process and thread
+                    filtered_df = curr_process_df.loc[
+                        curr_process_df["Thread"] == thread
+                    ]
+
+                    stack = []
+
+                    """
+                    Note:
+                    The reason that we are creating lists that are copies of the
+                    dataframecolumns below and iterating over those instead of using
+                    pandas iterrows is due to an observed improvement in performance
+                    when using lists.
+                    """
+
+                    event_types = list(filtered_df["Event Type"])
+                    df_indices, timestamps = list(filtered_df.index), list(
+                        filtered_df["Timestamp (ns)"]
+                    )
+
+                    # Iterate through all events of filtered DataFrame
+                    for i in range(len(filtered_df)):
+                        curr_df_index, curr_timestamp, evt_type = (
+                            df_indices[i],
+                            timestamps[i],
+                            event_types[i],
+                        )
+
+                        if evt_type == "Enter":
+                            # Add current dataframe index and timestamp to stack
+                            stack.append((curr_df_index, curr_timestamp))
+                        else:
+                            # Pop corresponding enter event's dataframe index
+                            # and timestamp
+                            enter_df_index, enter_timestamp = stack.pop()
+
+                            # Fill in the lists with the matching values
+                            matching_indices[enter_df_index] = curr_df_index
+                            matching_indices[curr_df_index] = enter_df_index
+
+                            matching_times[enter_df_index] = curr_timestamp
+                            matching_times[curr_df_index] = enter_timestamp
+
+            self.events["Matching Index"] = matching_indices
+            self.events["Matching Timestamp"] = matching_times
+
+    def time_profile(self, num_bins=10):
+        self.__pair_enter_leave()
+
+        # Filter by functions
+        all = self.events[self.events["Event Type"] == "Enter"].copy(deep=False)
+        all.rename(
+            columns={
+                "Name": "name",
+                "Timestamp (ns)": "start",
+                "Matching Timestamp": "end",
+            },
+            inplace=True,
+        )
+        all["time"] = all.end - all.start  # Inclusive time
+
+        # Create equal-sized bins
+        edges = np.linspace(0, all.end.max(), num_bins + 1)
+        bins = [(edges[i], edges[i + 1]) for i in range(num_bins)]
+        functions = []
+
+        for [start, end] in bins:
+            # Find all functions that belong in this bin
+            func = all[~((all.start > end) | (all.end < start))].copy(deep=False)
+
+            # Calculate time_in_bin for each function
+            # Case 1 - Function starts in bin
+            func.loc[func.start >= start, "time_in_bin"] = end - func.start
+
+            # Case 2 - Function ends in bin
+            func.loc[func.end <= end, "time_in_bin"] = func.end - start
+
+            # Case 3 - Function spans bin
+            func.loc[
+                (func.start < start) & (func.end > end),
+                "time_in_bin",
+            ] = (
+                end - start
+            )
+
+            # Case 4 - Function contained in bin
+            func.loc[
+                (func.start >= start) & (func.end <= end),
+                "time_in_bin",
+            ] = func["time"]
+
+            # Sum across processes
+            agg = func.groupby("name")["time_in_bin"].sum()
+            functions.append(agg.to_dict())
+
+        # Convert bins into dataframe
+        return (bins, functions)
