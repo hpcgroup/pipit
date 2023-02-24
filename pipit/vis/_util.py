@@ -139,7 +139,7 @@ def init_vis():
     hv.extension("bokeh", logo=False, css=pp.config["vis"]["css"])
 
     # Set bokeh theme
-    hv.renderer("bokeh").theme = pp.config["vis"]["theme"] + "_minimal"
+    # hv.renderer("bokeh").theme = pp.config["vis"]["theme"] + "_minimal"
 
     # Load default colormap
     if pp.config["vis"]["shuffle_colors"]:

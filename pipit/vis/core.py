@@ -5,16 +5,16 @@ import pipit as pp
 from bokeh.io import show, output_notebook
 from bokeh.plotting import figure
 from bokeh.transform import factor_cmap
-from bokeh.models import FactorRange, RangeTool
+from bokeh.models import FactorRange, RangeTool, Range1d
 from bokeh.layouts import column
+import math
 
 
 from ._util import (
     process_tick_formatter,
     time_tick_formatter,
+    format_time
 )
-
-output_notebook()
 
 
 def plot_timeline(trace):
@@ -132,7 +132,7 @@ def plot_timeline(trace):
     show(column(p, select, sizing_mode="stretch_width"))
 
 
-def plot_comm_matrix(trace, type="size", label_threshold=16):
+def plot_comm_matrix(trace, *args, **kwargs):
     """Plots heatmap of process-to-process message volume."""
     from bokeh.plotting import figure, show
     from bokeh.models import (
@@ -144,7 +144,7 @@ def plot_comm_matrix(trace, type="size", label_threshold=16):
     )
     from bokeh.palettes import YlGnBu9
 
-    comm_matrix = trace.comm_matrix()
+    comm_matrix = trace.comm_matrix(*args, **kwargs)
     N = comm_matrix.shape[0]
 
     mapper = LinearColorMapper(
@@ -191,5 +191,108 @@ def plot_comm_matrix(trace, type="size", label_threshold=16):
         border_line_color=None,
     )
     p.add_layout(color_bar, "right")
+
+    show(p)
+
+
+def plot_range_selector(trace):
+    (bins, times) = trace.time_profile(num_bins=1024)
+
+    xs = [ (_bin[0]) for _bin in bins ]
+
+    functions = trace.events[trace.events["Event Type"] == "Enter"]["Name"].unique()
+
+    for time in times:
+        total_time = sum(time.values())
+        for k, v in time.items():
+            time[k] = v / total_time
+
+        # total_time = sum([ math.exp(x/1000000000) for x in time.values() ])
+        # for k, v in time.items():
+        #     time[k] = math.exp(v/1000000000) / total_time
+
+    data = dict(xs=xs)
+
+    for function in functions:
+        data[function] = np.array([func.get(function, 0) for func in times])
+
+
+    p = figure(
+        title="Drag the middle and edges of the selection box to change the range",
+        height=400,
+        sizing_mode="stretch_width",
+        toolbar_location=None,
+        y_axis_type=None,
+    )
+
+    p.vbar_stack(
+        functions,
+        x="xs",
+        width=bins[0][1] - bins[0][0],
+        color=pp.config["vis"]["colors"][: len(functions)],
+        source=data,
+        legend_label=functions.tolist(),
+    )
+
+    range = Range1d(start=min(xs), end=max(xs))
+    
+    range_tool = RangeTool(x_range=range)
+    range_tool.overlay.fill_color = "navy"
+    range_tool.overlay.fill_alpha = 0.2
+
+    p.ygrid.grid_line_color = None
+    p.y_range.start = 0
+    p.xgrid.grid_line_color = None
+    p.axis.minor_tick_line_color = None
+    p.outline_line_color = None
+    p.xaxis.formatter = time_tick_formatter
+    p.add_tools(range_tool)
+    p.toolbar.active_multi = range_tool
+    p.legend.label_text_font_size = '12px'
+    p.legend.spacing = 0
+
+    p.add_layout(p.legend[0], "right")
+
+    show(p)
+
+def plot_time_profile(trace, *args, **kwargs):
+    (bins, times) = trace.time_profile(*args, **kwargs)
+
+    xs = [ f"{format_time(_bin[0])} - {format_time(_bin[1])}" for _bin in bins ]
+
+    functions = trace.events[trace.events["Event Type"] == "Enter"]["Name"].unique()
+
+    data = dict(xs=xs)
+
+    for function in functions:
+        data[function] = [func.get(function, 0) for func in times]
+
+    p = figure(
+        x_range=xs,
+        height=400,
+        title="Time Profile",
+        toolbar_location=None,
+        sizing_mode="stretch_width",
+    )
+
+    p.vbar_stack(
+        functions,
+        x="xs",
+        width=0.9,
+        color=pp.config["vis"]["colors"][: len(functions)],
+        source=data,
+        legend_label=functions.tolist(),
+    )
+
+    p.yaxis.formatter = time_tick_formatter
+    p.y_range.start = 0
+    p.xgrid.grid_line_color = None
+    p.axis.minor_tick_line_color = None
+    p.outline_line_color = None
+    p.xaxis.major_label_orientation = 0.3
+    p.legend.label_text_font_size = '12px'
+    p.legend.spacing = 0
+
+    p.add_layout(p.legend[0], "right")
 
     show(p)
