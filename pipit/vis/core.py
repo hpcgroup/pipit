@@ -1,195 +1,148 @@
 import numpy as np
 import pandas as pd
-import pipit as pp
-
-from bokeh.io import show, output_notebook
+from bokeh.models import (
+    BasicTicker,
+    ColorBar,
+    ColumnDataSource,
+    HoverTool,
+    LabelSet,
+    LinearColorMapper,
+    LogColorMapper,
+)
 from bokeh.plotting import figure
-from bokeh.transform import factor_cmap
-from bokeh.models import FactorRange, RangeTool
-from bokeh.layouts import column
-
 
 from ._util import (
-    process_tick_formatter,
-    time_tick_formatter,
+    format_size,
+    getProcessTickFormatter,
+    getSizeHoverFormatter,
+    getSizeTickFormatter,
+    plot,
 )
 
-output_notebook()
 
+def comm_matrix(trace, kind="heatmap", mapping="linear", notebook_url=None, **kwargs):
+    """Plots the communication matrix of a Trace.
 
-def plot_timeline(trace):
-    """Plots summary timeline of events in a Trace."""
-    df = trace.events.copy(deep=False).reset_index()
+    Args:
+        trace (pipit.Trace): Trace objects whose communication matrix is being plotted.
+        kind (str, optional): Type of plot, can be "heatmap" or "scatterplot". Defaults
+            to "heatmap".
+        mapping (str, optional): How to map colors (for heatmap) or size (for
+            scatterplot), can be "linear", "log", or "constant". Defaults to "linear".
+        notebook_url (str, optional): The URL of the current Jupyter notebook.
+            Defaults to url set in `pp.config["vis"]["notebook_url"]`.
+        **kwargs: Remaining keyword arguments passed to `Trace.comm_matrix`.
+    """
+    # Get communication matrix
+    comm_matrix = trace.comm_matrix(**kwargs)
 
-    df["Process"] = "Process " + df["Process"].astype("str")
-    df["Depth"] = "Depth " + df["Depth"].astype("int").astype("str")
-    df["y"] = df[["Process", "Depth"]].apply(lambda x: (x[0], str(x[1])), axis=1)
-
-    index_cmap = factor_cmap(
-        "Name",
-        palette=pp.config["vis"]["colors"],
-        factors=sorted(df.Name.unique()),
-        end=1,
+    # Transform matrix into a stacked form, required for labels and scatterplot
+    stacked = (
+        pd.DataFrame(comm_matrix)
+        .stack()
+        .reset_index()
+        .rename(columns={"level_1": "sender", "level_0": "receiver", 0: "volume"})
     )
 
-    p = figure(
-        output_backend="webgl",
-        y_range=FactorRange(*sorted(df["y"].unique(), reverse=True)),
-        sizing_mode="stretch_width",
-        height=len(df["y"].unique()) * 80 + 50,
-        title="Events Timeline",
-        tools=["xpan", "xwheel_zoom", "hover"],
-        x_range=trace.x_range,
-        x_axis_location="above",
-    )
-
-    print(p.x_range)
-
-    p.hbar(
-        y="y",
-        left="Timestamp (ns)",
-        right="Matching Timestamp",
-        height=1,
-        source=df[df["Event Type"] == "Enter"],
-        fill_color=index_cmap,
-        line_color="black",
-        line_width=0.5,
-        fill_alpha=1,
-    )
-
-    sends = df[df["Name"] == "MpiSend"]
-    recvs = df[df["Name"] == "MpiRecv"]
-
-    comm = pd.DataFrame()
-    comm["x0"] = sends["Timestamp (ns)"].values
-    comm["y0"] = sends["y"].values
-    comm["x1"] = recvs["Timestamp (ns)"].values
-    comm["y1"] = recvs["y"].values
-    comm["cx0"] = comm["x0"] + (comm["x1"] - comm["x0"]) * 0.5
-    comm["cx1"] = comm["x1"] - (comm["x1"] - comm["x0"]) * 0.5
-
-    p.bezier(
-        x0="x0",
-        y0="y0",
-        x1="x1",
-        y1="y1",
-        cx0="cx0",
-        cy0="y0",
-        cx1="cx1",
-        cy1="y1",
-        source=comm,
-        line_width=1,
-        line_color="black",
-    )
-
-    p.diamond(
-        x="Timestamp (ns)",
-        y="y",
-        source=df[df["Event Type"] == "Instant"],
-        size=12,
-        color="MediumAquaMarine",
-        line_width=1,
-        line_color="black",
-    )
-
-    p.xaxis.formatter = time_tick_formatter
-    p.y_range.range_padding = 0.5
-    p.yaxis.group_label_orientation = 0
-    p.yaxis.major_label_text_font_size = "0pt"
-    p.ygrid.grid_line_color = None
-
-    select = figure(
-        title="Drag the middle and edges of the selection box to change the range",
-        height=130,
-        sizing_mode="stretch_width",
-        y_range=p.y_range,
-        y_axis_type=None,
-        tools="",
-        toolbar_location=None,
-        background_fill_color="#efefef",
-    )
-
-    range_tool = RangeTool(x_range=p.x_range)
-    range_tool.overlay.fill_color = "navy"
-    range_tool.overlay.fill_alpha = 0.2
-
-    select.hbar(
-        y="Process",
-        left="Timestamp (ns)",
-        right="Matching Timestamp",
-        height=2,
-        source=df[df["Event Type"] == "Enter"],
-        fill_color=index_cmap,
-        line_color="black",
-        line_width=0.5,
-        fill_alpha=1,
-    )
-    select.xaxis.formatter = time_tick_formatter
-    select.ygrid.grid_line_color = None
-    select.add_tools(range_tool)
-    select.toolbar.active_multi = range_tool
-
-    show(column(p, select, sizing_mode="stretch_width"))
-
-
-def plot_comm_matrix(trace, type="size", label_threshold=16):
-    """Plots heatmap of process-to-process message volume."""
-    from bokeh.plotting import figure, show
-    from bokeh.models import (
-        AdaptiveTicker,
-        ColorBar,
-        LinearColorMapper,
-        PrintfTickFormatter,
-        BasicTicker,
-    )
-    from bokeh.palettes import YlGnBu9
-
-    comm_matrix = trace.comm_matrix()
     N = comm_matrix.shape[0]
 
-    mapper = LinearColorMapper(
-        palette=YlGnBu9, low=np.amin(comm_matrix), high=np.amin(comm_matrix)
-    )
+    # Define color mapping
+    if mapping == "linear":
+        color_mapper = LinearColorMapper(
+            palette="Viridis256", low=1, high=np.amax(comm_matrix)
+        )
+    elif mapping == "log":
+        color_mapper = LogColorMapper(
+            palette="Viridis256", low=1, high=np.amax(comm_matrix)
+        )
+    else:
+        color_mapper = LinearColorMapper(palette="Viridis256", low=1, high=1)
 
+    # Create Bokeh plot
     p = figure(
-        title="Communication Matrix",
-        x_axis_label="Sender",
-        y_axis_label="Receiver",
-        x_axis_location="above",
-        x_range=[-0.5, N - 0.5],
-        y_range=[N - 0.5, -0.5],
-        #    width=300,
         height=400,
         sizing_mode="stretch_width",
+        title="Communication Matrix",
+        x_axis_label="Sender",
+        x_axis_location="above",
+        x_range=(-0.5, N - 0.5),
+        y_axis_label="Receiver",
+        y_range=(N - 0.5, -0.5),
     )
-    #    tools=[])
 
-    p.xgrid.visible = False
-    p.ygrid.visible = False
+    # Add heatmap, color bar, and labels
+    if kind == "heatmap":
+        p.image(
+            image=[np.flipud(comm_matrix)],
+            x=-0.5,
+            y=N - 0.5,
+            dw=N,
+            dh=N,
+            color_mapper=color_mapper,
+        )
 
-    p.image(
-        image=[np.flip(comm_matrix, 0)],
-        x=-0.5,
-        y=N - 0.5,
-        dw=N,
-        dh=N,
-        palette=YlGnBu9,
-        level="image",
+        color_bar = ColorBar(
+            color_mapper=color_mapper,
+            major_label_text_font_size="9px",
+            formatter=getSizeTickFormatter(),
+            border_line_color=None,
+        )
+        p.add_layout(color_bar, "right")
+
+        if N <= 16:
+            stacked["color"] = np.where(
+                stacked["volume"] > stacked["volume"].max() / 2, "black", "white"
+            )
+            stacked["volume_formatted"] = stacked["volume"].apply(format_size)
+            labels = LabelSet(
+                x="sender",
+                y="receiver",
+                text="volume_formatted",
+                source=ColumnDataSource(stacked),
+                text_align="center",
+                text_font_size="10px",
+                text_color="color",
+                text_baseline="middle",
+                level="overlay",
+            )
+            p.add_layout(labels)
+
+    # Add circles
+    if kind == "scatterplot":
+        # Normalize circle size
+        stacked["volume_normalized"] = stacked["volume"] / stacked["volume"].max()
+        stacked["volume_normalized"] = np.sqrt(stacked["volume_normalized"]) * 20
+
+        # Create a column called "image" so that we can use one set of tooltips
+        # for heatmap and scatterplot
+        stacked["image"] = stacked["volume"]
+        p.circle(
+            x="sender",
+            y="receiver",
+            size="volume_normalized",
+            source=ColumnDataSource(stacked),
+            # color={"field": "image", "transform": color_mapper},
+        )
+
+    # Additional plot config
+    p.xaxis.ticker = BasicTicker(
+        base=2, desired_num_ticks=N, min_interval=1, num_minor_ticks=0
     )
-    p.grid.grid_line_width = 0.5
-    p.xaxis.ticker = AdaptiveTicker(base=2, min_interval=1)
-    p.yaxis.ticker = AdaptiveTicker(base=2, min_interval=1)
-    p.xaxis.formatter = process_tick_formatter
-    p.yaxis.formatter = process_tick_formatter
-
-    color_bar = ColorBar(
-        color_mapper=mapper,
-        major_label_text_font_size="7px",
-        ticker=BasicTicker(desired_num_ticks=len(YlGnBu9)),
-        formatter=PrintfTickFormatter(format="%d%%"),
-        label_standoff=6,
-        border_line_color=None,
+    p.yaxis.ticker = BasicTicker(
+        base=2, desired_num_ticks=N, min_interval=1, num_minor_ticks=0
     )
-    p.add_layout(color_bar, "right")
+    p.xaxis.formatter = getProcessTickFormatter()
+    p.yaxis.formatter = getProcessTickFormatter()
+    p.add_tools(
+        HoverTool(
+            tooltips={
+                "Sender": "Process $x{0.}",
+                "Receiver": "Process $y{0.}",
+                "Bytes": "@image{custom}",
+            },
+            formatters={"@image": getSizeHoverFormatter()},
+        )
+    )
 
-    show(p)
+    # Return plot with wrapper function
+    return plot(p, notebook_url=notebook_url)
