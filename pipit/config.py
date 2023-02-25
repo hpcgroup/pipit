@@ -6,6 +6,7 @@ config = {
         "launch_server": False,
         "default_color": "#E5AE38",
         "shuffle_colors": True,
+        "notebook_url": "http://localhost:8888",
         "colors": [
             "rgb(138,113,152)",
             "rgb(175,112,133)",
