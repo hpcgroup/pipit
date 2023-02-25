@@ -1,8 +1,13 @@
 import numpy as np
 import pandas as pd
-from bokeh.models import FactorRange, RangeTool, Range1d
+from bokeh.models import (
+    FactorRange,
+    RangeTool,
+    Range1d,
+    WheelZoomTool,
+)
 from bokeh.plotting import figure
-from bokeh.transform import factor_cmap, dodge
+from bokeh.transform import factor_cmap
 from bokeh.layouts import column
 
 from ._util import plot, getTimeTickFormatter, format_time
@@ -14,7 +19,8 @@ def plot_timeline(trace, range_selector=False):
     df = trace.events.copy(deep=False).reset_index()
 
     df["Process"] = "Process " + df["Process"].astype("str")
-    df["Depth"] = "Depth " + df["Depth"].astype("int").astype("str")
+    df["Depth"] = df["Depth"].astype("float").fillna(-1)
+    df["Depth"] = "Depth " + df["Depth"].astype("str")
     df["y"] = df[["Process", "Depth"]].apply(lambda x: (x[0], str(x[1])), axis=1)
 
     df["mtype"] = "circle"
@@ -32,7 +38,7 @@ def plot_timeline(trace, range_selector=False):
         output_backend="webgl",
         y_range=FactorRange(*sorted(df["y"].unique(), reverse=True)),
         sizing_mode="stretch_width",
-        height=min(400, len(df["y"].unique()) * 80 + 60),
+        height=min(400, len(df["y"].unique()) * 40 + 30),
         title="Event Timeline",
         tools=["xpan", "xwheel_zoom", "hover"],
         x_axis_location="above",
@@ -63,13 +69,13 @@ def plot_timeline(trace, range_selector=False):
 
     p.bezier(
         x0="x0",
-        y0=dodge("y0", 0.7, range=p.y_range),
+        y0="y0",
         x1="x1",
-        y1=dodge("y1", 0.7, range=p.y_range),
+        y1="y1",
         cx0="cx0",
-        cy0=dodge("y0", 0.7, range=p.y_range),
+        cy0="y0",
         cx1="cx1",
-        cy1=dodge("y1", 0.7, range=p.y_range),
+        cy1="y1",
         source=comm,
         line_width=1,
         line_color="black",
@@ -78,20 +84,22 @@ def plot_timeline(trace, range_selector=False):
 
     p.scatter(
         x="Timestamp (ns)",
-        y=dodge("y", 0.7, range=p.y_range),
+        y="y",
         source=df[df["Event Type"] == "Instant"],
         size=9,
-        color="MediumAquaMarine",
         alpha=0.5,
         marker="mtype",
     )
 
     p.xaxis.formatter = getTimeTickFormatter()
     p.x_range.range_padding = 0.2
-    p.y_range.range_padding = 0.5
     p.yaxis.group_label_orientation = 0
     p.yaxis.major_label_text_font_size = "0pt"
     p.ygrid.grid_line_color = None
+    p.yaxis.minor_tick_line_color = None
+    p.yaxis.major_tick_line_color = None
+    zoom = p.select(dict(type=WheelZoomTool))
+    p.toolbar.active_scroll = zoom[0]
 
     if range_selector:
         select = figure(
