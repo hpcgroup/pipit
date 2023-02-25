@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from bokeh.models import FactorRange, RangeTool, Range1d
 from bokeh.plotting import figure
-from bokeh.transform import factor_cmap
+from bokeh.transform import factor_cmap, dodge
 from bokeh.layouts import column
 
 from ._util import plot, getTimeTickFormatter, format_time
@@ -18,8 +18,8 @@ def plot_timeline(trace, range_selector=False):
     df["y"] = df[["Process", "Depth"]].apply(lambda x: (x[0], str(x[1])), axis=1)
 
     df["mtype"] = "circle"
-    df.loc[df["Name"] == "MpiSend", "mtype"] = "triangle"
-    df.loc[df["Name"] == "MpiRecv", "mtype"] = "plus"
+    # df.loc[df["Name"] == "MpiSend", "mtype"] = "triangle"
+    # df.loc[df["Name"] == "MpiRecv", "mtype"] = "inverted_triangle"
 
     index_cmap = factor_cmap(
         "Name",
@@ -32,14 +32,11 @@ def plot_timeline(trace, range_selector=False):
         output_backend="webgl",
         y_range=FactorRange(*sorted(df["y"].unique(), reverse=True)),
         sizing_mode="stretch_width",
-        height=len(df["y"].unique()) * 80 + 50,
+        height=min(400, len(df["y"].unique()) * 80 + 60),
         title="Event Timeline",
         tools=["xpan", "xwheel_zoom", "hover"],
-        x_range=[0, df["Matching Timestamp"].max()],
         x_axis_location="above",
     )
-
-    print(p.x_range)
 
     p.hbar(
         y="y",
@@ -66,30 +63,31 @@ def plot_timeline(trace, range_selector=False):
 
     p.bezier(
         x0="x0",
-        y0="y0",
+        y0=dodge("y0", 0.7, range=p.y_range),
         x1="x1",
-        y1="y1",
+        y1=dodge("y1", 0.7, range=p.y_range),
         cx0="cx0",
-        cy0="y0",
+        cy0=dodge("y0", 0.7, range=p.y_range),
         cx1="cx1",
-        cy1="y1",
+        cy1=dodge("y1", 0.7, range=p.y_range),
         source=comm,
         line_width=1,
         line_color="black",
+        alpha=0.6,
     )
 
     p.scatter(
         x="Timestamp (ns)",
-        y="y",
+        y=dodge("y", 0.7, range=p.y_range),
         source=df[df["Event Type"] == "Instant"],
-        size=12,
+        size=9,
         color="MediumAquaMarine",
-        line_width=1,
-        line_color="black",
+        alpha=0.5,
         marker="mtype",
     )
 
     p.xaxis.formatter = getTimeTickFormatter()
+    p.x_range.range_padding = 0.2
     p.y_range.range_padding = 0.5
     p.yaxis.group_label_orientation = 0
     p.yaxis.major_label_text_font_size = "0pt"
