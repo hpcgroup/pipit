@@ -11,7 +11,7 @@ from bokeh.models import (
 )
 from bokeh.plotting import figure
 from bokeh.transform import factor_cmap
-from bokeh.layouts import column
+from bokeh.events import RangesUpdate
 
 from ._util import plot, getTimeTickFormatter, format_time
 import pipit as pp
@@ -25,6 +25,7 @@ def plot_timeline(trace):
     """
 
     # Get all events
+    trace.calc_inc_time()
     df = trace.events.copy(deep=False)
 
     # Create "y" column based on process and depth
@@ -48,10 +49,31 @@ def plot_timeline(trace):
     comm["y1"] = recvs["y"].values
     comm["cx0"] = comm["x0"] + (comm["x1"] - comm["x0"]) * 0.5
     comm["cx1"] = comm["x1"] - (comm["x1"] - comm["x0"]) * 0.5
+    comm["dx"] = comm["x1"] - comm["x0"]
 
-    # Define data sources
-    source = ColumnDataSource(df)
-    comm_source = ColumnDataSource(comm)
+    # Define data source for Bokeh glyphs
+    source = ColumnDataSource()
+    comm_source = ColumnDataSource()
+
+    # Callback function that updates Bokeh data sources based on current x-range
+    def update_data_sources(event):
+        nonlocal source
+        nonlocal comm_source
+
+        x0 = event.x0 if event is not None else df["Timestamp (ns)"].min()
+        x1 = event.x1 if event is not None else df["Timestamp (ns)"].max()
+        N = 10000
+
+        # Remove events that are out of bounds or too small
+        source.data = df[
+            ~((df["Matching Timestamp"] < x0) | (df["Timestamp (ns)"] > x1))
+        ].nlargest(N, columns="Inc Time")
+
+        comm_source.data = comm[~((comm["x1"] < x0) | (comm["x0"] > x1))].nlargest(
+            N, columns="dx"
+        )
+
+    update_data_sources(None)
 
     # Define function color mapping
     function_cmap = factor_cmap(
@@ -129,6 +151,7 @@ def plot_timeline(trace):
     p.yaxis.major_tick_line_color = None
     p.yaxis.minor_tick_line_color = None
     p.ygrid.grid_line_color = None
+    p.on_event(RangesUpdate, update_data_sources)
 
     plot(p)
 
