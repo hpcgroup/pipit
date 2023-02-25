@@ -17,6 +17,18 @@ from ._util import plot, getTimeTickFormatter, format_time
 import pipit as pp
 
 
+def _gen_y(trace):
+    if "y" in trace.events.columns:
+        return
+
+    trace.events["y"] = list(
+        zip(
+            "Process " + trace.events["Process"].astype("str"),
+            "Depth " + trace.events["Depth"].astype("float").fillna(-1).astype("str"),
+        )
+    )
+
+
 def plot_timeline(trace):
     """Plots an overflow timeline of events in a Trace.
 
@@ -26,18 +38,25 @@ def plot_timeline(trace):
 
     # Get all events
     trace.calc_inc_time()
-    df = trace.events.copy(deep=False)
+    trace._gen_calling_relationships()
 
     # Create "y" column based on process and depth
     # Example value: (Process 1, Depth 3.0)
-    df["Depth"] = df["Depth"].astype("float").fillna(-1)
-    df["y"] = list(
-        zip(
-            "Process " + df["Process"].astype("str"),
-            "Depth " + df["Depth"].astype("str"),
-        )
-    )
+    _gen_y(trace)
+
+    df = trace.events.copy(deep=False)
     df = df.sort_values(by="Inc Time", ascending=False)
+    df = df.drop(
+        columns=[
+            "Thread",
+            "Process",
+            "Depth",
+            "Children",
+            "Matching Index",
+            "Attributes",
+            "Inc Time",
+        ]
+    )
 
     # Generate comm data for lines
     sends = df[df["Name"] == "MpiSend"]
@@ -54,8 +73,8 @@ def plot_timeline(trace):
     comm = comm.sort_values(by="dx", ascending=False)
 
     # Define data source for Bokeh glyphs
-    source = ColumnDataSource(df)
-    comm_source = ColumnDataSource(comm)
+    source = ColumnDataSource(df.head(0))
+    comm_source = ColumnDataSource(comm.head(0))
 
     # Callback function that updates Bokeh data sources based on current x-range
     def update_data_sources(event):
@@ -67,13 +86,13 @@ def plot_timeline(trace):
         N = 5000
 
         # Remove events that are out of bounds or too small
-        source.data = df[
+
+        filtered_df = df[
             ~((df["Matching Timestamp"] < x0) | (df["Timestamp (ns)"] > x1))
         ].head(N)
+        source.data = filtered_df
 
         comm_source.data = comm[~((comm["x1"] < x0) | (comm["x0"] > x1))].head(N)
-
-    update_data_sources(None)
 
     # Define function color mapping
     function_cmap = factor_cmap(
@@ -152,6 +171,8 @@ def plot_timeline(trace):
     p.yaxis.minor_tick_line_color = None
     p.ygrid.grid_line_color = None
     p.on_event(RangesUpdate, update_data_sources)
+
+    update_data_sources(None)
 
     plot(p)
 
