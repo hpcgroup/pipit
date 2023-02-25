@@ -5,6 +5,9 @@ from bokeh.models import (
     RangeTool,
     Range1d,
     WheelZoomTool,
+    ColumnDataSource,
+    CDSView,
+    GroupFilter,
 )
 from bokeh.plotting import figure
 from bokeh.transform import factor_cmap
@@ -14,48 +17,27 @@ from ._util import plot, getTimeTickFormatter, format_time
 import pipit as pp
 
 
-def plot_timeline(trace, range_selector=False):
-    """Plots summary timeline of events in a Trace."""
-    df = trace.events.copy(deep=False).reset_index()
+def plot_timeline(trace):
+    """Plots an overflow timeline of events in a Trace.
 
-    df["Process"] = "Process " + df["Process"].astype("str")
+    Args:
+        trace (pipit.Trace): Trace object whose events are being plotted.
+    """
+
+    # Get all events
+    df = trace.events.copy(deep=False)
+
+    # Create "y" column based on process and depth
+    # Example value: (Process 1, Depth 3.0)
     df["Depth"] = df["Depth"].astype("float").fillna(-1)
-    df["Depth"] = "Depth " + df["Depth"].astype("str")
-    df["y"] = df[["Process", "Depth"]].apply(lambda x: (x[0], str(x[1])), axis=1)
-
-    df["mtype"] = "circle"
-    # df.loc[df["Name"] == "MpiSend", "mtype"] = "triangle"
-    # df.loc[df["Name"] == "MpiRecv", "mtype"] = "inverted_triangle"
-
-    index_cmap = factor_cmap(
-        "Name",
-        palette=pp.config["vis"]["colors"],
-        factors=sorted(df.Name.unique()),
-        end=1,
+    df["y"] = list(
+        zip(
+            "Process " + df["Process"].astype("str"),
+            "Depth " + df["Depth"].astype("str"),
+        )
     )
 
-    p = figure(
-        output_backend="webgl",
-        y_range=FactorRange(*sorted(df["y"].unique(), reverse=True)),
-        sizing_mode="stretch_width",
-        height=min(400, len(df["y"].unique()) * 40 + 30),
-        title="Event Timeline",
-        tools=["xpan", "xwheel_zoom", "hover"],
-        x_axis_location="above",
-    )
-
-    p.hbar(
-        y="y",
-        left="Timestamp (ns)",
-        right="Matching Timestamp",
-        height=1,
-        source=df[df["Event Type"] == "Enter"],
-        fill_color=index_cmap,
-        line_color="black",
-        line_width=0.5,
-        fill_alpha=1,
-    )
-
+    # Generate comm data for lines
     sends = df[df["Name"] == "MpiSend"]
     recvs = df[df["Name"] == "MpiRecv"]
 
@@ -67,6 +49,61 @@ def plot_timeline(trace, range_selector=False):
     comm["cx0"] = comm["x0"] + (comm["x1"] - comm["x0"]) * 0.5
     comm["cx1"] = comm["x1"] - (comm["x1"] - comm["x0"]) * 0.5
 
+    # Define data sources
+    source = ColumnDataSource(df)
+    comm_source = ColumnDataSource(comm)
+
+    # Define function color mapping
+    function_cmap = factor_cmap(
+        "Name",
+        palette=pp.config["vis"]["colors"],
+        factors=sorted(df.Name.unique()),
+        end=1,
+    )
+
+    # Create Bokeh plot
+    p = figure(
+        output_backend="webgl",
+        y_range=FactorRange(*sorted(df["y"].unique(), reverse=True)),
+        sizing_mode="stretch_width",
+        height=min(400, len(df["y"].unique()) * 40 + 30),
+        title="Event Timeline",
+        tools=["xpan", "xwheel_zoom", "hover"],
+        x_axis_location="above",
+    )
+
+    # Add bars for functions
+    hbar_view = CDSView(
+        source=source, filters=[GroupFilter(column_name="Event Type", group="Enter")]
+    )
+    p.hbar(
+        y="y",
+        left="Timestamp (ns)",
+        right="Matching Timestamp",
+        height=1,
+        source=source,
+        view=hbar_view,
+        fill_color=function_cmap,
+        line_color="black",
+        line_width=0.5,
+        fill_alpha=1,
+    )
+
+    # Add points for instant events
+    scatter_view = CDSView(
+        source=source, filters=[GroupFilter(column_name="Event Type", group="Instant")]
+    )
+    p.scatter(
+        x="Timestamp (ns)",
+        y="y",
+        source=source,
+        view=scatter_view,
+        size=9,
+        alpha=0.5,
+        marker="circle",
+    )
+
+    # Add lines to connect MPI sends and receives
     p.bezier(
         x0="x0",
         y0="y0",
@@ -76,66 +113,24 @@ def plot_timeline(trace, range_selector=False):
         cy0="y0",
         cx1="cx1",
         cy1="y1",
-        source=comm,
+        source=comm_source,
         line_width=1,
         line_color="black",
         alpha=0.6,
     )
 
-    p.scatter(
-        x="Timestamp (ns)",
-        y="y",
-        source=df[df["Event Type"] == "Instant"],
-        size=9,
-        alpha=0.5,
-        marker="mtype",
-    )
-
-    p.xaxis.formatter = getTimeTickFormatter()
-    p.x_range.range_padding = 0.2
-    p.yaxis.group_label_orientation = 0
-    p.yaxis.major_label_text_font_size = "0pt"
-    p.ygrid.grid_line_color = None
-    p.yaxis.minor_tick_line_color = None
-    p.yaxis.major_tick_line_color = None
+    # Additional plot config
     zoom = p.select(dict(type=WheelZoomTool))
     p.toolbar.active_scroll = zoom[0]
+    p.x_range.range_padding = 0.2
+    p.xaxis.formatter = getTimeTickFormatter()
+    p.yaxis.group_label_orientation = 0
+    p.yaxis.major_label_text_font_size = "0pt"
+    p.yaxis.major_tick_line_color = None
+    p.yaxis.minor_tick_line_color = None
+    p.ygrid.grid_line_color = None
 
-    if range_selector:
-        select = figure(
-            title="Drag the middle and edges of the selection box to change the range",
-            height=130,
-            sizing_mode="stretch_width",
-            y_range=p.y_range,
-            y_axis_type=None,
-            tools="",
-            toolbar_location=None,
-            background_fill_color="#efefef",
-        )
-
-        range_tool = RangeTool(x_range=p.x_range)
-        range_tool.overlay.fill_color = "navy"
-        range_tool.overlay.fill_alpha = 0.2
-
-        select.hbar(
-            y="Process",
-            left="Timestamp (ns)",
-            right="Matching Timestamp",
-            height=2,
-            source=df[df["Event Type"] == "Enter"],
-            fill_color=index_cmap,
-            line_color="black",
-            line_width=0.5,
-            fill_alpha=1,
-        )
-        select.xaxis.formatter = getTimeTickFormatter()
-        select.ygrid.grid_line_color = None
-        select.add_tools(range_tool)
-        select.toolbar.active_multi = range_tool
-
-        plot(column(p, select, sizing_mode="stretch_width"))
-    else:
-        plot(p)
+    plot(p)
 
 
 def plot_range_selector(trace):
