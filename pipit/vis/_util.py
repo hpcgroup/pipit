@@ -3,17 +3,17 @@
 #
 # SPDX-License-Identifier: MIT
 
-import numpy as np
+import sys
+
+from bokeh.io import output_notebook, show
+from bokeh.models import CustomJSHover, FuncTickFormatter, PrintfTickFormatter
 
 import pipit as pp
-import random
 
-from bokeh.models import PrintfTickFormatter, FuncTickFormatter, CustomJSHover
-
-# Constants
 
 # Formatters
-process_tick_formatter = PrintfTickFormatter(format="Process %d")
+def getProcessTickFormatter():
+    return PrintfTickFormatter(format="Process %d")
 
 
 def format_time(ns):
@@ -32,7 +32,7 @@ def format_time(ns):
 # JS expression equivalent to `format_time` function above; assumes:
 # - `x` is the value (in ns) being compared to determine units
 # - `y` is the value (in ns) actually being formatted
-format_time_js = """
+FORMAT_TIME_JS = """
     if(x < 1e3)
         return Math.round(y) + "ns";
     if(x < 1e6)
@@ -43,34 +43,36 @@ format_time_js = """
         return (y / 1e9).toFixed(3) + "s";
 """
 
+
 # Used to format ticks for time-based axes
-# https://docs.bokeh.org/en/2.4.1/docs/reference/models/formatters.html#functickformatter
-time_tick_formatter = FuncTickFormatter(
-    code=f"""
-        let x = Math.max(...ticks) - Math.min(...ticks);
-        let y = tick;
-        {format_time_js}
-    """
-)
+def getTimeTickFormatter():
+    return FuncTickFormatter(
+        code=f"""
+                let x = Math.max(...ticks) - Math.min(...ticks);
+                let y = tick;
+                {FORMAT_TIME_JS}
+            """
+    )
+
 
 # Used to format tooltips for time-based values
-# https://docs.bokeh.org/en/latest/docs/reference/models/tools.html#bokeh.models.CustomJSHover
-time_hover_formatter = CustomJSHover(
-    code=f"""
-        let x = value;
-        let y = value;
-        {format_time_js}
-    """
-)
+def getTimeHoverFormatter():
+    return CustomJSHover(
+        code=f"""
+                let x = value;
+                let y = value;
+                {FORMAT_TIME_JS}
+            """,
+    )
 
 
 def format_size(b):
     """Converts bytes to something more readable"""
 
-    if b < 1e3:  # Less than 1 KB -> byte
-        return f"{b:.2f} bytes"
-    if b < 1e6:  # Less than 1 MB -> KB
-        return f"{(b / 1e3):.2f} KB"
+    if b < 1e3:  # Less than 1 kB -> byte
+        return f"{b:.2f} B"
+    if b < 1e6:  # Less than 1 MB -> kB
+        return f"{(b / 1e3):.2f} kB"
     if b < 1e9:  # Less than 1 GB -> MB
         return f"{(b / 1e6):.2f} MB"
     if b < 1e12:  # Less than 1 TB -> GB
@@ -84,11 +86,11 @@ def format_size(b):
 # JS expression equivalent to `format_size` function above; assumes:
 # - `x` is the value (in bytes) being compared to determine units
 # - `y` is the value (in bytes) actually being formatted
-format_size_js = """
+FORMAT_SIZE_JS = """
     if(x < 1e3)
-        return (y).toFixed(2) + " bytes";
+        return (y).toFixed(2) + " B";
     if(x < 1e6)
-        return (y / 1e3).toFixed(2) + " KB";
+        return (y / 1e3).toFixed(2) + " kB";
     if(x < 1e9)
         return (y / 1e6).toFixed(2) + " MB";
     if(x < 1e12)
@@ -99,108 +101,77 @@ format_size_js = """
         return (y / 1e15).toFixed(2) + " PB";
 """
 
+
 # Used to format ticks for size-based axes
-# https://docs.bokeh.org/en/2.4.1/docs/reference/models/formatters.html#functickformatter
-size_tick_formatter = FuncTickFormatter(
-    code=f"""
-        let x = Math.max(...ticks) - Math.min(...ticks);
-        let y = tick;
-        {format_size_js}
-    """
-)
+def getSizeTickFormatter():
+    return FuncTickFormatter(
+        code=f"""
+                let x = Math.max(...ticks) - Math.min(...ticks);
+                let y = tick;
+                {FORMAT_SIZE_JS}
+            """
+    )
+
 
 # Used to format tooltips for size-based values
-# https://docs.bokeh.org/en/latest/docs/reference/models/tools.html#bokeh.models.CustomJSHover
-size_hover_formatter = CustomJSHover(
-    code=f"""
-        let x = value;
-        let y = value;
-        {format_size_js}
-    """
-)
-
-
-# Other utility functions
-def reload_vis():
-    pp.config["vis"]["initialized"] = False
-    init_vis()
-
-
-def init_vis():
-    if pp.config["vis"]["initialized"]:
-        return
-
-    print("reloading vis")
-
-    import holoviews as hv
-    from holoviews import opts
-
-    # Set bokeh to be our backend, and apply css
-    hv.extension("bokeh", logo=False, css=pp.config["vis"]["css"])
-
-    # Set bokeh theme
-    # hv.renderer("bokeh").theme = pp.config["vis"]["theme"] + "_minimal"
-
-    # Load default colormap
-    if pp.config["vis"]["shuffle_colors"]:
-        random.shuffle(pp.config["vis"]["colors"])
-
-    # Default hook
-    def plot_hook(p, _):
-        p.state.toolbar_location = "above"
-        p.state.ygrid.visible = False
-        if p.state.legend:
-            p.state.legend.label_text_font_size = "8pt"
-            p.state.legend.spacing = 0
-            p.state.legend.location = "top"
-
-    # Apply default opts
-    default_opts = dict(
-        fontsize={"title": 10, "legend": 8},
-        hooks=[plot_hook],
-        responsive=True,
-        height=300,
+def getSizeHoverFormatter():
+    return CustomJSHover(
+        code=f"""
+                let x = value;
+                let y = value;
+                {FORMAT_SIZE_JS}
+            """,
     )
 
-    opts.defaults(
-        opts.Area(**default_opts, color=pp.config["vis"]["default_color"]),
-        opts.Bars(**default_opts, color=pp.config["vis"]["default_color"]),
-        opts.Bivariate(**default_opts),
-        opts.BoxWhisker(**default_opts),
-        opts.Chord(**default_opts),
-        opts.Contours(**default_opts),
-        opts.Curve(**default_opts, color=pp.config["vis"]["default_color"]),
-        opts.Distribution(**default_opts),
-        opts.Graph(**default_opts),
-        opts.Histogram(**default_opts, color=pp.config["vis"]["default_color"]),
-        opts.Image(**default_opts),
-        opts.Labels(**default_opts),
-        opts.Points(**default_opts),
-        opts.Polygons(**default_opts),
-        opts.Rectangles(**default_opts),
-        opts.Sankey(**default_opts),
-        opts.Segments(**default_opts),
-    )
 
-    pp.config["vis"]["launch_server"] = not in_notebook()
-    pp.config["vis"]["initialized"] = True
+# Helper functions
+def plot(obj, notebook_url=None):
+    """Internal function used to wrap return values from visualizations. If we are in a
+        notebook, then `bokeh.io.show` is invoked and the plot is displayed immediately
+        in the associated output cell. If we are in the Python shell, then a new Bokeh
+        server instance is launched, and the plot is displayed in a new browser tab.
+        Both scenarios allow for bidirectional communication between the JS frontend
+        and the Python backend.
 
-
-def plot(element):
-    """Used to wrap return values in vis functions. Launches HTTP server if config
-    variable is set to True, else returns the element.
+        See https://docs.bokeh.org/en/latest/docs/user_guide/output/jupyter.html#bokeh-server-applications,   # noqa E501
+        https://docs.bokeh.org/en/latest/docs/user_guide/server/library.html.
 
     Args:
-        element (hv.Element): HoloViews element to launch in server or return
+        obj: The Bokeh object to display.
     """
-    if pp.config["vis"]["launch_server"]:
-        import panel as pn
 
-        pn.extension(raw_css=pp.config["vis"]["css"])
-        pn.panel(element).show()
-        return
+    # Wrap the plot in a Bokeh app
+    def bkapp(doc):
+        doc.add_root(obj)
 
-    return element
+    # Case 1: running unit tests
+    if "pytest" in sys.modules:
+        return obj
+
+    # Case 2: Notebook
+    if in_notebook():
+        # Add CSS to increase cell width
+        from IPython.core.display import HTML, display_html
+
+        display_html(HTML("<style>.container { width: 90% !important }</style>"))
+
+        # Get default notebook url if not given
+        if notebook_url is None:
+            notebook_url = pp.config["vis"]["notebook_url"]
+
+        # Show it in output cell
+        output_notebook(hide_banner=True)
+        show(bkapp, notebook_url=notebook_url)
+
+    # Case 3: Standalone Python script
+    else:
+        # Start a Bokeh server
+        from bokeh.server.server import Server
+
+        server = Server({"/": bkapp}, port=0, allow_websocket_origin=["*"])
+        server.start(start_loop=False)
+        server.io_loop.add_callback(server.show, "/")
+        server.io_loop.start()
 
 
 def in_notebook():
@@ -215,32 +186,3 @@ def in_notebook():
     except AttributeError:
         return False
     return True
-
-
-def clamp(n, smallest, largest):
-    """Clamps a value between a min and max bound"""
-    return max(smallest, min(n, largest))
-
-
-def generate_cmap(series, palette):
-    """Maps a categorical series to a color palette (list of css colors)"""
-    names = series.unique().tolist()
-
-    cmap = {names[i]: palette[i] for i in range(len(names))}
-    return cmap
-
-
-def time_series(T=1, N=100, mu=1, sigma=0.3, S0=20):
-    """Generates parameterized noisy time series"""
-    dt = float(T) / N
-    t = np.linspace(0, T, N)
-    W = np.random.standard_normal(size=N)
-    W = np.cumsum(W) * np.sqrt(dt)  # standard brownian motion
-    X = (mu - 0.5 * sigma**2) * t + sigma * W
-    S = S0 * np.exp(X)  # geometric brownian motion
-    return S
-
-
-def get_height(num_ys, max_height=600):
-    """Calculate optimal height for plot based on number of elements on the y-axis"""
-    return clamp(num_ys * 45, 150, max_height)
