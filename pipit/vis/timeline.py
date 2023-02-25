@@ -37,23 +37,25 @@ def plot_timeline(trace):
             "Depth " + df["Depth"].astype("str"),
         )
     )
+    df = df.sort_values(by="Inc Time", ascending=False)
 
     # Generate comm data for lines
     sends = df[df["Name"] == "MpiSend"]
     recvs = df[df["Name"] == "MpiRecv"]
 
     comm = pd.DataFrame()
-    comm["x0"] = sends["Timestamp (ns)"].values
-    comm["y0"] = sends["y"].values
-    comm["x1"] = recvs["Timestamp (ns)"].values
-    comm["y1"] = recvs["y"].values
+    comm["x0"] = sends["Timestamp (ns)"]
+    comm["y0"] = sends["y"]
+    comm["x1"] = recvs["Timestamp (ns)"]
+    comm["y1"] = recvs["y"]
     comm["cx0"] = comm["x0"] + (comm["x1"] - comm["x0"]) * 0.5
     comm["cx1"] = comm["x1"] - (comm["x1"] - comm["x0"]) * 0.5
     comm["dx"] = comm["x1"] - comm["x0"]
+    comm = comm.sort_values(by="dx", ascending=False)
 
     # Define data source for Bokeh glyphs
-    source = ColumnDataSource()
-    comm_source = ColumnDataSource()
+    source = ColumnDataSource(df)
+    comm_source = ColumnDataSource(comm)
 
     # Callback function that updates Bokeh data sources based on current x-range
     def update_data_sources(event):
@@ -62,16 +64,14 @@ def plot_timeline(trace):
 
         x0 = event.x0 if event is not None else df["Timestamp (ns)"].min()
         x1 = event.x1 if event is not None else df["Timestamp (ns)"].max()
-        N = 10000
+        N = 5000
 
         # Remove events that are out of bounds or too small
         source.data = df[
             ~((df["Matching Timestamp"] < x0) | (df["Timestamp (ns)"] > x1))
-        ].nlargest(N, columns="Inc Time")
+        ].head(N)
 
-        comm_source.data = comm[~((comm["x1"] < x0) | (comm["x0"] > x1))].nlargest(
-            N, columns="dx"
-        )
+        comm_source.data = comm[~((comm["x1"] < x0) | (comm["x0"] > x1))].head(N)
 
     update_data_sources(None)
 
@@ -88,7 +88,7 @@ def plot_timeline(trace):
         output_backend="webgl",
         y_range=FactorRange(*sorted(df["y"].unique(), reverse=True)),
         sizing_mode="stretch_width",
-        height=min(400, len(df["y"].unique()) * 40 + 30),
+        height=min(700, len(df["y"].unique()) * 40 + 30),
         title="Event Timeline",
         tools=["xpan", "xwheel_zoom", "hover"],
         x_axis_location="above",
