@@ -49,14 +49,15 @@ def plot_timeline(trace):
     df = df.drop(
         columns=[
             "Thread",
-            "Process",
+            # "Process",
             "Depth",
             "Children",
             "Matching Index",
             "Attributes",
-            "Inc Time",
+            # "Inc Time",
         ]
     )
+    df["Process"] = df["Process"].astype("float")
 
     # Generate comm data for lines
     sends = df[df["Name"] == "MpiSend"]
@@ -74,6 +75,7 @@ def plot_timeline(trace):
 
     # Define data source for Bokeh glyphs
     source = ColumnDataSource(df.head(0))
+    # hist_source = ColumnDataSource(df.head(0))
     comm_source = ColumnDataSource(comm.head(0))
 
     # Callback function that updates Bokeh data sources based on current x-range
@@ -83,16 +85,52 @@ def plot_timeline(trace):
 
         x0 = event.x0 if event is not None else df["Timestamp (ns)"].min()
         x1 = event.x1 if event is not None else df["Timestamp (ns)"].max()
-        N = 5000
 
-        # Remove events that are out of bounds or too small
+        N = 800
+        min_time = (x1 - x0) / N
 
-        filtered_df = df[
-            ~((df["Matching Timestamp"] < x0) | (df["Timestamp (ns)"] > x1))
-        ].head(N)
-        source.data = filtered_df
+        # Remove events that are out of bounds
+        in_bounds = df[
+            ~(
+                (df["Matching Timestamp"] < x0)
+                | (df["Timestamp (ns)"] > x1)
+                | (df["Event Type"] != "Enter")
+            )
+        ]
 
-        comm_source.data = comm[~((comm["x1"] < x0) | (comm["x0"] > x1))].head(N)
+        # Split into large and small events
+        large = in_bounds[in_bounds["Inc Time"] >= min_time]
+        small = in_bounds[in_bounds["Inc Time"] < min_time]
+
+        new_df = large
+        df["y"] = df["y"].astype("category")
+
+        # Use reduction operator to reduce small events
+        # Convert small events into bins
+        ys = df["y"].unique()
+        for y in ys:
+            evt = small[small["y"] == y]
+
+            if evt.shape[0] > 0:
+                # out, bins = pd.cut(evt["Timestamp (ns)"], 500, retbins=True)
+                out, bins = np.histogram(evt["Timestamp (ns)"], N, range=(x0, x1))
+                arr = [
+                    {
+                        "Timestamp (ns)": bins[i],
+                        "Matching Timestamp": bins[i + 1],
+                        "Event Type": "Enter",
+                        "y": y,
+                    }
+                    for i, x in enumerate(out)
+                    if x > 0
+                ]
+                new_df = pd.concat([new_df, pd.DataFrame(arr)])
+
+        source.data = new_df
+
+        # comm_source.data = comm[~((comm["x1"] < x0) | (comm["x0"] > x1))].head(N)
+
+    # return update_data_sources(None)
 
     # Define function color mapping
     function_cmap = factor_cmap(
@@ -100,6 +138,7 @@ def plot_timeline(trace):
         palette=pp.config["vis"]["colors"],
         factors=sorted(df.Name.unique()),
         end=1,
+        # nan_color="#fff"
     )
 
     # Create Bokeh plot
@@ -111,7 +150,10 @@ def plot_timeline(trace):
         title="Event Timeline",
         tools=["xpan", "xwheel_zoom", "hover"],
         x_axis_location="above",
+        # x_range=[0, df["Timestamp (ns)"].max()]
     )
+
+    p.circle(0, 0)
 
     # Add bars for functions
     hbar_view = CDSView(
@@ -126,23 +168,25 @@ def plot_timeline(trace):
         view=hbar_view,
         fill_color=function_cmap,
         line_color="black",
-        line_width=0.5,
+        line_width=0.2,
         fill_alpha=1,
+        hover_color="red",
     )
 
     # Add points for instant events
-    scatter_view = CDSView(
-        source=source, filters=[GroupFilter(column_name="Event Type", group="Instant")]
-    )
-    p.scatter(
-        x="Timestamp (ns)",
-        y="y",
-        source=source,
-        view=scatter_view,
-        size=9,
-        alpha=0.5,
-        marker="circle",
-    )
+    # scatter_view = CDSView(
+    #     source=source, filters=[GroupFilter(column_name="Event Type",
+    #     group="Instant")]
+    # )
+    # p.scatter(
+    #     x="Timestamp (ns)",
+    #     y="y",
+    #     source=source,
+    #     view=scatter_view,
+    #     size=9,
+    #     alpha=0.5,
+    #     marker="circle",
+    # )
 
     # Add lines to connect MPI sends and receives
     p.bezier(
@@ -171,6 +215,8 @@ def plot_timeline(trace):
     p.yaxis.minor_tick_line_color = None
     p.ygrid.grid_line_color = None
     p.on_event(RangesUpdate, update_data_sources)
+    p.lod_threshold = 10000000
+    # p.lod_factor = 3
 
     update_data_sources(None)
 
