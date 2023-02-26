@@ -60,6 +60,10 @@ def plot_timeline(trace):
     )
     df["Process"] = df["Process"].astype("float")
     df["y"] = df["y"].astype("category")
+    df["Timestamp (ns)"] = df["Timestamp (ns)"].astype("float32")
+    df["Matching Timestamp"] = df["Matching Timestamp"].astype("float32")
+    df["Inc Time"] = df["Inc Time"].astype("float32")
+    df["Random"] = np.random.uniform(0.0, 1.0, df.shape[0])
     ys = df["y"].unique()
 
     # Generate comm data for lines
@@ -93,18 +97,12 @@ def plot_timeline(trace):
         min_time = (x1 - x0) / N
 
         # Remove events that are out of bounds
-        in_bounds = df[
-            ~(
-                (df["Matching Timestamp"] < x0)
-                | (df["Timestamp (ns)"] > x1)
-                | (df["Event Type"] != "Enter")
-            )
-        ]
+        in_bounds = df[~((df["Matching Timestamp"] < x0) | (df["Timestamp (ns)"] > x1))]
 
         # Split into large and small events
-        is_large = in_bounds["Inc Time"] >= min_time
+        is_large = (in_bounds["Inc Time"] >= min_time) | (in_bounds["Inc Time"].isna())
         large = in_bounds[is_large]
-        small = in_bounds[~is_large]
+        small = in_bounds[~is_large & (in_bounds["Event Type"] == "Enter")]
 
         # Use reduction operator to reduce small events
         # Convert small events into bins
@@ -120,9 +118,10 @@ def plot_timeline(trace):
                     {
                         "Timestamp (ns)": ls[i],
                         "Matching Timestamp": ls[i + 1],
-                        "x": (ls[i] + ls[i + 1]) / 2,
+                        # "x": (ls[i] + ls[i + 1]) / 2,
                         # "Event Type": "Bin",
                         "Event Type": "Enter",
+                        "Count": max(min(x / 10, 2), 0.8),
                         "y": y,
                     }
                     for i, x in enumerate(out)
@@ -148,14 +147,12 @@ def plot_timeline(trace):
         output_backend="webgl",
         y_range=FactorRange(*sorted(df["y"].unique(), reverse=True)),
         sizing_mode="stretch_width",
-        height=min(700, len(df["y"].unique()) * 40 + 30),
+        height=min(900, len(df["y"].unique()) * 40 + 30),
         title="Event Timeline",
         tools=["xpan", "xwheel_zoom", "hover"],
         x_axis_location="above",
         # x_range=[0, df["Timestamp (ns)"].max()]
     )
-
-    p.circle(0, 0)
 
     # Add bars for functions
     hbar_view = CDSView(
@@ -172,40 +169,41 @@ def plot_timeline(trace):
         line_color="black",
         line_width=0.2,
         fill_alpha=1,
-        hover_color="red",
     )
 
     # Add dashes for bins
     # bin_view = CDSView(
     #     source=source, filters=[GroupFilter(column_name="Event Type", group="Bin")]
     # )
-    # p.dash(
-    #     y="y",
-    #     x="x",
-    #     angle=1.5708,
+    # p.segment(
+    #     x0="x",
+    #     y0=dodge("y", -0.5, range=p.y_range),
+    #     x1="x",
+    #     y1=dodge("y", 0.5, range=p.y_range),
+    #     # angle=1.5708,
     #     source=source,
     #     view=bin_view,
-    #     size=9.5,
+    #     # size=9.5,
     #     color='black',
     #     alpha=0.6,
-    #     line_width=1.5,
-    #     hover_color="red",
+    #     line_width="Count",
     # )
 
     # Add points for instant events
     # scatter_view = CDSView(
-    #     source=source, filters=[GroupFilter(column_name="Event Type",
-    #     group="Instant")]
+    #     source=source, filters=[GroupFilter(column_name="Event Type", group="Instant")]
     # )
-    # p.scatter(
-    #     x="Timestamp (ns)",
-    #     y="y",
-    #     source=source,
-    #     view=scatter_view,
-    #     size=9,
-    #     alpha=0.5,
-    #     marker="circle",
-    # )
+    scatter_source = df[(df["Event Type"] == "Instant")].head(100)
+    p.scatter(
+        x="Timestamp (ns)",
+        y="y",
+        # y=dodge("y", "random", range=p.y_range),
+        source=scatter_source,
+        # view=scatter_view,
+        size=8,
+        alpha=0.5,
+        marker="circle",
+    )
 
     # Add lines to connect MPI sends and receives
     p.bezier(
