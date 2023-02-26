@@ -54,10 +54,13 @@ def plot_timeline(trace):
             "Children",
             "Matching Index",
             "Attributes",
+            "Parent"
             # "Inc Time",
         ]
     )
     df["Process"] = df["Process"].astype("float")
+    df["y"] = df["y"].astype("category")
+    ys = df["y"].unique()
 
     # Generate comm data for lines
     sends = df[df["Name"] == "MpiSend"]
@@ -86,7 +89,7 @@ def plot_timeline(trace):
         x0 = event.x0 if event is not None else df["Timestamp (ns)"].min()
         x1 = event.x1 if event is not None else df["Timestamp (ns)"].max()
 
-        N = 800
+        N = 700
         min_time = (x1 - x0) / N
 
         # Remove events that are out of bounds
@@ -99,38 +102,37 @@ def plot_timeline(trace):
         ]
 
         # Split into large and small events
-        large = in_bounds[in_bounds["Inc Time"] >= min_time]
-        small = in_bounds[in_bounds["Inc Time"] < min_time]
-
-        new_df = large
-        df["y"] = df["y"].astype("category")
+        is_large = in_bounds["Inc Time"] >= min_time
+        large = in_bounds[is_large]
+        small = in_bounds[~is_large]
 
         # Use reduction operator to reduce small events
         # Convert small events into bins
-        ys = df["y"].unique()
+        ls = np.linspace(x0, x1, N + 1)
+        arrs = []
+
+        # For each y-value, generate bins
         for y in ys:
             evt = small[small["y"] == y]
-
             if evt.shape[0] > 0:
-                # out, bins = pd.cut(evt["Timestamp (ns)"], 500, retbins=True)
-                out, bins = np.histogram(evt["Timestamp (ns)"], N, range=(x0, x1))
+                out, _ = np.histogram(evt["Timestamp (ns)"], ls, range=(x0, x1))
                 arr = [
                     {
-                        "Timestamp (ns)": bins[i],
-                        "Matching Timestamp": bins[i + 1],
+                        "Timestamp (ns)": ls[i],
+                        "Matching Timestamp": ls[i + 1],
+                        "x": (ls[i] + ls[i + 1]) / 2,
+                        # "Event Type": "Bin",
                         "Event Type": "Enter",
                         "y": y,
                     }
                     for i, x in enumerate(out)
                     if x > 0
                 ]
-                new_df = pd.concat([new_df, pd.DataFrame(arr)])
+                arrs += arr
 
-        source.data = new_df
-
+        # Add bins to data source
+        source.data = pd.concat([large, pd.DataFrame(arrs)])
         # comm_source.data = comm[~((comm["x1"] < x0) | (comm["x0"] > x1))].head(N)
-
-    # return update_data_sources(None)
 
     # Define function color mapping
     function_cmap = factor_cmap(
@@ -172,6 +174,23 @@ def plot_timeline(trace):
         fill_alpha=1,
         hover_color="red",
     )
+
+    # Add dashes for bins
+    # bin_view = CDSView(
+    #     source=source, filters=[GroupFilter(column_name="Event Type", group="Bin")]
+    # )
+    # p.dash(
+    #     y="y",
+    #     x="x",
+    #     angle=1.5708,
+    #     source=source,
+    #     view=bin_view,
+    #     size=9.5,
+    #     color='black',
+    #     alpha=0.6,
+    #     line_width=1.5,
+    #     hover_color="red",
+    # )
 
     # Add points for instant events
     # scatter_view = CDSView(
