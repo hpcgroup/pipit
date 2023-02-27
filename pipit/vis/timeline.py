@@ -2,59 +2,58 @@ import datashader as ds
 import holoviews as hv
 import pandas as pd
 from holoviews import opts
-from holoviews.operation.datashader import datashade, spread, rasterize, dynspread
+from holoviews.operation.datashader import datashade, spread
 from holoviews.operation import decimate
 from ._util import getProcessTickFormatter, getTimeTickFormatter
-import pipit as pp
+from bokeh.models import Grid, FixedTicker
 import numpy as np
-from bokeh.models import Grid, FixedTicker, HoverTool
-import bokeh.palettes as bp
+import pipit as pp
 
 hv.extension("bokeh")
 
 added = False
 
-def hook(plot, _):
+
+def plot_hook(plot, element):
+    global added
     plot.handles["yaxis"].minor_tick_line_color = None
     plot.handles["yaxis"].major_tick_line_color = None
 
-    # global added
+    if not added:
+        g = Grid(
+            dimension=1,
+            band_fill_color="gray",
+            band_fill_alpha=0.1,
+            ticker=FixedTicker(ticks=list(np.arange(-1000, 1000) + 0.5)),
+        )
+        plot.state.add_layout(g)
+        added = True
 
-    # if not added:
-    #     plot.state.add_layout( Grid(dimension=1, ticker=FixedTicker(ticks=[-1.5, -0.5, 0.5, 1.5, ]), band_fill_alpha=0.1, band_fill_color="skyblue"))
-    #     added = True
+
+ropts = dict(
+    responsive=True,
+    height=800,
+    default_tools=["xpan", "xwheel_zoom"],
+    active_tools=["xpan", "xwheel_zoom"],
+    xaxis="top",
+    labelled=[],
+    xformatter=getTimeTickFormatter(),
+    yformatter=getProcessTickFormatter(),
+    yticks=16,
+    show_grid=True,
+    gridstyle=dict(ygrid_line_color=None),
+    hooks=[plot_hook],
+    invert_yaxis=True,
+    ylim=(-0.5, 15.5),
+)
 
 
 def plot_timeline(trace):
-    added = False
     trace._pair_enter_leave()
     trace._gen_calling_relationships()
     trace.calc_inc_time()
 
-    # Default opts
-    ropts = dict(
-        responsive=True,
-        height=min(700, max(150, len(trace.events["Process"].unique()) * 40)),
-        default_tools=["xpan", "xwheel_zoom"],
-        active_tools=["xpan", "xwheel_zoom"],
-        xaxis="top",
-        labelled=[],
-        xformatter=getTimeTickFormatter(),
-        yformatter=getProcessTickFormatter(),
-        yticks=len(trace.events["Process"].unique()),
-        show_grid=True,
-        gridstyle=dict(ygrid_line_color=None),
-        invert_yaxis=True,
-        hooks=[hook],
-        title="Timeline",
-        ylim=(-0.5, len(trace.events["Process"].unique()) - 0.5),
-    )
-
-    # Functions -> hv.Rectangles
-    func = trace.events[trace.events["Event Type"] == "Enter"].copy(deep=False)
-    func["y0"] = func["Process"].astype("float") + 0.1
-    func["y1"] = func["Process"].astype("float") + 0.5
-    func["Name"] = func["Name"].astype("category")
+    func = trace.events[trace.events["Event Type"] == "Enter"]
 
     colors = pp.config["vis"]["colors"]
     color_key = {
@@ -63,68 +62,94 @@ def plot_timeline(trace):
         )
         for i, cat in enumerate(func["Name"].unique())
     }
+    color_key_ds = {
+        key: tuple(int(x * 0.85) for x in value) for key, value in color_key.items()
+    }
+
+    rects_df = pd.DataFrame()
+    rects_df["x0"] = func["Timestamp (ns)"]
+    rects_df["y0"] = func["Process"].astype("float") - 0.4
+    rects_df["x1"] = func["Matching Timestamp"]
+    rects_df["y1"] = func["Process"].astype("float") + 0.4
+    rects_df["name"] = func["Name"].astype("category")
 
     rects_opts = opts.Rectangles(
-        fill_color=None,
-        line_width=0,
+        fill_color="name",
+        line_width=0.2,
+        line_color="black",
+        cmap=color_key,
         show_legend=False,
     )
 
-    rects = (
-        hv.Rectangles(
-            func, kdims=["Timestamp (ns)", "y0", "Matching Timestamp", "y1"], vdims=["Name"]
-        )
-        .opts(rects_opts)
-        .opts(**ropts)
-    )
-
-    # Instant events -> hv.Points
-    inst = trace.events[trace.events["Event Type"] == "Instant"].copy(deep=False)
-    inst["Type"] = np.where(inst["Name"].str.startswith("Mpi"), "MPI", "other")
-    inst["y"] = inst["Process"].astype("float") - 0.15 # + np.random.uniform(low=0, high=0.3, size=(inst.shape[0],))
-
-    greens = bp.Greens[256][::-1][85:]
-
-    points_opts = opts.Points(
-        line_width=0,
-        marker='circle',
-        fill_color=None,
-        size=5,
-    )
-    
-    points = hv.Points(inst, kdims=["Timestamp (ns)", "y"], vdims=["Name"]).opts(points_opts).opts(**ropts)
-
-    d1 = decimate(rects, max_samples=1000).opts(**ropts).opts(tools=[HoverTool(tooltips={"Name": "@Name"})])
-    d2 = decimate(points, max_samples=1000).opts(**ropts).opts(tools=[HoverTool(tooltips={"Name": "@Name"})])
-
-    r1 = datashade(rects, color_key=color_key, min_alpha=0.1, aggregator=ds.by("Name", ds.any())).opts(**ropts)
-    r2 = spread(rasterize(points), px=2, shape='circle').opts(cmap=greens, clim=(0, 20), **ropts)
-
-    return d1 * d2 * r1 * r2
+    rects = hv.Rectangles(rects_df, vdims=["name"]).opts(rects_opts).opts(**ropts)
 
     def get_elements(x_range):
-        low, high = (0, rects["Matching Timestamp"].max()) if x_range is None else x_range
-
-        # Get functions
+        low, high = (0, rects["x1"].max()) if x_range is None else x_range
         min_time = (high - low) / 500
 
-        in_range = rects[~((rects["Matching Timestamp"] < low) | (rects["Timestamp (ns)"] > high))]
-        large = in_range[in_range["Matching Timestamp"] - in_range["Timestamp (ns)"] >= min_time]
-        small = in_range[in_range["Matching Timestamp"] - in_range["Timestamp (ns)"] < min_time]
+        in_range = rects[~((rects["x1"] < low) | (rects["x0"] > high))]
+        large = in_range[in_range["x1"] - in_range["x0"] >= min_time]
+        small = in_range[in_range["x1"] - in_range["x0"] < min_time]
 
         small_raster = datashade(
             small,
-            color_key=color_key,
+            color_key=color_key_ds,
             min_alpha=0.1,
-            aggregator=ds.by("Name", ds.any()),
+            aggregator=ds.by("name", ds.any()),
             dynamic=False,
-            width=800,
-            height=700,
-        ).opts(**ropts)
+        )
 
-        in_range_pts = points[(points["Timestamp (ns)"] > low) & (points["Timestamp (ns)"] < high)]
-
-
-        return large.opts(tools=["hover"]) * small_raster * in_range_pts
+        return large.opts(tools=["hover"]) * small_raster
 
     return hv.DynamicMap(get_elements, streams=[hv.streams.RangeX()]).opts(**ropts)
+
+
+def plot_timeline_2(trace):
+    global added
+    added = False
+    inst = trace.events[trace.events["Event Type"] == "Instant"].copy(deep=False)
+    inst["y"] = inst["Process"].astype("float") - 0.2
+
+    func = trace.events[trace.events["Event Type"] == "Enter"].copy(deep=False)
+    func["ys0"] = func["Process"].astype("float") + 0.2
+    func["ys1"] = func["Process"].astype("float") + 0.2
+    func["yr0"] = func["Process"].astype("float") + 0
+    func["yr1"] = func["Process"].astype("float") + 0.4
+    func["Name"] = func["Name"].astype("category")
+
+    points = hv.Points(inst, kdims=["Timestamp (ns)", "y"], vdims=["Name"])
+    segments = hv.Segments(
+        func,
+        kdims=["Timestamp (ns)", "ys0", "Matching Timestamp", "ys1"],
+        vdims=["Name"],
+    )
+    rects = hv.Rectangles(
+        func,
+        kdims=["Timestamp (ns)", "yr0", "Matching Timestamp", "yr1"],
+        vdims=["Name"],
+    ).opts(alpha=0, line_alpha=0)
+
+    r1 = spread(
+        datashade(
+            segments,
+            min_alpha=255,
+            width=300,
+            height=300,
+            aggregator=ds.count_cat("Name"),
+        ),
+        shape="square",
+        px=10,
+    ).opts(**ropts)
+    r2 = spread(
+        datashade(
+            points,
+            min_alpha=255,
+            width=300,
+            height=300,
+            aggregator=ds.count_cat("Name"),
+        ),
+        px=2,
+    ).opts(**ropts)
+    r3 = decimate(rects).opts(tools=["hover"])
+
+    return (r1 * r2 * r3).opts(**ropts)
