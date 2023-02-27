@@ -3,8 +3,10 @@ import holoviews as hv
 import pandas as pd
 from holoviews import opts
 from holoviews.operation.datashader import datashade
+from holoviews.operation import decimate
 from ._util import getProcessTickFormatter, getTimeTickFormatter
 import pipit as pp
+import numpy as np
 
 hv.extension("bokeh")
 
@@ -18,7 +20,30 @@ def plot_timeline(trace):
     trace._gen_calling_relationships()
     trace.calc_inc_time()
 
-    func = trace.events[trace.events["Event Type"] == "Enter"]
+    # Default opts
+    ropts = dict(
+        responsive=True,
+        height=min(700, max(160, len(trace.events["Process"].unique()) * 40)),
+        default_tools=["xpan", "xwheel_zoom"],
+        active_tools=["xpan", "xwheel_zoom"],
+        xaxis="top",
+        labelled=[],
+        xformatter=getTimeTickFormatter(),
+        yformatter=getProcessTickFormatter(),
+        yticks=len(trace.events["Process"].unique()),
+        show_grid=True,
+        gridstyle=dict(ygrid_line_color=None),
+        invert_yaxis=True,
+        hooks=[hook],
+        title="Timeline",
+        ylim=(-0.5, len(trace.events["Process"].unique()) - 0.5),
+    )
+
+    # Functions -> hv.Rectangles
+    func = trace.events[trace.events["Event Type"] == "Enter"].copy(deep=False)
+    func["y0"] = func["Process"].astype("float") - 0.5
+    func["y1"] = func["Process"].astype("float") + 0.5
+    func["Name"] = func["Name"].astype("category")
 
     colors = pp.config["vis"]["colors"]
     color_key = {
@@ -27,49 +52,30 @@ def plot_timeline(trace):
         )
         for i, cat in enumerate(func["Name"].unique())
     }
-    color_key_ds = {
-        key: tuple(int(x * 0.9) for x in value) for key, value in color_key.items()
-    }
-
-    rects_df = pd.DataFrame()
-    rects_df["x0"] = func["Timestamp (ns)"]
-    rects_df["y0"] = func["Process"].astype("float") - 0.5
-    rects_df["x1"] = func["Matching Timestamp"]
-    rects_df["y1"] = func["Process"].astype("float") + 0.5
-    rects_df["name"] = func["Name"].astype("category")
-
-    scatter_df = pd.DataFrame()
-    scatter_df["x"] = func["Timestamp (ns)"]
-    scatter_df["y"] = func["Process"].astype("float")
-    scatter_df["name"] = func["Name"].astype("category")
 
     rects_opts = opts.Rectangles(
-        fill_color="name",
+        fill_color="Name",
         line_width=0.2,
         line_color="black",
         cmap=color_key,
         show_legend=False,
     )
 
-    copts = dict(
-        responsive=True,
-        height=min(700, max(160, len(func["Process"].unique()) * 40)),
-        default_tools=["xpan", "xwheel_zoom"],
-        active_tools=["xpan", "xwheel_zoom"],
-        xaxis="top",
-        labelled=[],
-        xformatter=getTimeTickFormatter(),
-        yformatter=getProcessTickFormatter(),
-        yticks=len(func["Process"].unique()),
-        show_grid=True,
-        gridstyle=dict(ygrid_line_color=None),
-        invert_yaxis=True,
-        hooks=[hook],
-        title="Timeline",
+    rects = (
+        hv.Rectangles(
+            func, kdims=["Timestamp (ns)", "y0", "Matching Timestamp", "y1"], vdims=["Name"]
+        )
+        .opts(rects_opts)
+        .opts(**ropts)
     )
 
-    rects = hv.Rectangles(rects_df, vdims=["name"]).opts(rects_opts).opts(**copts)
-    # scatter = hv.Points(scatter_df, vdims=["name"]).opts(jitter=0.5, **copts)
+    # Instant events -> hv.Points
+    inst = trace.events[trace.events["Event Type"] == "Instant"].copy(deep=False)
+    inst["Type"] = np.where(inst["Name"].str.startswith("Mpi"), "MPI", "other")
+    inst["Process"] = inst["Process"].astype("float")
+
+    points = hv.Points(inst, kdims=["Timestamp (ns)", "Process"], vdims=["Name"]).opts(**ropts)
+    return rects * points
 
     def get_elements(x_range):
         low, high = (0, rects["x1"].max()) if x_range is None else x_range
@@ -87,8 +93,8 @@ def plot_timeline(trace):
             dynamic=False,
             width=800,
             height=700,
-        ).opts(**copts)
+        ).opts(**ropts)
 
         return large.opts(tools=["hover"]) * small_raster
 
-    return hv.DynamicMap(get_elements, streams=[hv.streams.RangeX()]).opts(**copts)
+    return hv.DynamicMap(get_elements, streams=[hv.streams.RangeX()]).opts(**ropts)
