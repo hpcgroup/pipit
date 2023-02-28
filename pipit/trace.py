@@ -127,30 +127,28 @@ class Trace:
             ]
 
         return communication_matrix
-        
-    def time_per_func_occurrence(self, metric="Exc Time", groupby_column="Name"):
+
+    def metric_per_func_occurrence(self, metric="Exc Time", groupby_column="Name"):
         """
         Arguments:
         metric - a string that can be either "Exc Time" or "Inc Time"
-        groupby_column - a string containing the column to be grouped by
+        groupby_column - a string or list of strings containing the column(s)
+                         to be grouped by
 
         Returns:
-        A dictionary where the keys are the names of all the events in the trace
-        and the values are lists containing the times that every individual function
-        occurrence of that event took. Depending on the metric parameter, the times
-        will either be inclusive or exclusive.
-
-        The dictionary's values can be used to create a scatterplot of the times of
-        all of a function's occurrences, calculate imbalance, etc.
+        A dictionary where the keys are the set of groupby column values
+        (ex: function names) and the values are lists containing the metrics
+        for every individual function occurrence corresponding to the key
+        (ex: exclusive times).
         """
 
         if metric == "Exc Time" and "Exc Time" not in self.events.columns:
-            self.calc_exc_time()  # once inc/exc pr is merged
+            self.calc_exc_time()
         elif metric == "Inc Time" and "Inc Time" not in self.events.columns:
-            self.calc_inc_time()  # once inc/exc pr is merged
+            self.calc_inc_time()
 
         return (
-            self.events.loc[self.events["Event Type"] == "Entry"]
+            self.events.loc[self.events["Event Type"] == "Enter"]
             .groupby(groupby_column, observed=True)[metric]
             .apply(list)
             .to_dict()
@@ -165,21 +163,15 @@ class Trace:
         Returns:
         A Pandas DataFrame that will have the aggregated metrics
         for the grouped by columns.
-
-        Note:
-        Filtering by process id, event names, etc has not been added.
-        Perhaps a query language similar to Hatchet can be utilized.
-        There should also be some error handling.
-        These are areas to touch up on throughout the repo.
         """
 
         if "Inc Time" in metric and "Inc Time" not in self.events.columns:
-            self.calc_inc_time()  # once inc/exc pr is merged
+            self.calc_inc_time()
         if "Exc Time" in metric and "Exc Time" not in self.events.columns:
-            self.calc_exc_time()  # once inc/exc pr is merged
+            self.calc_exc_time()
 
         return (
-            self.events.loc[self.events["Event Type"] == "Entry"]
+            self.events.loc[self.events["Event Type"] == "Enter"]
             .groupby(groupby_column, observed=True)[metric]
             .sum()
         )
