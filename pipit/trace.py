@@ -155,7 +155,7 @@ class Trace:
             ]
 
             # Iterating over process & threads to
-            # read callstack sequentially
+            # read call stack sequentially
             for process in set(enter_leave_df["Process"]):
                 curr_process_df = enter_leave_df.loc[
                     enter_leave_df["Process"] == process
@@ -215,20 +215,6 @@ class Trace:
                                 ) if curr_depth == 0 else parent_node.add_child(
                                     curr_node
                                 )
-
-                            """
-                            add the Enter DataFrame index as a calling context id
-                            """
-                            curr_node.add_calling_context_id(curr_df_index)
-
-                            """
-                            maps the Enter DataFrame index to the node
-
-                            note:
-                            this seems redundant because the node will already
-                            exist in the row's Graph_Node column
-                            """
-                            graph.add_to_map(curr_df_index, curr_node)
 
                             # Update nodes stack, column, and current depth
                             nodes_stack.append(curr_node)
