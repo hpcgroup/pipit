@@ -51,7 +51,7 @@ ropts = dict(
 def plot_timeline(trace):
     trace._pair_enter_leave()
     trace._gen_calling_relationships()
-    trace.calc_inc_time()
+    # trace.calc_inc_time()
 
     func = trace.events[trace.events["Event Type"] == "Enter"]
 
@@ -99,12 +99,14 @@ def plot_timeline(trace):
             dynamic=False,
         )
 
-        return large.opts(tools=["hover"]) * small_raster
+        return large.opts(tools=["hover"]) * small_raster.opts(**ropts)
 
     return hv.DynamicMap(get_elements, streams=[hv.streams.RangeX()]).opts(**ropts)
 
 
 def plot_timeline_2(trace):
+    trace._pair_enter_leave()
+
     global added
     added = False
     inst = trace.events[trace.events["Event Type"] == "Instant"].copy(deep=False)
@@ -117,39 +119,46 @@ def plot_timeline_2(trace):
     func["yr1"] = func["Process"].astype("float") + 0.4
     func["Name"] = func["Name"].astype("category")
 
-    points = hv.Points(inst, kdims=["Timestamp (ns)", "y"], vdims=["Name"])
-    segments = hv.Segments(
-        func,
-        kdims=["Timestamp (ns)", "ys0", "Matching Timestamp", "ys1"],
-        vdims=["Name"],
+    # print(inst)
+
+    sends = inst[inst["Name"].isin(["MpiSend"])]
+    recvs = inst[inst["Name"].isin(["MpiRecv"])]
+    comm = pd.DataFrame()
+    comm["x0"] = pd.Series(sends["Timestamp (ns)"].values)
+    comm["y0"] = pd.Series(sends["Process"].astype("float").values)
+    comm["x1"] = pd.Series(recvs["Timestamp (ns)"].values)
+    comm["y1"] = pd.Series(recvs["Process"].astype("float").values)
+
+    segments = hv.Segments(comm).opts(
+        line_width=1, line_color=None, hover_line_color="black"
+    )
+
+    points = hv.Points(inst, kdims=["Timestamp (ns)", "y"], vdims=["Name"]).opts(
+        line_color="black", line_alpha=0, hover_line_alpha=1, alpha=0, size=6
     )
     rects = hv.Rectangles(
         func,
         kdims=["Timestamp (ns)", "yr0", "Matching Timestamp", "yr1"],
         vdims=["Name"],
-    ).opts(alpha=0, line_alpha=0)
+    ).opts(alpha=0, line_alpha=0, hover_line_alpha=1, line_color="black")
 
-    r1 = spread(
-        datashade(
-            segments,
-            min_alpha=255,
-            width=300,
-            height=300,
-            aggregator=ds.count_cat("Name"),
-        ),
-        shape="square",
-        px=10,
+    r1 = datashade(
+        rects,
+        min_alpha=255,
+        aggregator=ds.count_cat("Name"),
     ).opts(**ropts)
     r2 = spread(
         datashade(
             points,
             min_alpha=255,
-            width=300,
-            height=300,
             aggregator=ds.count_cat("Name"),
         ),
         px=2,
     ).opts(**ropts)
-    r3 = decimate(rects).opts(tools=["hover"])
+    r3 = decimate(rects).opts(tools=["hover"]).opts(**ropts)
+    r4 = decimate(points).opts(tools=["hover"]).opts(**ropts)
+    # r5 = decimate(segments).opts(**ropts)
 
-    return (r1 * r2 * r3).opts(**ropts)
+    r6 = datashade(segments, alpha=30, cmap="viridis").opts(**ropts)
+
+    return (r6 * r1 * r2 * r3 * r4).opts(**ropts)
