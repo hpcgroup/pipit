@@ -307,9 +307,19 @@ class HPCToolkitReader:
                 close_node = close_node.parent
 
         trace_df = pd.DataFrame(data)
+        # Need to sort df by timestamp then index
+        # (since many events occur at the same timestamp)
 
+        # rename the index axis, so we can sort with it
+        trace_df.rename_axis("index", inplace=True)
+
+        # sort by timestamp then index
         trace_df.sort_values(
-            by="Timestamp (ns)", axis=0, ascending=True, inplace=True, ignore_index=True
+            by=["Timestamp (ns)", "index"],
+            axis=0,
+            ascending=True,
+            inplace=True,
+            ignore_index=True,
         )
 
         trace_df = trace_df.astype(
