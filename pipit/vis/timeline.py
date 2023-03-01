@@ -8,6 +8,7 @@ from ._util import getProcessTickFormatter, getTimeTickFormatter
 from bokeh.models import Grid, FixedTicker
 import numpy as np
 import pipit as pp
+from fast_histogram.histogram import histogram2d
 
 hv.extension("bokeh")
 
@@ -51,7 +52,7 @@ ropts = dict(
 def plot_timeline(trace):
     trace._pair_enter_leave()
     trace._gen_calling_relationships()
-    # trace.calc_inc_time()
+    trace.calc_inc_time()
 
     func = trace.events[trace.events["Event Type"] == "Enter"]
 
@@ -97,9 +98,9 @@ def plot_timeline(trace):
             min_alpha=0.1,
             aggregator=ds.by("name", ds.any()),
             dynamic=False,
-        )
+        ).opts(**ropts)
 
-        return large.opts(tools=["hover"]) * small_raster.opts(**ropts)
+        return large.opts(tools=["hover"]) * small_raster
 
     return hv.DynamicMap(get_elements, streams=[hv.streams.RangeX()]).opts(**ropts)
 
@@ -119,46 +120,96 @@ def plot_timeline_2(trace):
     func["yr1"] = func["Process"].astype("float") + 0.4
     func["Name"] = func["Name"].astype("category")
 
-    # print(inst)
-
-    sends = inst[inst["Name"].isin(["MpiSend"])]
-    recvs = inst[inst["Name"].isin(["MpiRecv"])]
-    comm = pd.DataFrame()
-    comm["x0"] = pd.Series(sends["Timestamp (ns)"].values)
-    comm["y0"] = pd.Series(sends["Process"].astype("float").values)
-    comm["x1"] = pd.Series(recvs["Timestamp (ns)"].values)
-    comm["y1"] = pd.Series(recvs["Process"].astype("float").values)
-
-    segments = hv.Segments(comm).opts(
-        line_width=1, line_color=None, hover_line_color="black"
-    )
-
-    points = hv.Points(inst, kdims=["Timestamp (ns)", "y"], vdims=["Name"]).opts(
-        line_color="black", line_alpha=0, hover_line_alpha=1, alpha=0, size=6
+    points = hv.Points(inst, kdims=["Timestamp (ns)", "y"], vdims=["Name"])
+    segments = hv.Segments(
+        func,
+        kdims=["Timestamp (ns)", "ys0", "Matching Timestamp", "ys1"],
+        vdims=["Name"],
     )
     rects = hv.Rectangles(
         func,
         kdims=["Timestamp (ns)", "yr0", "Matching Timestamp", "yr1"],
         vdims=["Name"],
-    ).opts(alpha=0, line_alpha=0, hover_line_alpha=1, line_color="black")
+    ).opts(alpha=0, line_alpha=0)
 
-    r1 = datashade(
-        rects,
-        min_alpha=255,
-        aggregator=ds.count_cat("Name"),
-    ).opts(**ropts)
-    r2 = spread(
-        datashade(
-            points,
+    num_ranks = int(trace.events["Process"].astype("float").max() + 1)
+
+    hline = hv.Overlay(
+        [
+            hv.HLine(y=n + 0.5).opts(line_color="lightgray", line_width=0.7)
+            for n in range(num_ranks)
+        ]
+    )
+
+    def callback(x_range, scale, width, height):
+        x_range = (
+            (0, trace.events["Timestamp (ns)"].max()) if x_range is None else x_range
+        )
+        width = 800 if width is None else width
+        height = 300 if height is None else height
+
+        # Datashade segments
+        img = datashade(
+            segments,
             min_alpha=255,
+            dynamic=False,
+            width=width,
+            height=num_ranks,
+            x_range=x_range,
+            y_range=(-0.5, num_ranks - 0.5),
             aggregator=ds.count_cat("Name"),
-        ),
-        px=2,
-    ).opts(**ropts)
-    r3 = decimate(rects).opts(tools=["hover"]).opts(**ropts)
-    r4 = decimate(points).opts(tools=["hover"]).opts(**ropts)
-    # r5 = decimate(segments).opts(**ropts)
+        ).opts(**ropts)
 
-    r6 = datashade(segments, alpha=30, cmap="viridis").opts(**ropts)
+        # Compute 2d hist for point
+        N = 30
+        d = histogram2d(
+            inst["Timestamp (ns)"],
+            inst["Process"],
+            range=(x_range, (0, num_ranks)),
+            bins=(N, num_ranks),
+        )
+        clusters = (
+            pd.DataFrame(d)
+            .stack()
+            .reset_index()
+            .rename(columns={"level_0": "x", "level_1": "y", 0: "count"})
+        )
+        clusters = clusters[clusters["count"] > 10]
+        clusters["x"] = clusters["x"] / N * (x_range[1] - x_range[0]) + x_range[0]
 
-    return (r6 * r1 * r2 * r3 * r4).opts(**ropts)
+        return img * hv.Points(clusters, kdims=["x", "y"], vdims=["count"]).opts(
+            **ropts
+        ).opts(
+            alpha=0.4,
+            line_width=2,
+            line_color="white",
+            color="white",
+            size=(hv.dim("count") / clusters["count"].max()) * 20 + 3,
+            # size=min(hv.dim("count"))
+        )
+
+    return hv.DynamicMap(
+        callback, streams=[hv.streams.RangeX(), hv.streams.PlotSize()]
+    ).opts(**ropts) * hline.opts(**ropts)
+
+    # r1 = spread(
+    #     datashade(
+    #         segments,
+    #         min_alpha=255,
+    #         aggregator=ds.count_cat("Name"),
+    #     ),
+    #     shape="square",
+    #     px=10,
+    # ).opts(**ropts)
+    # r2 = spread(
+    #     datashade(
+    #         points,
+    #         min_alpha=255,
+    #         aggregator=ds.count_cat("Name"),
+    #     ),
+    #     px=2,
+    # ).opts(**ropts)
+    # r3 = decimate(rects).opts(tools=["hover"])
+    # r4 = decimate(points).opts(tools=["hover"])
+
+    # return (r1 * r2 * r3 * r4).opts(**ropts)
