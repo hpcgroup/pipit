@@ -7,6 +7,7 @@ import numpy as np
 import pipit as pp
 
 hv.extension("bokeh")
+hv.renderer("bokeh").webgl = True
 
 added = False
 
@@ -54,12 +55,15 @@ def plot_timeline(trace):
     inst["y"] = inst["Process"].astype("float")
 
     func = trace.events[trace.events["Event Type"] == "Enter"].copy(deep=False)
-    func["ys0"] = func["Process"].astype("float") + 0.2
-    func["ys1"] = func["Process"].astype("float") + 0.2
+    func["ys0"] = func["Process"].astype("float")
+    func["ys1"] = func["Process"].astype("float")
     func["yr0"] = func["Process"].astype("float") - 0.5
     func["yr1"] = func["Process"].astype("float") + 0.5
     func["Name"] = func["Name"].astype("category")
     func["y"] = func["Process"].astype("float")
+    func["Inc Time"] = func["Matching Timestamp"] - func["Timestamp (ns)"]
+
+    func = func.sort_values(by=["Inc Time"], ascending=False)
 
     colors = pp.config["vis"]["colors"]
     color_key = {
@@ -71,15 +75,6 @@ def plot_timeline(trace):
     color_key_ds = {
         key: tuple(int(x * 0.85) for x in value) for key, value in color_key.items()
     }
-
-    # points = hv.Points(inst, kdims=["Timestamp (ns)", "y"], vdims=["Name"]).opts(
-    #     color="black", alpha=0.5, marker="diamond", size=4
-    # )
-    rects = hv.Rectangles(
-        func,
-        kdims=["Timestamp (ns)", "yr0", "Matching Timestamp", "yr1"],
-        vdims=["Name", "y"],
-    ).opts(line_width=0.2, line_color="black", fill_color="Name", cmap=color_key)
 
     num_ranks = int(trace.events["Process"].astype("float").max() + 1)
 
@@ -99,31 +94,44 @@ def plot_timeline(trace):
             if None in (scale, width, height)
             else (scale, width, height)
         )
-        min_time = (high - low) / 500
+        buffer = (high - low) * 0.25
 
-        in_range = rects[
-            ~((rects["Matching Timestamp"] < low) | (rects["Timestamp (ns)"] > high))
+        # Draw the 5000 largest functions, rasterize the rest!
+        in_range = func[
+            ~(
+                (func["Matching Timestamp"] < low - buffer)
+                | (func["Timestamp (ns)"] > high + buffer)
+            )
         ]
-        large = in_range[
-            in_range["Matching Timestamp"] - in_range["Timestamp (ns)"] >= min_time
-        ]
-        small = in_range[
-            in_range["Matching Timestamp"] - in_range["Timestamp (ns)"] < min_time
-        ]
+        large = in_range.head(5000)
 
-        raster = datashade(
-            hv.Points(small, kdims=["Timestamp (ns)", "y"], vdims=["Name"]),
-            dynamic=False,
-            min_alpha=255,
-            width=int(width),
-            height=num_ranks,
-            x_range=x_range,
-            y_range=(-0.5, num_ranks - 0.5),
-            aggregator=ds.count_cat("Name"),
-            color_key=color_key_ds,
+        comp = hv.Overlay()
+        comp *= (
+            hv.Rectangles(
+                large,
+                kdims=["Timestamp (ns)", "yr0", "Matching Timestamp", "yr1"],
+                vdims=["Name", "y", "Inc Time"],
+            )
+            .opts(line_width=0.1, line_color="black", fill_color="Name", cmap=color_key)
+            .opts(**ropts)
         )
 
-        return large.opts(**ropts) * raster.opts(**ropts)
+        if len(in_range) > 1000:
+            small = in_range.tail(len(in_range) - 1000)
+            raster = datashade(
+                hv.Points(small, kdims=["Timestamp (ns)", "y"], vdims=["Name"]),
+                dynamic=False,
+                min_alpha=200,
+                width=int(width),
+                height=num_ranks,
+                x_range=x_range,
+                y_range=(-0.5, num_ranks - 0.5),
+                aggregator=ds.count_cat("Name"),
+                color_key=color_key_ds,
+            )
+            comp *= raster.opts(**ropts)
+
+        return comp.opts(**ropts)
 
     return (
         hv.DynamicMap(
