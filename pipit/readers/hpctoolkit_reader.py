@@ -9,6 +9,8 @@ import pandas as pd
 import pipit.trace
 from pipit.graph import Graph, Node
 
+
+
 class MetaReader:
 
 
@@ -19,9 +21,30 @@ class MetaReader:
         self.meta_file = open(file_location, "rb")
         
         # setting necessary read options
-        self.byte_order = "big"
+        self.byte_order = "little"
         self.signed = False
         self.encoding = "ASCII"
+
+        # The meta.db header consists of the common .db header and n sections.
+        # Here I'm mapping the section name to it's order in the meta.db header
+
+        self.header_map = {"General Properties": 0, "Identifier Names": 1, "Performance Metrics": 2, \
+                           "Context Tree": 3, "Common String Table": 4, "Load Modules": 5, \
+                            "Source Files": 6, "Functions": 7}
+        
+        # We want to keep this order when reading sections:
+        # "Common String Table" -> "Source Files" -> "Functions" -> "Context Tree", and 
+        # "Common String Table -> "Load Modules" -> "Context Tree"
+        # Here I'm specifying the order of reading the file
+        self.read_order = ["General Properties", "Common String Table", "Source Files", \
+                           "Functions", "Load Modules", "Context Tree", "Identifier Names", "Performance Metrics"] 
+        
+        # Let's make sure that we include every section in the read order
+        assert set(self.read_order) == set(self.header_map)
+
+        # Now let's create a function to section map
+        self.reader_map = {self.__read_context_tree_section: }
+
 
 
         # reading the meta.db header (and rest of the file)
@@ -44,14 +67,14 @@ class MetaReader:
         assert(identifier == "HPCTOOLKIT")
 
         # next 4 bytes (u8) are the "Specific format identifier"
-        format_identifier = int.from_bytes(self.meta_file.read(4,  byteorder=self.byte_order, signed=self.signed))
+        format_identifier = int.from_bytes(self.meta_file.read(4), byteorder=self.byte_order, signed=self.signed)
 
         # next byte (u8) contains the "Common major version, currently 4"
-        self.major_version = int.from_bytes(self.meta_file.read(1,  byteorder=self.byte_order, signed=self.signed)) 
+        self.major_version = int.from_bytes(self.meta_file.read(1), byteorder=self.byte_order, signed=self.signed) 
         # next byte (u8) contains the "Specific minor version"
-        self.minor_version = int.from_bytes(self.meta_file.read(1,  byteorder=self.byte_order, signed=self.signed)) 
+        self.minor_version = int.from_bytes(self.meta_file.read(1), byteorder=self.byte_order, signed=self.signed) 
 
-    def __read_meta_file(self) -> None:
+    def __read_meta_header(self) -> None:
         """ 
         Reads meta.db file with version 4.0
 
@@ -66,18 +89,28 @@ class MetaReader:
         # going to that section just in case
         if self.meta_file.tell() != 0x10:
             self.meta_file.seek(0x10)
+
+        self.section_pointer = []
+        self.section_size = []
+        # In the header each section is given 16 bytes:
+        #   - First 8 bytes specify the total size of the section (in bytes)
+        #   - Last 8 bytes specify a pointer to the beggining of the section
+        for i in range(len(self.header_map)):
+            self.section_size.append(int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed))
+            self.section_pointer.append(int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed))
+
         
         # Reading "General Properties" section
         # Documentation: https://gitlab.com/hpctoolkit/hpctoolkit/-/blob/develop/doc/FORMATS.md#metadb-general-properties-section
         # First 8 bytes of General Properties is a pointer to the title
-        self.title_pointer = int.from_bytes(self.meta_file.read(8,  byteorder=self.byte_order, signed=self.signed))
+        self.title_pointer = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
         # Last 8 bytes of General Properties is a pointer to the description
-        self.description_pointer = int.from_bytes(self.meta_file.read(8,  byteorder=self.byte_order, signed=self.signed))
+        self.description_pointer = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
 
         # Reading "Identifier Names" section
         # Documentation: https://gitlab.com/hpctoolkit/hpctoolkit/-/blob/develop/doc/FORMATS.md#metadb-hierarchical-identifier-names-section
-        self.identifier_names_array_pointer = int.from_bytes(self.meta_file.read(8,  byteorder=self.byte_order, signed=self.signed))
-        self.num_identifier_names = int.from_bytes(self.meta_file.read(1,  byteorder=self.byte_order, signed=self.signed))
+        self.identifier_names_array_pointer = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
+        self.num_identifier_names = int.from_bytes(self.meta_file.read(1), byteorder=self.byte_order, signed=self.signed)
         # space is left in the file for more information in the future, 
         # so we need to go to the right position for the next read.
         if self.meta_file.tell() != 0x30:
@@ -103,6 +136,40 @@ class MetaReader:
         # Reading "Source Files" section
         self.__read_source_files_section()
 
+        # Reading "Functions" section
+        self.__read_functions_section()
+
+    def __read_functions_section(self) -> None:
+        if self.meta_file.tell() != 0x80:
+            self.meta_file.seek(0x80)
+        
+        section_size = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
+        section_pointer = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
+        print("Functions section size: ", section_size)
+        print("Functions section_pointer size: ", section_pointer)
+        self.meta_file.seek(section_pointer)
+
+        functions_array_pointer = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
+        num_functions = int.from_bytes(self.meta_file.read(4), byteorder=self.byte_order, signed=self.signed)
+        size_functions = int.from_bytes(self.meta_file.read(2), byteorder=self.byte_order, signed=self.signed)
+        for i in range(100):
+            current_index = functions_array_pointer + (i * size_functions)
+            self.meta_file.seek(current_index)
+            function_name_pointer = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
+            modules_pointer = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
+            modules_offset = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
+            file_pointer = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
+            source_line = int.from_bytes(self.meta_file.read(4), byteorder=self.byte_order, signed=self.signed)
+            flags = int.from_bytes(self.meta_file.read(4), byteorder=self.byte_order, signed=self.signed)
+            if file_pointer != 0:
+                print("function has file pointer:", file_pointer)
+                print("function has name pointer:", function_name_pointer)
+                self.meta_file.seek(function_name_pointer)
+                print("function name:" + str(self.meta_file.read(10), encoding='UTF-8'))
+            # return
+        
+
+
     def __read_source_files_section(self) -> None:
         """
         Reads the "Source Files" Section of meta.db.
@@ -115,13 +182,29 @@ class MetaReader:
         # make sure we're in the right spot of the file
         if self.meta_file.tell() != 0x70:
             self.meta_file.seek(0x70)
+        
+        section_size = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
+        section_pointer = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
+        print("section size: ", section_size)
+        print("section_pointer size: ", section_pointer)
+        self.meta_file.seek(section_pointer)
+        
+        print("Reading Source Files section. At index: ", self.meta_file.tell() )
 
         # Source files used in this database 
-        files_pointer = int.from_bytes(self.meta_file.read(8,  byteorder=self.byte_order, signed=self.signed))
+        files_pointer = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
+        print("At index: " + str(self.meta_file.tell()) )
+
         # Number of source files listed in this section (u32)
-        num_files = int.from_bytes(self.meta_file.read(4,  byteorder=self.byte_order, signed=self.signed))
+        num_files = int.from_bytes(self.meta_file.read(4), byteorder=self.byte_order, signed=self.signed)
+        print("At index: " + str(self.meta_file.tell()) )
         # Size of a Source File Specification, currently 16 (u16)
-        file_size = int.from_bytes(self.meta_file.read(4,  byteorder=self.byte_order, signed=self.signed))
+        file_size = int.from_bytes(self.meta_file.read(2), byteorder=self.byte_order, signed=self.signed)
+        print("At index: " + str(self.meta_file.tell()) )
+        
+        print("files pointer: " + str(files_pointer))
+        print("There are " + str(num_files) + " files, each of size " + str(file_size))
+        return
 
         # Looping through individual files to get there information now
         for i in range(num_files):
@@ -129,11 +212,11 @@ class MetaReader:
             current_index = files_pointer + (i * file_size)
             self.meta_file.seek(current_index)
 
-            flag = int.from_bytes(self.meta_file.read(8,  byteorder=self.byte_order, signed=self.signed))
+            flag = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
             # Path to the source file. Absolute, or relative to the root database directory.
             # The string pointed to by pPath is completely within the Common String Table section,
             # including the terminating NUL byte.
-            file_path_pointer = int.from_bytes(self.meta_file.read(8,  byteorder=self.byte_order, signed=self.signed))
+            file_path_pointer = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
 
 
 
@@ -157,11 +240,11 @@ class MetaReader:
             self.meta_file.seek(0x40)
 
         # ({Entry}[nEntryPoints]*)
-        entry_points_array_pointer = int.from_bytes(self.meta_file.read(8,  byteorder=self.byte_order, signed=self.signed))
+        entry_points_array_pointer = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
         # (u16)
-        num_entry_points = int.from_bytes(self.meta_file.read(2,  byteorder=self.byte_order, signed=self.signed))
+        num_entry_points = int.from_bytes(self.meta_file.read(2), byteorder=self.byte_order, signed=self.signed)
         # (u8)
-        entry_point_size = int.from_bytes(self.meta_file.read(1,  byteorder=self.byte_order, signed=self.signed))
+        entry_point_size = int.from_bytes(self.meta_file.read(1), byteorder=self.byte_order, signed=self.signed)
                 
         for i in range (num_entry_points):
             current_pointer = entry_points_array_pointer + i * entry_point_size
@@ -183,17 +266,17 @@ class MetaReader:
 
         # Reading information about child contexts
         # Total size of *pChildren (I call pChildren children_pointer), in bytes (u64)
-        children_size = int.from_bytes(self.meta_file.read(8,  byteorder=self.byte_order, signed=self.signed))
+        children_size = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
         # Pointer to the array of child contexts
-        children_pointer = int.from_bytes(self.meta_file.read(8,  byteorder=self.byte_order, signed=self.signed))
+        children_pointer = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
 
         # Reading information about this context
         # Unique identifier for this context (u32)
-        context_id = int.from_bytes(self.meta_file.read(4,  byteorder=self.byte_order, signed=self.signed))
+        context_id = int.from_bytes(self.meta_file.read(4), byteorder=self.byte_order, signed=self.signed)
         # Type of entry point used here (u16)
-        entry_point_type = int.from_bytes(self.meta_file.read(2,  byteorder=self.byte_order, signed=self.signed))
+        entry_point_type = int.from_bytes(self.meta_file.read(2), byteorder=self.byte_order, signed=self.signed)
         # Human-readable name for the entry point
-        pretty_name_pointer = int.from_bytes(self.meta_file.read(8,  byteorder=self.byte_order, signed=self.signed))
+        pretty_name_pointer = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
 
         # Create Node for this context
         node: Node = Node(None, None, None)
@@ -218,30 +301,30 @@ class MetaReader:
         while(index < total_size):
             # Reading information about child contexts (as in the children of this context)
             # Total size of *pChildren (I call pChildren children_pointer), in bytes (u64)
-            children_size = int.from_bytes(self.meta_file.read(8,  byteorder=self.byte_order, signed=self.signed))
+            children_size = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
             index += 8
             # Pointer to the array of child contexts
-            children_pointer = int.from_bytes(self.meta_file.read(8,  byteorder=self.byte_order, signed=self.signed))
+            children_pointer = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
             index += 8
 
             # Reading information about this context
             # Unique identifier for this context (u32)
-            context_id = int.from_bytes(self.meta_file.read(4,  byteorder=self.byte_order, signed=self.signed))
+            context_id = int.from_bytes(self.meta_file.read(4), byteorder=self.byte_order, signed=self.signed)
             index += 4
             # Reading flags (u8)
-            flags = int.from_bytes(self.meta_file.read(1,  byteorder=self.byte_order, signed=self.signed))
+            flags = int.from_bytes(self.meta_file.read(1), byteorder=self.byte_order, signed=self.signed)
             index += 1
             # Relation this context has with its parent (u8)
-            relation = int.from_bytes(self.meta_file.read(1,  byteorder=self.byte_order, signed=self.signed))
+            relation = int.from_bytes(self.meta_file.read(1), byteorder=self.byte_order, signed=self.signed)
             index += 1
             # Type of lexical context represented (u8)
-            lexical_type = int.from_bytes(self.meta_file.read(1,  byteorder=self.byte_order, signed=self.signed))
+            lexical_type = int.from_bytes(self.meta_file.read(1), byteorder=self.byte_order, signed=self.signed)
             index += 1
             # Size of flex, in u8[8] "words" (bytes / 8) (u8)
-            num_flex_words = int.from_bytes(self.meta_file.read(1,  byteorder=self.byte_order, signed=self.signed))
+            num_flex_words = int.from_bytes(self.meta_file.read(1), byteorder=self.byte_order, signed=self.signed)
             index += 1
             # Bitmask for defining propagation scopes (u16) 
-            propogation = int.from_bytes(self.meta_file.read(2,  byteorder=self.byte_order, signed=self.signed))
+            propogation = int.from_bytes(self.meta_file.read(2), byteorder=self.byte_order, signed=self.signed)
             index += 2
             # Skipping reading flex
             self.meta_file.read(num_flex_words * 8)
@@ -594,3 +677,11 @@ class HPCToolkitReader:
 
         self.trace_df = trace_df
         return pipit.trace.Trace(None, trace_df)
+
+
+def main():
+    meta_loc = '/Users/movsesyanae/Programming/Research/pipit_data/hpctoolkit-lulesh2.0-database/meta.db'
+    x = MetaReader(meta_loc)
+
+if __name__ == "__main__":
+    main()
