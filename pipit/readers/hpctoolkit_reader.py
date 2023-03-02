@@ -9,8 +9,269 @@ import pandas as pd
 import pipit.trace
 from pipit.graph import Graph, Node
 
+class MetaReader:
 
-class ExperimentReader:
+
+
+    def __init__(self, file_location):
+
+        # open the file to ready in binary mode (rb) 
+        self.meta_file = open(file_location, "rb")
+        
+        # setting necessary read options
+        self.byte_order = "big"
+        self.signed = False
+        self.encoding = "ASCII"
+
+
+        # reading the meta.db header (and rest of the file)
+        self.__read_meta_file()
+
+
+
+
+
+    def __read_common_header(self) -> None:
+        """ 
+        Reads common .db file header version 4.0
+        
+        Documentation: https://gitlab.com/hpctoolkit/hpctoolkit/-/blob/develop/doc/FORMATS.md#common-file-structure
+        """
+
+        # read Magic identifier ("HPCPROF-tracedb_")
+        # first ten buyes are HPCTOOLKIT in ASCII 
+        identifier = str(self.meta_file.read(10), encoding=self.encoding)
+        assert(identifier == "HPCTOOLKIT")
+
+        # next 4 bytes (u8) are the "Specific format identifier"
+        format_identifier = int.from_bytes(self.meta_file.read(4,  byteorder=self.byte_order, signed=self.signed))
+
+        # next byte (u8) contains the "Common major version, currently 4"
+        self.major_version = int.from_bytes(self.meta_file.read(1,  byteorder=self.byte_order, signed=self.signed)) 
+        # next byte (u8) contains the "Specific minor version"
+        self.minor_version = int.from_bytes(self.meta_file.read(1,  byteorder=self.byte_order, signed=self.signed)) 
+
+    def __read_meta_file(self) -> None:
+        """ 
+        Reads meta.db file with version 4.0
+
+        Documentation: https://gitlab.com/hpctoolkit/hpctoolkit/-/blob/develop/doc/FORMATS.md#metadb-version-40
+        """
+
+        # reading the common .db file header
+        self.__read_common_header()
+
+        # Reading meta header
+        # this header starts at 0x10
+        # going to that section just in case
+        if self.meta_file.tell() != 0x10:
+            self.meta_file.seek(0x10)
+        
+        # Reading "General Properties" section
+        # Documentation: https://gitlab.com/hpctoolkit/hpctoolkit/-/blob/develop/doc/FORMATS.md#metadb-general-properties-section
+        # First 8 bytes of General Properties is a pointer to the title
+        self.title_pointer = int.from_bytes(self.meta_file.read(8,  byteorder=self.byte_order, signed=self.signed))
+        # Last 8 bytes of General Properties is a pointer to the description
+        self.description_pointer = int.from_bytes(self.meta_file.read(8,  byteorder=self.byte_order, signed=self.signed))
+
+        # Reading "Identifier Names" section
+        # Documentation: https://gitlab.com/hpctoolkit/hpctoolkit/-/blob/develop/doc/FORMATS.md#metadb-hierarchical-identifier-names-section
+        self.identifier_names_array_pointer = int.from_bytes(self.meta_file.read(8,  byteorder=self.byte_order, signed=self.signed))
+        self.num_identifier_names = int.from_bytes(self.meta_file.read(1,  byteorder=self.byte_order, signed=self.signed))
+        # space is left in the file for more information in the future, 
+        # so we need to go to the right position for the next read.
+        if self.meta_file.tell() != 0x30:
+            self.meta_file.seek(0x30)
+
+        # Reading "Performance Metrics" section
+        # Documentation: https://gitlab.com/hpctoolkit/hpctoolkit/-/blob/develop/doc/FORMATS.md#metadb-performance-metrics-section
+        # skipping this section for now -- will come back
+        self.meta_file.read(16)
+
+        # Reading "Context Tree" section
+        self.__read_context_tree_section()
+        
+
+        # Reading Common String Table
+        # Skipping this section since I can't see how it's stored in the documentation
+        self.meta_file.read(16)
+
+        # Reading "Load Modules" section
+        # Documentation: https://gitlab.com/hpctoolkit/hpctoolkit/-/blob/develop/doc/FORMATS.md#metadb-load-modules-section
+        # Skipping this section for now  -- not sure if it's necessary
+
+        # Reading "Source Files" section
+        self.__read_source_files_section()
+
+    def __read_source_files_section(self) -> None:
+        """
+        Reads the "Source Files" Section of meta.db.
+
+        Documentation: https://gitlab.com/hpctoolkit/hpctoolkit/-/blob/develop/doc/FORMATS.md#metadb-source-files-section
+        """
+
+        # Reading "Source Files" section header
+
+        # make sure we're in the right spot of the file
+        if self.meta_file.tell() != 0x70:
+            self.meta_file.seek(0x70)
+
+        # Source files used in this database 
+        files_pointer = int.from_bytes(self.meta_file.read(8,  byteorder=self.byte_order, signed=self.signed))
+        # Number of source files listed in this section (u32)
+        num_files = int.from_bytes(self.meta_file.read(4,  byteorder=self.byte_order, signed=self.signed))
+        # Size of a Source File Specification, currently 16 (u16)
+        file_size = int.from_bytes(self.meta_file.read(4,  byteorder=self.byte_order, signed=self.signed))
+
+        # Looping through individual files to get there information now
+        for i in range(num_files):
+            # Reading information about each individual source file
+            current_index = files_pointer + (i * file_size)
+            self.meta_file.seek(current_index)
+
+            flag = int.from_bytes(self.meta_file.read(8,  byteorder=self.byte_order, signed=self.signed))
+            # Path to the source file. Absolute, or relative to the root database directory.
+            # The string pointed to by pPath is completely within the Common String Table section,
+            # including the terminating NUL byte.
+            file_path_pointer = int.from_bytes(self.meta_file.read(8,  byteorder=self.byte_order, signed=self.signed))
+
+
+
+        
+
+    def __read_context_tree_section(self) -> None:
+        """
+        Reads the "Context Tree" section of meta.db.
+
+        Loops and calls __read_single_entry_point with the correct pointer to read the correct entry and add it to the CCT.
+
+        Documentation: https://gitlab.com/hpctoolkit/hpctoolkit/-/blob/develop/doc/FORMATS.md#metadb-context-tree-section
+        """
+
+        self.cct = Graph()
+
+        # Reading "Context Tree" section header
+
+        # make sure we're in the right spot of the file
+        if self.meta_file.tell() != 0x40:
+            self.meta_file.seek(0x40)
+
+        # ({Entry}[nEntryPoints]*)
+        entry_points_array_pointer = int.from_bytes(self.meta_file.read(8,  byteorder=self.byte_order, signed=self.signed))
+        # (u16)
+        num_entry_points = int.from_bytes(self.meta_file.read(2,  byteorder=self.byte_order, signed=self.signed))
+        # (u8)
+        entry_point_size = int.from_bytes(self.meta_file.read(1,  byteorder=self.byte_order, signed=self.signed))
+                
+        for i in range (num_entry_points):
+            current_pointer = entry_points_array_pointer + i * entry_point_size
+            self.__read_single_entry_point(current_pointer)
+
+        # reading the context tree has us go around the file, so we need to come back to the right spot
+        self.meta_file.seek(0x50)  
+
+    def __read_single_entry_point(self, entry_point_pointer: int) -> None:
+        """
+        Reads single (root) context entry.
+
+        Reads the correct entry and adds it to the CCT.
+
+        Documentation: https://gitlab.com/hpctoolkit/hpctoolkit/-/blob/develop/doc/FORMATS.md#metadb-context-tree-section
+        """
+
+        self.meta_file.seek(entry_point_pointer)
+
+        # Reading information about child contexts
+        # Total size of *pChildren (I call pChildren children_pointer), in bytes (u64)
+        children_size = int.from_bytes(self.meta_file.read(8,  byteorder=self.byte_order, signed=self.signed))
+        # Pointer to the array of child contexts
+        children_pointer = int.from_bytes(self.meta_file.read(8,  byteorder=self.byte_order, signed=self.signed))
+
+        # Reading information about this context
+        # Unique identifier for this context (u32)
+        context_id = int.from_bytes(self.meta_file.read(4,  byteorder=self.byte_order, signed=self.signed))
+        # Type of entry point used here (u16)
+        entry_point_type = int.from_bytes(self.meta_file.read(2,  byteorder=self.byte_order, signed=self.signed))
+        # Human-readable name for the entry point
+        pretty_name_pointer = int.from_bytes(self.meta_file.read(8,  byteorder=self.byte_order, signed=self.signed))
+
+        # Create Node for this context
+        node: Node = Node(None, None, None)
+        node.add_calling_context_id(context_id)
+        # Adding the Node to the CCT
+        self.cct.add_root(node)
+        self.cct.add_to_map(context_id, node)
+
+        # Reading the children contexts
+        self.__read_children_contexts(children_pointer, children_size, node)
+
+    def __read_children_contexts(self, context_array_pointer: int, total_size: int, parent_node: Node) -> None:
+        """
+        Recursive function to read all child contexts and add it to the CCT
+
+        Documentation: https://gitlab.com/hpctoolkit/hpctoolkit/-/blob/develop/doc/FORMATS.md#metadb-context-tree-section
+        """
+        if total_size <= 0 or context_array_pointer <= 0:
+            return
+        self.meta_file.seek(context_array_pointer)
+        index = 0
+        while(index < total_size):
+            # Reading information about child contexts (as in the children of this context)
+            # Total size of *pChildren (I call pChildren children_pointer), in bytes (u64)
+            children_size = int.from_bytes(self.meta_file.read(8,  byteorder=self.byte_order, signed=self.signed))
+            index += 8
+            # Pointer to the array of child contexts
+            children_pointer = int.from_bytes(self.meta_file.read(8,  byteorder=self.byte_order, signed=self.signed))
+            index += 8
+
+            # Reading information about this context
+            # Unique identifier for this context (u32)
+            context_id = int.from_bytes(self.meta_file.read(4,  byteorder=self.byte_order, signed=self.signed))
+            index += 4
+            # Reading flags (u8)
+            flags = int.from_bytes(self.meta_file.read(1,  byteorder=self.byte_order, signed=self.signed))
+            index += 1
+            # Relation this context has with its parent (u8)
+            relation = int.from_bytes(self.meta_file.read(1,  byteorder=self.byte_order, signed=self.signed))
+            index += 1
+            # Type of lexical context represented (u8)
+            lexical_type = int.from_bytes(self.meta_file.read(1,  byteorder=self.byte_order, signed=self.signed))
+            index += 1
+            # Size of flex, in u8[8] "words" (bytes / 8) (u8)
+            num_flex_words = int.from_bytes(self.meta_file.read(1,  byteorder=self.byte_order, signed=self.signed))
+            index += 1
+            # Bitmask for defining propagation scopes (u16) 
+            propogation = int.from_bytes(self.meta_file.read(2,  byteorder=self.byte_order, signed=self.signed))
+            index += 2
+            # Skipping reading flex
+            self.meta_file.read(num_flex_words * 8)
+            index += (8 * num_flex_words)
+
+            # Creating Node for this context
+            node = Node(None, None, parent_node)
+            node.add_calling_context_id(context_id)
+
+            # Connecting this node to the parent node
+            parent_node.add_child(node)
+
+            # Adding this node to the graph
+            self.cct.add_to_map(context_id, node)
+
+            # recursively call this function to add more children
+            self.__read_children_contexts(children_pointer, children_size, node)
+
+
+
+
+
+
+
+
+       
+
+
+
+class ExperimentReaderOld:
     def __init__(self, file_location):
         self.tree = ElementTree(file=file_location)
         self._create_identifier_name_table()
