@@ -160,7 +160,7 @@ class Trace:
                     """
                     Note:
                     The reason that we are creating lists that are copies of the
-                    dataframecolumns below and iterating over those instead of using
+                    dataframe columns below and iterating over those instead of using
                     pandas iterrows is due to an observed improvement in performance
                     when using lists.
                     """
@@ -279,6 +279,8 @@ class Trace:
                 parent,
                 children,
             )
+
+            self.events = self.events.astype({"Depth": "Int32", "Parent": "Int32"})
 
             self.events = self.events.astype(
                 {"Depth": "category", "Parent": "category"}
