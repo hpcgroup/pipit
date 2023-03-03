@@ -141,7 +141,7 @@ class Trace:
 
     def __match_events(self):
         """Matches corresponding enter/leave events and adds two columns to the
-           dataframe: _matching_event and _matching_timestamp
+        dataframe: _matching_event and _matching_timestamp
         """
 
         if "_matching_event" not in self.events.columns:
@@ -207,7 +207,7 @@ class Trace:
             self.events = self.events.astype({"_matching_event": "Int32"})
 
     def __match_caller_callee(self):
-        """ Matches callers (parents) to callees (children) and adds three
+        """Matches callers (parents) to callees (children) and adds three
         columns to the dataframe:
         _depth, _parent, and _children
 
