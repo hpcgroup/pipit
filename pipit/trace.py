@@ -140,15 +140,14 @@ class Trace:
         return np.histogram(sizes, bins=bins, **kwargs)
 
     def __pair_enter_leave(self):
-        if "Matching Index" not in self.events.columns:
+        if "_matching_event" not in self.events.columns:
             """
             Two columns to be added to dataframe:
-            "Matching Index" and "Matching Timestamp"
-
+            "_matching_event" and "_matching_timestamp"
             Matches dataframe indices and timestamps
             between corresponding enter and leave rows.
             """
-            matching_indices = [float("nan")] * len(self.events)
+            matching_events = [float("nan")] * len(self.events)
             matching_times = [float("nan")] * len(self.events)
 
             # only pairing enter and leave rows
@@ -198,26 +197,28 @@ class Trace:
                             enter_df_index, enter_timestamp = stack.pop()
 
                             # Fill in the lists with the matching values
-                            matching_indices[enter_df_index] = curr_df_index
-                            matching_indices[curr_df_index] = enter_df_index
+                            matching_events[enter_df_index] = curr_df_index
+                            matching_events[curr_df_index] = enter_df_index
 
                             matching_times[enter_df_index] = curr_timestamp
                             matching_times[curr_df_index] = enter_timestamp
 
-            self.events["Matching Index"] = matching_indices
-            self.events["Matching Timestamp"] = matching_times
+            self.events["_matching_event"] = matching_events
+            self.events["_matching_timestamp"] = matching_times
+
+            self.events = self.events.astype({"_matching_event": "Int32"})
 
     def __gen_calling_relationships(self):
         """
         Three columns to be added to dataframe:
-        "Depth", "Parent", and "Children"
+        "_depth", "_parent", and "_children"
 
-        Depth is level in the call tree starting from 0.
-        Parent is the dataframe index of a row's parent event.
-        Children is a list of dataframe indices of a row's children events.
+        _depth is level in the call tree starting from 0.
+        _parent is the dataframe index of a row's parent event.
+        _children is a list of dataframe indices of a row's children events.
         """
 
-        if "Children" not in self.events.columns:
+        if "_children" not in self.events.columns:
             children = [None] * len(self.events)
             depth, parent = [float("nan")] * len(self.events), [float("nan")] * len(
                 self.events
@@ -285,14 +286,14 @@ class Trace:
                             using the matching index that corresponds to the enter row
                             """
 
-            self.events["Depth"], self.events["Parent"], self.events["Children"] = (
+            self.events["_depth"], self.events["_parent"], self.events["_children"] = (
                 depth,
                 parent,
                 children,
             )
 
-            self.events = self.events.astype({"Depth": "Int32", "Parent": "Int32"})
+            self.events = self.events.astype({"_depth": "Int32", "_parent": "Int32"})
 
             self.events = self.events.astype(
-                {"Depth": "category", "Parent": "category"}
+                {"_depth": "category", "_parent": "category"}
             )

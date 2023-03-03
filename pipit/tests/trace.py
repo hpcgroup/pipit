@@ -41,9 +41,15 @@ def test_pair_enter_leave(data_dir, ping_pong_otf2_trace):
 
     df = trace.events
 
+    # test both ranks
     rank_0_df = df.loc[(df["Process"] == 0) & (df["Event Type"] != "Instant")]
     rank_1_df = df.loc[(df["Process"] == 1) & (df["Event Type"] != "Instant")]
 
+    """
+    Make lists of normal and matching columns for both indices and timestamps.
+    Compares the values of these lists to ensure the pairing functions produced
+    correct results.
+    """
     rank_0_indices = rank_0_df.index.to_list()
     rank_0_matching_indices = rank_0_df["Matching Index"].to_list()
     rank_0_timestamps = rank_0_df["Timestamp (ns)"].to_list()
@@ -57,12 +63,17 @@ def test_pair_enter_leave(data_dir, ping_pong_otf2_trace):
 
     for i in range(len(rank_0_df)):
         if i % 2 == 0:
+            # the matching event and timestamp for enter rows
+            # should occur right after (ex: (Enter: 45, Leave: 46))
             assert rank_0_matching_indices[i] == rank_0_indices[i + 1]
             assert rank_0_matching_timestamps[i] == rank_0_timestamps[i + 1]
         else:
+            # the matching event and timestamp for leave rows
+            # should occur right before (ex: (Enter: 45, Leave: 46))
             assert rank_0_matching_indices[i] == rank_0_indices[i - 1]
             assert rank_0_matching_timestamps[i] == rank_0_timestamps[i - 1]
 
+    # tests all the same as mentioned above, except for rank 1 as well
     rank_1_indices = rank_1_df.index.to_list()
     rank_1_matching_indices = rank_1_df["Matching Index"].to_list()
     rank_1_timestamps = rank_1_df["Timestamp (ns)"].to_list()
@@ -98,4 +109,5 @@ def test_gen_calling_relationships(data_dir, ping_pong_otf2_trace):
 
     df = trace.events
 
+    # all events of the ping pong trace are roots with no children
     assert set(df.loc[df["Event Type"] == "Enter"]["Depth"]) == set([0])
