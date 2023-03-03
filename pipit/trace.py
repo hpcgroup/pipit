@@ -140,13 +140,11 @@ class Trace:
         return np.histogram(sizes, bins=bins, **kwargs)
 
     def __match_events(self):
+        """Matches corresponding enter/leave events and adds two columns to the
+           dataframe: _matching_event and _matching_timestamp
+        """
+
         if "_matching_event" not in self.events.columns:
-            """
-            Two columns to be added to dataframe:
-            "_matching_event" and "_matching_timestamp"
-            Matches dataframe indices and timestamps
-            between corresponding enter and leave rows.
-            """
             matching_events = [float("nan")] * len(self.events)
             matching_times = [float("nan")] * len(self.events)
 
@@ -209,11 +207,11 @@ class Trace:
             self.events = self.events.astype({"_matching_event": "Int32"})
 
     def __match_caller_callee(self):
-        """
-        Three columns to be added to dataframe:
-        "_depth", "_parent", and "_children"
+        """ Matches callers (parents) to callees (children) and adds three
+        columns to the dataframe:
+        _depth, _parent, and _children
 
-        _depth is level in the call tree starting from 0.
+        _depth is level in the call tree starting at 0.
         _parent is the dataframe index of a row's parent event.
         _children is a list of dataframe indices of a row's children events.
         """
