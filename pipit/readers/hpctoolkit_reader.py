@@ -90,7 +90,12 @@ class MetaReader:
             section_reader = reader_map[section_name]
             section_reader(section_pointer, section_size)
 
-
+    def get_name_from_context_id(self, context_id: int):
+        context: dict = self.context_map[context_id]
+        function: dict = self.functions_list[context["function_index"]]
+        function_name: str = self.common_strings[function["string_index"]]
+        return function_name
+        
 
     def __read_common_header(self) -> None:
         """ 
@@ -244,7 +249,13 @@ class MetaReader:
                 break
             name += read
         return name
-            
+
+    def get_identifier_name(self, kind: int):
+        """
+        returns the identifier name, given the kind
+        """
+        return self.identifier_names[kind] 
+
     def __read_identifier_names_section(self, section_pointer: int, section_size: int) -> None:
         """
         Reads "Identifier Names" Section and Identifier Name strings in self.names_list 
@@ -260,15 +271,44 @@ class MetaReader:
         # Number of names listed in this section
         num_names = int.from_bytes(self.meta_file.read(1), byteorder=self.byte_order, signed=self.signed)
 
-        self.names_list: list[str] = []
+        self.identifier_names: list[str] = []
 
         for i in range(num_names):
             self.meta_file.seek(names_pointer_pointer + (i * 8))
             names_pointer = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
-            self.names_list.append(self.__read_string(names_pointer))
+            self.identifier_names.append(self.__read_string(names_pointer))
     
     def __read_performance_metrics_section(self, section_pointer: int, section_size: int) -> None:
+        """
+        Documentation: https://gitlab.com/hpctoolkit/hpctoolkit/-/blob/develop/doc/FORMATS.md#metadb-performance-metrics-section
+        """
         return
+        # go to correct spot in the file
+        self.meta_file.seek(section_pointer)
+
+        # Descriptions of performance metrics
+        metrics_pointer = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
+        # Number of performance metrics (u32)
+        num_metrics = int.from_bytes(self.meta_file.read(4), byteorder=self.byte_order, signed=self.signed)
+        # Size of the {MD} structure, currently 32 (u8)
+        metric_size = int.from_bytes(self.meta_file.read(1), byteorder=self.byte_order, signed=self.signed)
+        # Size of the {PSI} structure, currently 16 (u8)
+        PSI_size = int.from_bytes(self.meta_file.read(1), byteorder=self.byte_order, signed=self.signed)
+        # Size of the {SS} structure, currently 24 (u8)
+        SS_size = int.from_bytes(self.meta_file.read(1), byteorder=self.byte_order, signed=self.signed)
+        # Descriptions of propgation scopes
+        pScopes = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
+        # Number of propgation scopes (u16)
+        nScopes = int.from_bytes(self.meta_file.read(2), byteorder=self.byte_order, signed=self.signed)
+        # Size of the {PS} structure, currently 16 (u8)
+        num_PS = int.from_bytes(self.meta_file.read(1), byteorder=self.byte_order, signed=self.signed)
+
+        # one byte empty
+        self.meta_file.read(1)
+
+
+
+
     
 
     def __get_function_index(self, function_pointer: int) -> int:
@@ -321,7 +361,6 @@ class MetaReader:
                                     "source_file_index": source_file_index}
             self.functions_list.append(current_function_map)
         
-
     def __get_source_file_index(self, source_file_pointer: int) -> int:
         """
         Given the pointer to where the file would exists in meta.db,
@@ -559,7 +598,6 @@ class MetaReader:
        
 
 
-
 class ExperimentReaderOld:
     def __init__(self, file_location):
         self.tree = ElementTree(file=file_location)
@@ -634,13 +672,13 @@ class ExperimentReaderOld:
 class ProfileReader:
     # class to read data from profile.db file
 
-    def __init__(self, file_location, experiment_reader):
+    def __init__(self, file_location, meta_reader):
         # gets the pi_ptr variable to be able to read the identifier tuples
-        self.experiment_reader = experiment_reader
+        self.meta_reader: MetaReader = meta_reader
 
         self.file = open(file_location, "rb")
         file = self.file
-        file.seek(32)
+        file.seek(0x28)
 
         # need to test to see if correct
         byte_order = "big"
@@ -672,7 +710,7 @@ class ProfileReader:
             p_val = int.from_bytes(file.read(8), byteorder=byte_order, signed=signed)
             # l_val = int.from_bytes(file.read(8), byteorder=byte_order, signed=signed)
             file.read(8)
-            identifier_name = self.experiment_reader.get_identifier_name(kind)
+            identifier_name = self.meta_reader.get_identifier_name(kind)
             tuples_list.append((identifier_name, p_val))
         return tuples_list
 
@@ -692,12 +730,12 @@ class HPCToolkitReader:
         # open file
         file = open(dir_location + "/trace.db", "rb")
 
-        experiment_reader = ExperimentReader(dir_location + "/experiment.xml")
+        meta_reader = MetaReader(dir_location + "/meta.db")
 
-        profile_reader = ProfileReader(dir_location + "/profile.db", experiment_reader)
+        profile_reader = ProfileReader(dir_location + "/profile.db", meta_reader)
 
         # create graph
-        graph = experiment_reader.create_graph()
+        graph = meta_reader.cct
 
         # read Magic identifier ("HPCPROF-tracedb_")
         # encoding = "ASCII"  # idk just guessing rn
@@ -738,7 +776,8 @@ class HPCToolkitReader:
             "Host": [],
             "Node": [],
         }
-        min_max_time = experiment_reader.get_min_max_time()
+        # min_max_time = experiment_reader.get_min_max_time()
+        min_max_time = [0, 0]
 
         # cycle through trace headers (each iteration in this outer loop is a seperate
         # process/thread/rank)
@@ -888,6 +927,6 @@ class HPCToolkitReader:
 def main():
     meta_loc = '/Users/movsesyanae/Programming/Research/pipit_data/hpctoolkit-lulesh2.0-database/meta.db'
     x = MetaReader(meta_loc)
-
+    y = HPCToolkitReader('/Users/movsesyanae/Programming/Research/pipit_data/hpctoolkit-lulesh2.0-database/')
 if __name__ == "__main__":
     main()
