@@ -29,7 +29,6 @@ class NsightReader:
 
         # check if PID and TID are NOT the same. singlethreaded or multithreaded
         if self.df["PID"].equals(self.df["TID"]) is False:
-
             # Group the pids together and give each process it's own set of threads
             for i in pid:
                 # Seeing where the rows of the PIDs match. Grabbing the rows in mask
