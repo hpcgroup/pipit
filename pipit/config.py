@@ -1,9 +1,9 @@
-# TODO: ensure changes are reflected in vis
 config = {
     "vis": {
         "theme": "light",
         "initialized": False,
         "launch_server": False,
+        "notebook_url": "http://localhost:8888",
         "default_color": "#E5AE38",
         "shuffle_colors": True,
         "colors": [
