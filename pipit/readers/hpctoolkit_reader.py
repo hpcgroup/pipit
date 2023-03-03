@@ -26,31 +26,69 @@ class MetaReader:
         self.encoding = "ASCII"
 
         # The meta.db header consists of the common .db header and n sections.
-        # Here I'm mapping the section name to it's order in the meta.db header
+        # We're going to do a little set up work, so that's easy to change if 
+        # any revisions change the orders.
 
-        self.header_map = {"General Properties": 0, "Identifier Names": 1, "Performance Metrics": 2, \
-                           "Context Tree": 3, "Common String Table": 4, "Load Modules": 5, \
-                            "Source Files": 6, "Functions": 7}
+        # We're are going to specify 2 maps:
+        #   - One dictionary maps the section name to an index 
+        #       (which follows the order that the sections are seen
+        #        in the meta.db header)
+        #   - The second dictionary maps the section name to a 
+        #       function that reads the section. Each function is defined
+        #       as __read_<section_name>_section(self, section_pointer: int, section_size: int) -> None 
+
+        # Here I'm mapping the section name to it's order in the meta.db header
+        header_map = {"General Properties": 0, "Identifier Names": 1, "Performance Metrics": 2, \
+                        "Context Tree": 3, "Common String Table": 4, "Load Modules": 5, \
+                        "Source Files": 6, "Functions": 7}
         
-        # We want to keep this order when reading sections:
+        # Now let's create a function to section map
+        reader_map = {"General Properties": self.__read_general_properties_section, \
+                        "Common String Table": self.__read_common_string_table_section, \
+                        "Source Files": self.__read_source_files_section, \
+                        "Functions": self.__read_functions_section, \
+                        "Load Modules": self.__read_load_modules_section, \
+                        "Context Tree": self.__read_context_tree_section, \
+                        "Identifier Names": self.__read_identifier_names_section, \
+                        "Performance Metrics": self.__read_performance_metrics_section}
+        
+        # Another thing thing that we should consider is the order to read the sections.
+        # Here is a list of section references (x -> y means x references y)
+        #   - "Source Files"    ->  "Common String Table"
+        #   - "Functions"       ->  "Common String Table"
+        #   - "Context Tree"    ->  "Common String Table"
+        #   - "Load Modules"    ->  "Common String Table"
+        #   - "Functions"       ->  "Source Files"
+        #   - "Context Tree"    ->  "Functions"
+        #   - "Context Tree"    ->  "Source Files"
+        #   - "Functions"       ->  "Load Modules"
+        # 
+        # Thus we want to keep this order when reading sections:
         # "Common String Table" -> "Source Files" -> "Functions" -> "Context Tree", and 
         # "Common String Table -> "Load Modules" -> "Context Tree"
         # Here I'm specifying the order of reading the file
-        self.read_order = ["General Properties", "Common String Table", "Source Files", \
-                           "Functions", "Load Modules", "Context Tree", "Identifier Names", "Performance Metrics"] 
+        self.read_order = ["Common String Table", "General Properties", "Source Files", \
+                            "Load Modules", "Functions", "Context Tree", "Identifier Names", \
+                            "Performance Metrics"]
+
+
         
-        # Let's make sure that we include every section in the read order
-        assert set(self.read_order) == set(self.header_map)
-
-        # Now let's create a function to section map
-        self.reader_map = {self.__read_context_tree_section: }
+        # Let's make sure that we include every section in the read order and reader_map
+        assert set(self.read_order) == set(header_map) and set(header_map) == set(reader_map)
 
 
+        # Now to the actual reading of the meta.db file
 
-        # reading the meta.db header (and rest of the file)
-        self.__read_meta_file()
+        # reading the meta.db header
+        self.__read_meta_header()
 
-
+        # now let's read all the sections
+        for section_name in self.read_order:
+            section_index = header_map[section_name]
+            section_pointer = self.section_pointer[section_index]
+            section_size = self.section_size[section_index]
+            section_reader = reader_map[section_name]
+            section_reader(section_pointer, section_size)
 
 
 
@@ -76,7 +114,7 @@ class MetaReader:
 
     def __read_meta_header(self) -> None:
         """ 
-        Reads meta.db file with version 4.0
+        Reads meta.db file header with version 4.0
 
         Documentation: https://gitlab.com/hpctoolkit/hpctoolkit/-/blob/develop/doc/FORMATS.md#metadb-version-40
         """
@@ -95,65 +133,171 @@ class MetaReader:
         # In the header each section is given 16 bytes:
         #   - First 8 bytes specify the total size of the section (in bytes)
         #   - Last 8 bytes specify a pointer to the beggining of the section
-        for i in range(len(self.header_map)):
+        for i in range(len(self.read_order)):
             self.section_size.append(int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed))
             self.section_pointer.append(int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed))
 
+    def __read_general_properties_section(self, section_pointer: int, section_size: int) -> None:
+        """Reads the general properties of the trace. 
+        Sets:
+         
+        self.database_title: Title of the database. May be provided by the user.
+
+        self.database_description: Human-readable Markdown description of the database.
+
+        Documentation: https://gitlab.com/hpctoolkit/hpctoolkit/-/blob/develop/doc/FORMATS.md#metadb-general-properties-section
+        """
         
-        # Reading "General Properties" section
-        # Documentation: https://gitlab.com/hpctoolkit/hpctoolkit/-/blob/develop/doc/FORMATS.md#metadb-general-properties-section
-        # First 8 bytes of General Properties is a pointer to the title
-        self.title_pointer = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
-        # Last 8 bytes of General Properties is a pointer to the description
-        self.description_pointer = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
+        # go to the right spot in the file
+        self.meta_file.seek(section_pointer)
+        title_pointer = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
+        description_pointer = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
 
-        # Reading "Identifier Names" section
-        # Documentation: https://gitlab.com/hpctoolkit/hpctoolkit/-/blob/develop/doc/FORMATS.md#metadb-hierarchical-identifier-names-section
-        self.identifier_names_array_pointer = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
-        self.num_identifier_names = int.from_bytes(self.meta_file.read(1), byteorder=self.byte_order, signed=self.signed)
-        # space is left in the file for more information in the future, 
-        # so we need to go to the right position for the next read.
-        if self.meta_file.tell() != 0x30:
-            self.meta_file.seek(0x30)
+        self.database_title = self.__read_string(title_pointer)
+        self.database_description = self.__read_string(description_pointer)
 
-        # Reading "Performance Metrics" section
-        # Documentation: https://gitlab.com/hpctoolkit/hpctoolkit/-/blob/develop/doc/FORMATS.md#metadb-performance-metrics-section
-        # skipping this section for now -- will come back
-        self.meta_file.read(16)
+    def __get_common_string(self, string_pointer: int) -> str:
+        """Given the file pointer to find string, returns the string."""
+        if string_pointer in self.common_string_index_map:
+            return self.common_strings[self.common_string_index_map[string_pointer]]
+        else:
+            print("Couldn't Find String at Pointer:", string_pointer)
+            return None
 
-        # Reading "Context Tree" section
-        self.__read_context_tree_section()
+    def __read_common_string_table_section(self, section_pointer: int, section_size: int) -> None:
+        # Let's go to the section
+        self.meta_file.seek(section_pointer)
         
+        # We know that this section is just a densely packed list of strings,
+        # seperated by the null character
+        # So to create a list of these strings, we'll read them all into one string then
+        # split them by the null character
 
-        # Reading Common String Table
-        # Skipping this section since I can't see how it's stored in the documentation
-        self.meta_file.read(16)
-
-        # Reading "Load Modules" section
-        # Documentation: https://gitlab.com/hpctoolkit/hpctoolkit/-/blob/develop/doc/FORMATS.md#metadb-load-modules-section
-        # Skipping this section for now  -- not sure if it's necessary
-
-        # Reading "Source Files" section
-        self.__read_source_files_section()
-
-        # Reading "Functions" section
-        self.__read_functions_section()
-
-    def __read_functions_section(self) -> None:
-        if self.meta_file.tell() != 0x80:
-            self.meta_file.seek(0x80)
+        # Reading entire section into a string
+        total_section: str = str(self.meta_file.read(section_size), encoding='UTF-8')
         
-        section_size = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
-        section_pointer = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
-        print("Functions section size: ", section_size)
-        print("Functions section_pointer size: ", section_pointer)
+        # Splitting entire section into list of strings
+        self.common_strings: list[str] = total_section.split("\0")
+
+        # Now we are creating a map between the original location to the string
+        # to the index of the string in self.common_strings.
+        # This is because we are passed pointers to find the string in other sections
+        pointer_index = section_pointer
+        # pointer_index = 0
+        self.common_string_index_map: dict = {}
+        for i in range(len(self.common_strings)):
+            self.common_string_index_map[pointer_index] = i
+            pointer_index += (len(self.common_strings[i]) + 1)
+        
+    def __get_load_modules_index(self, load_module_pointer: int) -> int:
+        """
+        Given the pointer to where the file would exists in meta.db,
+        returns the index of the file in self.source_files_list.
+        """
+        return ((load_module_pointer - self.load_modules_pointer) // self.load_module_size)
+
+    def __read_load_modules_section(self, section_pointer: int, section_size: int) -> None:
+        """
+        Reads the "Load Modules" Section of meta.db.
+
+        Documentation: https://gitlab.com/hpctoolkit/hpctoolkit/-/blob/develop/doc/FORMATS.md#metadb-load-modules-section
+        """
+        # go to the right spot in meta.db
+        self.meta_file.seek(section_pointer)
+        
+        # Load modules used in this database 
+        self.load_modules_pointer = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
+        # Number of load modules listed in this section (u32)
+        num_load_modules = int.from_bytes(self.meta_file.read(4), byteorder=self.byte_order, signed=self.signed)
+        # Size of a Load Module Specification, currently 16 (u16)
+        self.load_module_size = int.from_bytes(self.meta_file.read(2), byteorder=self.byte_order, signed=self.signed)
+        
+        
+        # Going to store file's path in self.load_modules_list.
+        # Each will contain the index of file's path string in 
+        # self.common_string
+        self.load_modules_list: list[dict] = []
+       
+        for i in range(num_load_modules):
+            current_index = self.load_modules_pointer + (i * self.load_module_size)
+            self.meta_file.seek(current_index)
+
+            # Flags -- Reserved for future use (u32)
+            flags = int.from_bytes(self.meta_file.read(4), byteorder=self.byte_order, signed=self.signed)
+            # empty space that we need to skip
+            self.meta_file.read(4)
+            # Full path to the associated application binary
+            path_pointer = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
+            module_map = {"string_index": self.common_string_index_map[path_pointer]}
+            self.load_modules_list.append(module_map)
+
+    def __read_string(self, file_pointer: int) -> str:
+        """ 
+        Helper function to read a string from the file starting at the file_pointer
+        and ending at the first occurence of the null character
+        """
+        self.meta_file.seek(file_pointer)
+        name = ""
+        while True:
+            read = str(self.meta_file.read(1), encoding='UTF-8')
+            if read == "\0":
+                break
+            name += read
+        return name
+            
+    def __read_identifier_names_section(self, section_pointer: int, section_size: int) -> None:
+        """
+        Reads "Identifier Names" Section and Identifier Name strings in self.names_list 
+
+        Documentation: https://gitlab.com/hpctoolkit/hpctoolkit/-/blob/develop/doc/FORMATS.md#metadb-hierarchical-identifier-names-section
+        """
+
+        # go to correct section of file
         self.meta_file.seek(section_pointer)
 
-        functions_array_pointer = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
+        # Human-readable names for Identifier kinds
+        names_pointer_pointer = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
+        # Number of names listed in this section
+        num_names = int.from_bytes(self.meta_file.read(1), byteorder=self.byte_order, signed=self.signed)
+
+        self.names_list: list[str] = []
+
+        for i in range(num_names):
+            self.meta_file.seek(names_pointer_pointer + (i * 8))
+            names_pointer = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
+            self.names_list.append(self.__read_string(names_pointer))
+    
+    def __read_performance_metrics_section(self, section_pointer: int, section_size: int) -> None:
+        return
+    
+
+    def __get_function_index(self, function_pointer: int) -> int:
+        """
+        Given the pointer to where the function would exists in meta.db,
+        returns the index of the file in self.functions_list.
+        """
+        index = ((function_pointer - self.functions_array_pointer) // self.function_size)
+        assert index < len(self.functions_list)
+        return index 
+    
+    def __read_functions_section(self, section_pointer: int, section_size: int) -> None:
+        """
+        Reads the "Functions" section of meta.db.
+
+        Documentation: https://gitlab.com/hpctoolkit/hpctoolkit/-/blob/develop/doc/FORMATS.md#metadb-functions-section
+        """
+        
+        # go to correct section in file
+        self.meta_file.seek(section_pointer)
+
+        
+        self.functions_array_pointer = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
         num_functions = int.from_bytes(self.meta_file.read(4), byteorder=self.byte_order, signed=self.signed)
-        size_functions = int.from_bytes(self.meta_file.read(2), byteorder=self.byte_order, signed=self.signed)
-        for i in range(100):
-            current_index = functions_array_pointer + (i * size_functions)
+        self.function_size = int.from_bytes(self.meta_file.read(2), byteorder=self.byte_order, signed=self.signed)
+        
+        self.functions_list: list[dict] = []
+        for i in range(num_functions):
+            current_index = self.functions_array_pointer + (i * self.function_size)
             self.meta_file.seek(current_index)
             function_name_pointer = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
             modules_pointer = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
@@ -161,68 +305,73 @@ class MetaReader:
             file_pointer = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
             source_line = int.from_bytes(self.meta_file.read(4), byteorder=self.byte_order, signed=self.signed)
             flags = int.from_bytes(self.meta_file.read(4), byteorder=self.byte_order, signed=self.signed)
+            source_file_index = None
+            load_module_index = None
+            function_name_index = None
+            if function_name_pointer != 0:
+                function_name_index = self.common_string_index_map[function_name_pointer]
+            if modules_pointer != 0:
+                load_module_index = self.__get_load_modules_index(modules_pointer)
+                # currently ignoring offset -- no idea how that's used
             if file_pointer != 0:
-                print("function has file pointer:", file_pointer)
-                print("function has name pointer:", function_name_pointer)
-                self.meta_file.seek(function_name_pointer)
-                print("function name:" + str(self.meta_file.read(10), encoding='UTF-8'))
-            # return
+                source_file_index = self.__get_source_file_index(file_pointer)
+            
+            current_function_map = {"string_index": function_name_index, \
+                                    "source_line": source_line, "load_modules_index": load_module_index, \
+                                    "source_file_index": source_file_index}
+            self.functions_list.append(current_function_map)
         
 
+    def __get_source_file_index(self, source_file_pointer: int) -> int:
+        """
+        Given the pointer to where the file would exists in meta.db,
+        returns the index of the file in self.source_files_list.
+        """
+        index = ((source_file_pointer - self.source_files_pointer) // self.source_file_size)
+        assert index < len(self.source_files_list)
+        return index
 
-    def __read_source_files_section(self) -> None:
+    def __read_source_files_section(self, section_pointer: int, section_size: int) -> None:
         """
         Reads the "Source Files" Section of meta.db.
 
         Documentation: https://gitlab.com/hpctoolkit/hpctoolkit/-/blob/develop/doc/FORMATS.md#metadb-source-files-section
         """
 
-        # Reading "Source Files" section header
-
-        # make sure we're in the right spot of the file
-        if self.meta_file.tell() != 0x70:
-            self.meta_file.seek(0x70)
-        
-        section_size = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
-        section_pointer = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
-        print("section size: ", section_size)
-        print("section_pointer size: ", section_pointer)
         self.meta_file.seek(section_pointer)
         
-        print("Reading Source Files section. At index: ", self.meta_file.tell() )
-
         # Source files used in this database 
-        files_pointer = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
-        print("At index: " + str(self.meta_file.tell()) )
+        self.source_files_pointer = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
 
         # Number of source files listed in this section (u32)
         num_files = int.from_bytes(self.meta_file.read(4), byteorder=self.byte_order, signed=self.signed)
-        print("At index: " + str(self.meta_file.tell()) )
-        # Size of a Source File Specification, currently 16 (u16)
-        file_size = int.from_bytes(self.meta_file.read(2), byteorder=self.byte_order, signed=self.signed)
-        print("At index: " + str(self.meta_file.tell()) )
         
-        print("files pointer: " + str(files_pointer))
-        print("There are " + str(num_files) + " files, each of size " + str(file_size))
-        return
-
+        # Size of a Source File Specification, currently 16 (u16)
+        self.source_file_size = int.from_bytes(self.meta_file.read(2), byteorder=self.byte_order, signed=self.signed)
+        
         # Looping through individual files to get there information now
+        self.meta_file.seek(self.source_files_pointer)
+
+        # Going to store file's path in self.files_list.
+        # Each will contain the index of file's path string in 
+        # self.common_string 
+        self.source_files_list: list[dict] = []
         for i in range(num_files):
             # Reading information about each individual source file
-            current_index = files_pointer + (i * file_size)
-            self.meta_file.seek(current_index)
+            self.meta_file.seek(self.source_files_pointer + (i * self.source_file_size))
 
-            flag = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
+            flag = int.from_bytes(self.meta_file.read(4), byteorder=self.byte_order, signed=self.signed)
+            # empty space that we need to skip
+            self.meta_file.read(4)
             # Path to the source file. Absolute, or relative to the root database directory.
             # The string pointed to by pPath is completely within the Common String Table section,
             # including the terminating NUL byte.
             file_path_pointer = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
-
-
-
-        
-
-    def __read_context_tree_section(self) -> None:
+            string_index = self.common_string_index_map[file_path_pointer]
+            source_file_map = {"string_index": string_index}
+            self.source_files_list.append(source_file_map)
+            
+    def __read_context_tree_section(self, section_pointer: int, section_size: int) -> None:
         """
         Reads the "Context Tree" section of meta.db.
 
@@ -232,12 +381,12 @@ class MetaReader:
         """
 
         self.cct = Graph()
+        self.context_map: dict[int, dict] = {}
 
         # Reading "Context Tree" section header
 
         # make sure we're in the right spot of the file
-        if self.meta_file.tell() != 0x40:
-            self.meta_file.seek(0x40)
+        self.meta_file.seek(section_pointer)
 
         # ({Entry}[nEntryPoints]*)
         entry_points_array_pointer = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
@@ -247,11 +396,8 @@ class MetaReader:
         entry_point_size = int.from_bytes(self.meta_file.read(1), byteorder=self.byte_order, signed=self.signed)
                 
         for i in range (num_entry_points):
-            current_pointer = entry_points_array_pointer + i * entry_point_size
+            current_pointer = entry_points_array_pointer + (i * entry_point_size)
             self.__read_single_entry_point(current_pointer)
-
-        # reading the context tree has us go around the file, so we need to come back to the right spot
-        self.meta_file.seek(0x50)  
 
     def __read_single_entry_point(self, entry_point_pointer: int) -> None:
         """
@@ -275,15 +421,20 @@ class MetaReader:
         context_id = int.from_bytes(self.meta_file.read(4), byteorder=self.byte_order, signed=self.signed)
         # Type of entry point used here (u16)
         entry_point_type = int.from_bytes(self.meta_file.read(2), byteorder=self.byte_order, signed=self.signed)
+        # next 2 bytes are blank
+        self.meta_file.read(2)
         # Human-readable name for the entry point
         pretty_name_pointer = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
-
         # Create Node for this context
         node: Node = Node(None, None, None)
         node.add_calling_context_id(context_id)
         # Adding the Node to the CCT
         self.cct.add_root(node)
         self.cct.add_to_map(context_id, node)
+
+        # map context for this context 
+        context = {"string_index": self.common_string_index_map[pretty_name_pointer]}
+        self.context_map[context_id] = context
 
         # Reading the children contexts
         self.__read_children_contexts(children_pointer, children_size, node)
@@ -294,6 +445,7 @@ class MetaReader:
 
         Documentation: https://gitlab.com/hpctoolkit/hpctoolkit/-/blob/develop/doc/FORMATS.md#metadb-context-tree-section
         """
+
         if total_size <= 0 or context_array_pointer <= 0:
             return
         self.meta_file.seek(context_array_pointer)
@@ -326,8 +478,12 @@ class MetaReader:
             # Bitmask for defining propagation scopes (u16) 
             propogation = int.from_bytes(self.meta_file.read(2), byteorder=self.byte_order, signed=self.signed)
             index += 2
-            # Skipping reading flex
-            self.meta_file.read(num_flex_words * 8)
+            # Empty space
+            self.meta_file.read(6)
+            index += 6
+
+            # reading flex
+            flex = self.meta_file.read(8 * num_flex_words)
             index += (8 * num_flex_words)
 
             # Creating Node for this context
@@ -340,8 +496,58 @@ class MetaReader:
             # Adding this node to the graph
             self.cct.add_to_map(context_id, node)
 
+            function_index: int = None
+            source_file_index: int = None
+            source_file_line: int = None
+            load_module_index: int = None
+            load_module_offset: int = None
+
+            
+            # flex is u8[8][num_flex],
+            # meaning that one flex word is 8 bytes or u64
+
+            # Bit 0: hasFunction. If 1, the following sub-fields of flex are present:
+            #   flex[0]: FS* pFunction: Function associated with this context
+            if flags & 1 != 0:
+                sub_flex = int.from_bytes(flex[0:8], byteorder=self.byte_order, signed=self.signed)
+                flex = flex[8:]
+                function_index = self.__get_function_index(sub_flex)
+                
+            # Bit 1: hasSrcLoc. If 1, the following sub-fields of flex are present:
+            #   flex[1]: SFS* pFile: Source file associated with this context
+            #   flex[2]: u32 line: Associated source line in pFile
+            if flags & 2 != 0:
+                sub_flex_1 = int.from_bytes(flex[0:8], byteorder=self.byte_order, signed=self.signed)
+                sub_flex_2 = int.from_bytes(flex[8:10], byteorder=self.byte_order, signed=self.signed)
+                flex = flex[10:]
+                source_file_index = self.__get_source_file_index(sub_flex_1)
+                source_file_line = sub_flex_2
+                
+            # Bit 2: hasPoint. If 1, the following sub-fields of flex are present:
+            #   flex[3]: LMS* pModule: Load module associated with this context
+            #   flex[4]: u64 offset: Associated byte offset in *pModule
+            if flags & 4 != 0:
+                sub_flex_1 = int.from_bytes(flex[0:8], byteorder=self.byte_order, signed=self.signed)
+                sub_flex_2 = int.from_bytes(flex[8:16], byteorder=self.byte_order, signed=self.signed)
+                flex = flex[16:]
+                load_module_index = self.__get_load_modules_index(sub_flex_1)
+                load_module_offset = sub_flex_2
+
+
+            # creating a map for this context
+            context = {"relation": relation, "lexical_type": lexical_type, \
+                       "function_index": function_index, \
+                       "source_file_index": source_file_index, \
+                       "source_file_line": source_file_line, \
+                       "load_module_index":load_module_index, \
+                       "load_module_offset": load_module_offset}
+            
+            self.context_map[context_id] = context
+
             # recursively call this function to add more children
+            return_address = self.meta_file.tell()
             self.__read_children_contexts(children_pointer, children_size, node)
+            self.meta_file.seek(return_address)
 
 
 
