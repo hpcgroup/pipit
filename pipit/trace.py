@@ -129,26 +129,26 @@ class Trace:
         return communication_matrix
 
     def calc_inc_time(self):
-        # Adds "Inc Time" column
-        if "Inc Time" not in self.events.columns:
+        # Adds "time.inc" column
+        if "time.inc" not in self.events.columns:
             if "Matching Timestamp" not in self.events.columns:
                 self.__pair_enter_leave()
 
             # Uses matching timestamp to calculate the inclusive time
-            self.events["Inc Time"] = (
+            self.events["time.inc"] = (
                 self.events["Matching Timestamp"] - self.events["Timestamp (ns)"]
             ).abs()
 
     def calc_exc_time(self):
-        if "Exc Time" not in self.events.columns:
-            if "Inc Time" not in self.events.columns:
+        if "time.exc" not in self.events.columns:
+            if "time.inc" not in self.events.columns:
                 self.calc_inc_time()
             if "Children" not in self.events.columns:
                 self.__gen_calling_relationships()
 
             # start out with exc times being a copy of inc times
-            exc_times = self.events["Inc Time"].to_list()
-            inc_times = self.events["Inc Time"].to_list()
+            exc_times = self.events["time.inc"].to_list()
+            inc_times = self.events["time.inc"].to_list()
 
             # Filter to events that have children
             filtered_df = self.events.loc[self.events["Children"].notnull()]
@@ -169,4 +169,4 @@ class Trace:
             for i in range(len(filtered_df)):
                 exc_times[int(matching_indices[i])] = exc_times[parent_df_indices[i]]
 
-            self.events["Exc Time"] = exc_times
+            self.events["time.exc"] = exc_times
