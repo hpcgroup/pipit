@@ -127,7 +127,7 @@ class Trace:
             ]
 
         return communication_matrix
-        
+
     def message_histogram(self, bins=20, **kwargs):
         """Generates histogram of message frequency by size."""
 
