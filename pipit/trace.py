@@ -236,7 +236,7 @@ class Trace:
                     exc_times[curr_parent_idx] -= inc_times[child_idx]
 
             self.events["time.exc"] = exc_times
-    
+
     def comm_matrix(self, output="size"):
         """
         Communication Matrix for Peer-to-Peer (P2P) MPI messages
