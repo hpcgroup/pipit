@@ -240,7 +240,6 @@ class HPCToolkitReader:
                 # if it was then we skip it, as to not have multiple sets of
                 # open/close events for a function that it's still in
                 if last_id != calling_context_id:
-
                     # updating the trace_db
 
                     node = graph.get_node(calling_context_id)  # the node in the Graph
