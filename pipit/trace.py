@@ -139,7 +139,7 @@ class Trace:
 
         return np.histogram(sizes, bins=bins, **kwargs)
 
-    def __pair_enter_leave(self):
+    def __match_events(self):
         if "_matching_event" not in self.events.columns:
             """
             Two columns to be added to dataframe:
@@ -208,7 +208,7 @@ class Trace:
 
             self.events = self.events.astype({"_matching_event": "Int32"})
 
-    def __gen_calling_relationships(self):
+    def __match_caller_callee(self):
         """
         Three columns to be added to dataframe:
         "_depth", "_parent", and "_children"

@@ -35,9 +35,9 @@ def test_comm_matrix(data_dir, ping_pong_otf2_trace):
 
 
 @pytest.mark.xfail(reason="Allow this to fail until otf2 has a pip package.")
-def test_pair_enter_leave(data_dir, ping_pong_otf2_trace):
+def test_match_events(data_dir, ping_pong_otf2_trace):
     trace = Trace.from_otf2(str(ping_pong_otf2_trace))
-    trace.pair_enter_leave()
+    trace.__match_events()
 
     df = trace.events
 
@@ -103,9 +103,9 @@ def test_pair_enter_leave(data_dir, ping_pong_otf2_trace):
 
 
 @pytest.mark.xfail(reason="Allow this to fail until otf2 has a pip package.")
-def test_gen_calling_relationships(data_dir, ping_pong_otf2_trace):
+def test_match_caller_callee(data_dir, ping_pong_otf2_trace):
     trace = Trace.from_otf2(str(ping_pong_otf2_trace))
-    trace.gen_calling_relationships()
+    trace.__match_caller_callee()
 
     df = trace.events
 
