@@ -142,19 +142,19 @@ class Trace:
     def calc_inc_time(self):
         # Adds "time.inc" column
         if "time.inc" not in self.events.columns:
-            if "Matching Timestamp" not in self.events.columns:
+            if "_matching_timestamp" not in self.events.columns:
                 self.__pair_enter_leave()
 
             # Uses matching timestamp to calculate the inclusive time
-            self.events["time.inc"] = (
-                self.events["Matching Timestamp"] - self.events["Timestamp (ns)"]
-            ).abs()
+            self.events.loc[self.events["Event Type"] == "Enter", "time.inc"] = (
+                self.events["_matching_timestamp"] - self.events["Timestamp (ns)"]
+            )
 
     def calc_exc_time(self):
         if "time.exc" not in self.events.columns:
             if "time.inc" not in self.events.columns:
                 self.calc_inc_time()
-            if "Children" not in self.events.columns:
+            if "_children" not in self.events.columns:
                 self.__gen_calling_relationships()
 
             # start out with exc times being a copy of inc times
@@ -162,10 +162,10 @@ class Trace:
             inc_times = self.events["time.inc"].to_list()
 
             # Filter to events that have children
-            filtered_df = self.events.loc[self.events["Children"].notnull()]
+            filtered_df = self.events.loc[self.events["_children"].notnull()]
             parent_df_indices, children = (
                 list(filtered_df.index),
-                filtered_df["Children"].to_list(),
+                filtered_df["_children"].to_list(),
             )
 
             # Iterate through the events that are parents
@@ -174,10 +174,5 @@ class Trace:
                 for child_idx in curr_children:
                     # Subtract child's inclusive time to update parent's exclusive time
                     exc_times[curr_parent_idx] -= inc_times[child_idx]
-
-            # Set leave rows exc times to matching enter rows
-            matching_indices = list(filtered_df["Matching Index"])
-            for i in range(len(filtered_df)):
-                exc_times[int(matching_indices[i])] = exc_times[parent_df_indices[i]]
 
             self.events["time.exc"] = exc_times
