@@ -139,7 +139,7 @@ class Trace:
 
         return np.histogram(sizes, bins=bins, **kwargs)
 
-    def __match_events(self):
+    def _match_events(self):
         """Matches corresponding enter/leave events and adds two columns to the
         dataframe: _matching_event and _matching_timestamp
         """
@@ -203,7 +203,7 @@ class Trace:
 
             self.events = self.events.astype({"_matching_event": "Int32"})
 
-    def __match_caller_callee(self):
+    def _match_caller_callee(self):
         """Matches callers (parents) to callees (children) and adds three
         columns to the dataframe:
         _depth, _parent, and _children
