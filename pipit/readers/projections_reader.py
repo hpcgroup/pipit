@@ -167,7 +167,6 @@ class STSReader:
 
             # add to self.entries
             elif line_arr[0] == "ENTRY":
-
                 # Need to concat entry_name
                 while not line_arr[3].endswith('"'):
                     line_arr[3] = line_arr[3] + " " + line_arr[4]
@@ -269,7 +268,6 @@ class ProjectionsReader:
         }
 
     def read(self):
-
         if self.num_pes < 1:
             return None
 
@@ -284,7 +282,6 @@ class ProjectionsReader:
         return pipit.trace.Trace(None, trace_df)
 
     def __read_log_file(self, pe_num: int) -> pandas.DataFrame:
-
         # has information needed in sts file
         sts_reader = self.sts_reader
 
@@ -311,7 +308,7 @@ class ProjectionsReader:
                 details = {"From PE": pe}
 
                 data["Name"].append("Idle")
-                data["Event Type"].append("Entry")
+                data["Event Type"].append("Enter")
                 data["Timestamp (ns)"].append(time)
                 data["Process ID"].append(pe_num)
                 data["Details"].append(details)
@@ -323,7 +320,7 @@ class ProjectionsReader:
                 details = {"From PE": pe}
 
                 data["Name"].append("Idle")
-                data["Event Type"].append("Exit")
+                data["Event Type"].append("Leave")
                 data["Timestamp (ns)"].append(time)
                 data["Process ID"].append(pe_num)
                 data["Details"].append(details)
@@ -336,7 +333,7 @@ class ProjectionsReader:
                 details = {"From PE": pe}
 
                 data["Name"].append("Pack")
-                data["Event Type"].append("Entry")
+                data["Event Type"].append("Enter")
                 data["Timestamp (ns)"].append(time)
                 data["Process ID"].append(pe_num)
                 data["Details"].append(details)
@@ -348,7 +345,7 @@ class ProjectionsReader:
                 details = {"From PE": pe}
 
                 data["Name"].append("Pack")
-                data["Event Type"].append("Exit")
+                data["Event Type"].append("Leave")
                 data["Timestamp (ns)"].append(time)
                 data["Process ID"].append(pe_num)
                 data["Details"].append(details)
@@ -361,7 +358,7 @@ class ProjectionsReader:
                 details = {"From PE": pe}
 
                 data["Name"].append("Unpack")
-                data["Event Type"].append("Entry")
+                data["Event Type"].append("Enter")
                 data["Timestamp (ns)"].append(time)
                 data["Process ID"].append(pe_num)
                 data["Details"].append(details)
@@ -373,7 +370,7 @@ class ProjectionsReader:
                 details = {"From PE": pe}
 
                 data["Name"].append("Unpack")
-                data["Event Type"].append("Exit")
+                data["Event Type"].append("Leave")
                 data["Timestamp (ns)"].append(time)
                 data["Process ID"].append(pe_num)
                 data["Details"].append(details)
@@ -419,13 +416,13 @@ class ProjectionsReader:
                 }
 
                 data["Name"].append("User Supplied Bracketed Note")
-                data["Event Type"].append("Entry")
+                data["Event Type"].append("Enter")
                 data["Timestamp (ns)"].append(time)
                 data["Process ID"].append(pe_num)
                 data["Details"].append(details)
 
                 data["Name"].append("User Supplied Bracketed Note")
-                data["Event Type"].append("Exit")
+                data["Event Type"].append("Leave")
                 data["Timestamp (ns)"].append(end_time)
                 data["Process ID"].append(pe_num)
                 data["Details"].append(details)
@@ -530,7 +527,7 @@ class ProjectionsReader:
                 }
 
                 data["Name"].append("Processing")
-                data["Event Type"].append("Entry")
+                data["Event Type"].append("Enter")
                 data["Timestamp (ns)"].append(time)
                 data["Process ID"].append(pe_num)
                 data["Details"].append(details)
@@ -559,7 +556,7 @@ class ProjectionsReader:
                 }
 
                 data["Name"].append("Processing")
-                data["Event Type"].append("Exit")
+                data["Event Type"].append("Leave")
                 data["Timestamp (ns)"].append(time)
                 data["Process ID"].append(pe_num)
                 data["Details"].append(sts_reader.get_entry_name(entry))
@@ -569,7 +566,7 @@ class ProjectionsReader:
                 time = int(line_arr[1])
 
                 data["Name"].append("Trace")
-                data["Event Type"].append("Entry")
+                data["Event Type"].append("Enter")
                 data["Timestamp (ns)"].append(time)
                 data["Process ID"].append(pe_num)
                 data["Details"].append(None)
@@ -578,7 +575,7 @@ class ProjectionsReader:
                 time = int(line_arr[1])
 
                 data["Name"].append("Trace")
-                data["Event Type"].append("Exit")
+                data["Event Type"].append("Leave")
                 data["Timestamp (ns)"].append(time)
                 data["Process ID"].append(pe_num)
                 data["Details"].append(None)
@@ -642,7 +639,7 @@ class ProjectionsReader:
                 details = {"From PE": pe, "Event ID": event}
 
                 data["Name"].append("Interrupt")
-                data["Event Type"].append("Entry")
+                data["Event Type"].append("Enter")
                 data["Timestamp (ns)"].append(time)
                 data["Process ID"].append(pe_num)
                 data["Details"].append(details)
@@ -655,7 +652,7 @@ class ProjectionsReader:
                 details = {"From PE": pe, "Event ID": event}
 
                 data["Name"].append("Interrupt")
-                data["Event Type"].append("Exit")
+                data["Event Type"].append("Leave")
                 data["Timestamp (ns)"].append(time)
                 data["Process ID"].append(pe_num)
                 data["Details"].append(details)
@@ -665,7 +662,7 @@ class ProjectionsReader:
                 time = int(line_arr[1])
 
                 data["Name"].append("Computation")
-                data["Event Type"].append("Entry")
+                data["Event Type"].append("Enter")
                 data["Timestamp (ns)"].append(time)
                 data["Process ID"].append(pe_num)
                 data["Details"].append(None)
@@ -674,7 +671,7 @@ class ProjectionsReader:
                 time = int(line_arr[1])
 
                 data["Name"].append("Computation")
-                data["Event Type"].append("Exit")
+                data["Event Type"].append("Leave")
                 data["Timestamp (ns)"].append(time)
                 data["Process ID"].append(pe_num)
                 data["Details"].append(None)
@@ -733,7 +730,7 @@ class ProjectionsReader:
                 }
 
                 data["Name"].append("User Event Pair")
-                data["Event Type"].append("Entry")
+                data["Event Type"].append("Enter")
                 data["Timestamp (ns)"].append(time)
                 data["Process ID"].append(pe_num)
                 data["Details"].append(details)
@@ -753,7 +750,7 @@ class ProjectionsReader:
                 }
 
                 data["Name"].append("User Event Pair")
-                data["Event Type"].append("Exit")
+                data["Event Type"].append("Leave")
                 data["Timestamp (ns)"].append(time)
                 data["Process ID"].append(pe_num)
                 data["Details"].append(details)

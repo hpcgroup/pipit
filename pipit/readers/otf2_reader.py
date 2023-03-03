@@ -206,8 +206,13 @@ class OTF2Reader:
                 # TO DO:
                 # need to add support for accelerator and metric locations
                 if str(loc.type)[13:] == "CPU_THREAD":
-                    thread_ids.append(loc._ref)
-                    process_ids.append(loc.group._ref)
+                    process_id = loc.group._ref
+                    process_ids.append(process_id)
+
+                    # subtract the minimum location number of a process
+                    # from the location number to get threads numbered
+                    # 0 to (num_threads per process - 1) for each process.
+                    thread_ids.append(loc._ref - self.process_threads_map[process_id])
 
                     # type of event - enter, leave, or other types
                     event_type = str(type(event))[20:-2]
@@ -231,11 +236,9 @@ class OTF2Reader:
                         # iterates through the event's attributes
                         # (ex: region, bytes sent, etc)
                         for key, value in vars(event).items():
-
                             # only adds non-empty attributes
                             # and ignores time so there isn't a duplicate time
                             if value is not None and key != "time":
-
                                 # uses field_to_val to convert all data types
                                 # and ensure that there are no pickling errors
                                 attributes_dict[
@@ -267,6 +270,11 @@ class OTF2Reader:
         DataFrame
         """
 
+        # OTF2 stores locations numbered from 0 to the (total number of threads - 1)
+        # across all processes. This dict will help us convert those to be orderered
+        # from 0 to (number of threads for each process - 1) per process instead.
+        self.process_threads_map = dict()
+
         # ids are the _ref attribute of an object
         # all objects stored in a reference registry
         # (such as regions) have such an id
@@ -296,6 +304,24 @@ class OTF2Reader:
                 then def_object is a single region being looked at
                 """
                 for def_object in def_attribute.__iter__():
+                    # add to process threads map dict if you encounter a new location
+                    if (
+                        key == "_locations"
+                        and str(def_object.type) == "LocationType.CPU_THREAD"
+                    ):
+                        location_num, process_num = (
+                            def_object._ref,
+                            def_object.group._ref,
+                        )
+
+                        # each process (location group) will be mapped to its
+                        # minimum location number, which we will use to number threads
+                        # appropriately by subtracting that min from its location nums
+                        if process_num not in self.process_threads_map:
+                            self.process_threads_map[process_num] = location_num
+                        elif location_num < self.process_threads_map[process_num]:
+                            self.process_threads_map[process_num] = location_num
+
                     if hasattr(def_object, "_ref"):
                         # only add ids for those definitions that have it
                         def_id.append(def_object._ref)
