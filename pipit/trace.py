@@ -143,7 +143,7 @@ class Trace:
         # Adds "time.inc" column
         if "time.inc" not in self.events.columns:
             if "_matching_timestamp" not in self.events.columns:
-                self.__pair_enter_leave()
+                self._match_events()
 
             # Uses matching timestamp to calculate the inclusive time
             self.events.loc[self.events["Event Type"] == "Enter", "time.inc"] = (
@@ -155,7 +155,7 @@ class Trace:
             if "time.inc" not in self.events.columns:
                 self.calc_inc_time()
             if "_children" not in self.events.columns:
-                self.__gen_calling_relationships()
+                self._match_caller_callee()
 
             # start out with exc times being a copy of inc times
             exc_times = self.events["time.inc"].to_list()
