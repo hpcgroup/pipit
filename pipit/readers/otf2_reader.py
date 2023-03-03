@@ -55,7 +55,7 @@ class OTF2Reader:
             Example: An event can have an attribute called region which corresponds
             to a definition. We strip the string and extract only the relevant
             information, which is the type of definition such as Region and also
-            append its id  (like Region 6) so that this definition can be accessed
+            append its id (like Region 6) so that this definition can be accessed
             in the Definitions DataFrame
             """
             return field_type[25:-2] + " " + str(getattr(field, "_ref"))
@@ -83,8 +83,7 @@ class OTF2Reader:
         the same data structure as the passed argument but field_to_val is applied
         to all of the values it contains
 
-        Note:
-        all of the below cases handle the case where the data structure
+        Note all of the below cases handle the case where the data structure
         could be nested, which is always possibility depending on the trace's
         specific attributes
         """
