@@ -165,13 +165,10 @@ class Trace:
 
                     stack = []
 
-                    """
-                    Note:
-                    The reason that we are creating lists that are copies of the
-                    dataframe columns below and iterating over those instead of using
-                    pandas iterrows is due to an observed improvement in performance
-                    when using lists.
-                    """
+                    # Note: The reason that we are creating lists that are
+                    # copies of the dataframe columns below and iterating over
+                    # those instead of using pandas iterrows is due to an
+                    # observed improvement in performance when using lists.
 
                     event_types = list(filtered_df["Event Type"])
                     df_indices, timestamps = list(filtered_df.index), list(
@@ -258,10 +255,9 @@ class Trace:
                                 parent_df_index = stack[-1]
 
                                 if children[parent_df_index] is None:
-                                    """
-                                    create a new list of children for the parent if
-                                    the current event is the first child being added
-                                    """
+                                    # create a new list of children for the
+                                    # parent if the current event is the first
+                                    # child being added
                                     children[parent_df_index] = [curr_df_index]
                                 else:
                                     children[parent_df_index].append(curr_df_index)
@@ -275,14 +271,12 @@ class Trace:
                             stack.append(curr_df_index)
                         else:
                             # pop event off stack once matching leave found
+                            # Note: depth, parent, and children for a leave row
+                            # can be found using the matching index that
+                            # corresponds to the enter row
                             stack.pop()
 
                             curr_depth -= 1
-
-                            """
-                            depth, parent, and children for a leave row can be found
-                            using the matching index that corresponds to the enter row
-                            """
 
             self.events["_depth"], self.events["_parent"], self.events["_children"] = (
                 depth,
