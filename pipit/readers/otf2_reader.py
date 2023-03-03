@@ -83,7 +83,7 @@ class OTF2Reader:
         the same data structure as the passed argument but field_to_val is applied
         to all of the values it contains
 
-        Note all of the below cases handle the case where the data structure
+        Note: all of the below cases handle the case where the data structure
         could be nested, which is always possibility depending on the trace's
         specific attributes
         """
