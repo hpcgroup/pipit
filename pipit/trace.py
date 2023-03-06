@@ -337,9 +337,6 @@ class Trace:
                             """
                             curr_node = nodes_stack.pop()
 
-                            # do we want to store node reference in leave row too?
-                            graph_nodes[curr_df_index] = curr_node
-
                             # Update functions stack and current depth
                             functions_stack.pop()
                             curr_depth -= 1
