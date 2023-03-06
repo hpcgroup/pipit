@@ -327,7 +327,7 @@ class Trace:
         sizes = messages["Attributes"].map(lambda x: x["msg_length"])
 
         return np.histogram(sizes, bins=bins, **kwargs)
-        
+
     def flat_profile(self, metric=["Inc Time", "Exc Time"], groupby_column="Name"):
         """
         Arguments:
@@ -375,4 +375,3 @@ class Trace:
             .apply(list)
             .to_dict()
         )
-        
