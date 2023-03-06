@@ -1,5 +1,5 @@
-# Copyright 2022 Parallel Software and Systems Group, University of Maryland.
-# See the top-level LICENSE file for details.
+# Copyright 2022-2023 Parallel Software and Systems Group, University of
+# Maryland. See the top-level LICENSE file for details.
 #
 # SPDX-License-Identifier: MIT
 
@@ -30,7 +30,7 @@ import pkg_resources
 # -- Project information -----------------------------------------------------
 
 project = "pipit"
-copyright = "2022, Parallel Software and Systems Group, University of Maryland"
+copyright = "2022-2023, Parallel Software and Systems Group, University of Maryland"
 author = "Abhinav Bhatele"
 
 # The full version, including alpha/beta/rc tags

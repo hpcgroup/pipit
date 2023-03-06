@@ -1,5 +1,5 @@
-# Copyright 2022 Parallel Software and Systems Group, University of Maryland.
-# See the top-level LICENSE file for details.
+# Copyright 2022-2023 Parallel Software and Systems Group, University of
+# Maryland. See the top-level LICENSE file for details.
 #
 # SPDX-License-Identifier: MIT
 
@@ -258,7 +258,7 @@ class ProjectionsReader:
 
     # Returns an empty dict, used for reading log file into dataframe
     @staticmethod
-    def __create_empty_dict() -> dict:
+    def _create_empty_dict() -> dict:
         return {
             "Name": [],
             "Event Type": [],
@@ -274,19 +274,19 @@ class ProjectionsReader:
         # Read each log file and store as list of dataframes
         dataframes_list = []
         for i in range(self.num_pes):
-            dataframes_list.append(self.__read_log_file(i))
+            dataframes_list.append(self._read_log_file(i))
 
         # Concatinate the dataframes list into dataframe containing entire trace
         trace_df = pandas.concat(dataframes_list, ignore_index=True)
 
         return pipit.trace.Trace(None, trace_df)
 
-    def __read_log_file(self, pe_num: int) -> pandas.DataFrame:
+    def _read_log_file(self, pe_num: int) -> pandas.DataFrame:
         # has information needed in sts file
         sts_reader = self.sts_reader
 
         # create an empty dict to append to
-        data = self.__create_empty_dict()
+        data = self._create_empty_dict()
 
         # opening the log file we need to read
         log_file = gzip.open(
