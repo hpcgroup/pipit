@@ -1,5 +1,5 @@
-# Copyright 2022 Parallel Software and Systems Group, University of Maryland.
-# See the top-level LICENSE file for details.
+# Copyright 2022-2023 Parallel Software and Systems Group, University of
+# Maryland. See the top-level LICENSE file for details.
 #
 # SPDX-License-Identifier: MIT
 
@@ -13,7 +13,7 @@ from pipit.graph import Graph, Node
 class ExperimentReader:
     def __init__(self, file_location):
         self.tree = ElementTree(file=file_location)
-        self.__create_identifier_name_table()
+        self._create_identifier_name_table()
 
     def get_function_name(self, procedure_table_id):
         """return function name, given a procedure_table_id"""
@@ -22,7 +22,7 @@ class ExperimentReader:
         procedure = self.tree.find(procedure_table_search)
         return procedure.get("n")
 
-    def __create_identifier_name_table(self):
+    def _create_identifier_name_table(self):
         self.identifier_name_table = {}
         for identifier in list(list(list(list(self.tree.getroot())[1])[0])[0]):
             identifier_map = identifier.attrib

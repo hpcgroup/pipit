@@ -1,5 +1,5 @@
-# Copyright 2022 Parallel Software and Systems Group, University of Maryland.
-# See the top-level LICENSE file for details.
+# Copyright 2022-2023 Parallel Software and Systems Group, University of
+# Maryland. See the top-level LICENSE file for details.
 #
 # SPDX-License-Identifier: MIT
 
@@ -83,7 +83,7 @@ class Node:
             + str(self.level)
         )
 
-    def __calculate_level(self):
+    def _calculate_level(self):
         """private function to get depth of node"""
         if self.parent is None:
             return 0
