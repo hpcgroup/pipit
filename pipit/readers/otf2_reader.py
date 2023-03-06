@@ -1,10 +1,8 @@
-# Copyright 2022 Parallel Software and Systems Group, University of Maryland.
-# See the top-level LICENSE file for details.
+# Copyright 2022-2023 Parallel Software and Systems Group, University of
+# Maryland. See the top-level LICENSE file for details.
 #
 # SPDX-License-Identifier: MIT
 
-import math
-import otf2
 import pandas as pd
 import multiprocessing as mp
 import pipit.trace
@@ -13,9 +11,16 @@ import pipit.trace
 class OTF2Reader:
     """Reader for OTF2 trace files"""
 
-    def __init__(self, dir_name):
+    def __init__(self, dir_name, num_processes=None):
         self.dir_name = dir_name  # directory of otf2 file being read
         self.file_name = self.dir_name + "/traces.otf2"
+
+        num_cpus = mp.cpu_count()
+        if num_processes is None or num_processes < 1 or num_processes > num_cpus:
+            # uses all processes to parallelize reading by default
+            self.num_processes = num_cpus
+        else:
+            self.num_processes = num_processes
 
     def field_to_val(self, field):
         """
@@ -50,7 +55,7 @@ class OTF2Reader:
             Example: An event can have an attribute called region which corresponds
             to a definition. We strip the string and extract only the relevant
             information, which is the type of definition such as Region and also
-            append its id  (like Region 6) so that this definition ca be accessed
+            append its id (like Region 6) so that this definition can be accessed
             in the Definitions DataFrame
             """
             return field_type[25:-2] + " " + str(getattr(field, "_ref"))
@@ -81,7 +86,6 @@ class OTF2Reader:
         Note: all of the below cases handle the case where the data structure
         could be nested, which is always possibility depending on the trace's
         specific attributes
-
         """
 
         if isinstance(data, list):
@@ -99,9 +103,9 @@ class OTF2Reader:
             }
         elif isinstance(data, tuple):
             """
-            There is a definition called CartTopology which has a field called
-            dimensions that is a tuple of two other definitions called
-            CartDimensions, showing why this nested structure is needed
+            Example: There is a definition called CartTopology which has a
+            field called dimensions that is a tuple of two other definitions
+            called CartDimensions, showing why this nested structure is needed
             """
             return tuple([self.handle_data(data_element) for data_element in data])
         elif isinstance(data, set):
@@ -147,100 +151,129 @@ class OTF2Reader:
         to a dataframe
         """
 
-        with otf2.reader.open(self.file_name) as trace:
+        with otf2.reader.open(self.file_name) as trace:  # noqa: F821
             # extracts the rank and size
             # and gets all the locations
             # of the trace
             rank, size = rank_size[0], rank_size[1]
             locations = list(trace.definitions._locations)
+            num_locations = len(locations)
 
-            # calculates how many locations to read per process
-            # and determines starting and ending indices to select
-            # for the current process
-            per_process = math.floor(len(locations) / size)
-            begin_int, end_int = int(rank * per_process), int((rank + 1) * per_process)
+            # base number of locations read by each process
+            per_process = int(num_locations // size)
+
+            # remainder number of locations to be split evenly
+            remainder = int(num_locations % size)
+
+            if rank < remainder:
+                """
+                Example:
+                For the reading of 30 locations split over 14 processes,
+                first 2 processes will read 3 locations each since the remainder
+                is 2.
+                """
+                begin_int = rank * (per_process + 1)
+                end_int = (rank + 1) * (per_process + 1)
+            else:
+                """
+                Example:
+                For the reading of 30 locations split over 14 processes,
+                last 12 processes will read 2 locations each. The starting index
+                accounts for the fact that the first two will read 3 locations each.
+                """
+                begin_int = (rank * per_process) + remainder
+                end_int = ((rank + 1) * per_process) + remainder
+
+            # select the locations to read based on above calculations
+            loc_events = list(trace.events(locations[begin_int:end_int]).__iter__())
 
             # columns of the DataFrame
             timestamps, event_types, event_attributes, names = [], [], [], []
-            locs, loc_types, loc_groups, loc_group_types = [], [], [], []
 
-            # selects a subset of all trace locations to
-            # read based on the current rank
-            loc_events = []
-            if rank == size - 1:
-                loc_events = list(trace.events(locations[begin_int:]).__iter__())
-            elif len(locations[begin_int:end_int]) != 0:
-                loc_events = list(trace.events(locations[begin_int:end_int]).__iter__())
+            # Note:
+            # 1. The below lists are for storing logical ids.
+            # 2. Support for GPU events has to be added and unified across readers.
+            process_ids, thread_ids = [], []
 
             # iterates through the events and processes them
             for loc_event in loc_events:
                 # extracts the location and event
-                # location could be thread, process, accelerator stream, etc
+                # location could be thread, process, etc
                 loc, event = loc_event[0], loc_event[1]
 
-                # information about the location
-                # that the event occurred on
-                locs.append(loc._ref)
-                loc_types.append(str(loc.type)[13:])
-                loc_groups.append(loc.group._ref)
-                loc_group_types.append(str(loc.group.location_group_type)[18:])
+                # information about the location that the event occurred on
 
-                # type of event - enter, leave, or other types
-                event_type = str(type(event))[20:-2]
-                event_types.append(event_type)
+                # TO DO:
+                # need to add support for accelerator and metric locations
+                if str(loc.type)[13:] == "CPU_THREAD":
+                    process_id = loc.group._ref
+                    process_ids.append(process_id)
 
-                # only enter/leave events have a name
-                if event_type in ["Enter", "Leave"]:
-                    names.append(event.region.name)
-                else:
-                    # names column is of categorical dtype
-                    names.append("N/A")
+                    # subtract the minimum location number of a process
+                    # from the location number to get threads numbered
+                    # 0 to (num_threads per process - 1) for each process.
+                    thread_ids.append(loc._ref - self.process_threads_map[process_id])
 
-                timestamps.append(event.time)
+                    # type of event - enter, leave, or other types
+                    event_type = str(type(event))[20:-2]
+                    if event_type == "Enter" or event_type == "Leave":
+                        event_types.append(event_type)
+                    else:
+                        event_types.append("Instant")
 
-                # only add attributes for non-leave rows so that
-                # there aren't duplicate attributes for a single event
-                if event_type != "Leave":
-                    attributes_dict = {}
+                    if event_type in ["Enter", "Leave"]:
+                        names.append(event.region.name)
+                    else:
+                        names.append(event_type)
 
-                    # iterates through the event's attributes
-                    # (ex: region, bytes sent, etc)
-                    for key, value in vars(event).items():
+                    timestamps.append(event.time)
 
-                        # only adds non-empty attributes
-                        # and ignores time so there isn't a duplicate time
-                        if value is not None and key != "time":
+                    # only add attributes for non-leave rows so that
+                    # there aren't duplicate attributes for a single event
+                    if event_type != "Leave":
+                        attributes_dict = {}
 
-                            # uses field_to_val to convert all data types appropriately
-                            # and ensure that there are no pickling errors
-                            attributes_dict[self.field_to_val(key)] = self.handle_data(
-                                value
-                            )
-                    event_attributes.append(attributes_dict)
-                else:
-                    # nan attributes for leave rows
-                    # attributes column is of object dtype
-                    event_attributes.append(None)
+                        # iterates through the event's attributes
+                        # (ex: region, bytes sent, etc)
+                        for key, value in vars(event).items():
+                            # only adds non-empty attributes
+                            # and ignores time so there isn't a duplicate time
+                            if value is not None and key != "time":
+                                # uses field_to_val to convert all data types
+                                # and ensure that there are no pickling errors
+                                attributes_dict[
+                                    self.field_to_val(key)
+                                ] = self.handle_data(value)
+                        event_attributes.append(attributes_dict)
+                    else:
+                        # nan attributes for leave rows
+                        # attributes column is of object dtype
+                        event_attributes.append(None)
 
             trace.close()  # close event files
 
-        # returns dictionary with all events and their fields
-        return {
-            "Event Type": event_types,
-            "Timestamp (ns)": timestamps,
-            "Name": names,
-            "Location ID": locs,
-            "Location Type": loc_types,
-            "Location Group ID": loc_groups,
-            "Location Group Type": loc_group_types,
-            "Attributes": event_attributes,
-        }
+        # returns dataframe with all events and their fields
+        return pd.DataFrame(
+            {
+                "Timestamp (ns)": timestamps,
+                "Event Type": event_types,
+                "Name": names,
+                "Thread": thread_ids,
+                "Process": process_ids,
+                "Attributes": event_attributes,
+            }
+        )
 
     def read_definitions(self, trace):
         """
         Reads the definitions from the trace and converts them to a Pandas
         DataFrame
         """
+
+        # OTF2 stores locations numbered from 0 to the (total number of threads - 1)
+        # across all processes. This dict will help us convert those to be orderered
+        # from 0 to (number of threads for each process - 1) per process instead.
+        self.process_threads_map = dict()
 
         # ids are the _ref attribute of an object
         # all objects stored in a reference registry
@@ -271,6 +304,24 @@ class OTF2Reader:
                 then def_object is a single region being looked at
                 """
                 for def_object in def_attribute.__iter__():
+                    # add to process threads map dict if you encounter a new location
+                    if (
+                        key == "_locations"
+                        and str(def_object.type) == "LocationType.CPU_THREAD"
+                    ):
+                        location_num, process_num = (
+                            def_object._ref,
+                            def_object.group._ref,
+                        )
+
+                        # each process (location group) will be mapped to its
+                        # minimum location number, which we will use to number threads
+                        # appropriately by subtracting that min from its location nums
+                        if process_num not in self.process_threads_map:
+                            self.process_threads_map[process_num] = location_num
+                        elif location_num < self.process_threads_map[process_num]:
+                            self.process_threads_map[process_num] = location_num
+
                     if hasattr(def_object, "_ref"):
                         # only add ids for those definitions that have it
                         def_id.append(def_object._ref)
@@ -307,26 +358,18 @@ class OTF2Reader:
 
         # parallelizes the reading of events
         # using the multiprocessing library
-        pool_size, pool = mp.cpu_count(), mp.Pool()
+        pool_size, pool = self.num_processes, mp.Pool(self.num_processes)
 
-        # confusing, but at this moment in time events_dict is actually a
-        # list of dicts that will be merged into one dictionary after this
-        events_dict = pool.map(
+        # list of dataframes returned by the processes pool
+        events_dataframes = pool.map(
             self.events_reader, [(rank, pool_size) for rank in range(pool_size)]
         )
 
         pool.close()
 
-        # combines the dictionaries returned from each
-        # process to generate a full trace
-        for i in range(len(events_dict) - 1):
-            for key, value in events_dict[0].items():
-                value.extend(events_dict[1][key])
-            del events_dict[1]
-        events_dict = events_dict[0]
-
-        # returns the events as a DataFrame
-        events_dataframe = pd.DataFrame(events_dict)
+        # merges the dataframe into one events dataframe
+        events_dataframe = pd.concat(events_dataframes)
+        del events_dataframes
 
         # accessing the clock properties of the trace using the definitions
         clock_properties = self.definitions.loc[
@@ -348,16 +391,21 @@ class OTF2Reader:
             by="Timestamp (ns)", axis=0, ascending=True, inplace=True, ignore_index=True
         )
 
+        # convert these to ints
+        # (sometimes they get converted to floats
+        #  while concatenating dataframes)
+        events_dataframe = events_dataframe.astype(
+            {"Thread": "int32", "Process": "int32"}
+        )
+
         # using categorical dtypes for memory optimization
         # (only efficient when used for categorical data)
         events_dataframe = events_dataframe.astype(
             {
                 "Event Type": "category",
                 "Name": "category",
-                "Location ID": "category",
-                "Location Type": "category",
-                "Location Group ID": "category",
-                "Location Group Type": "category",
+                "Thread": "category",
+                "Process": "category",
             }
         )
 
@@ -365,14 +413,24 @@ class OTF2Reader:
 
     def read(self):
         """
-        Returns a TraceData object for the otf2 file
+        Returns a Trace object for the otf2 file
         that has one definitions DataFrame and another
         events DataFrame as its primary attributes
         """
 
-        with otf2.reader.open(self.file_name) as trace:
+        with otf2.reader.open(self.file_name) as trace:  # noqa: F821
             self.definitions = self.read_definitions(trace)  # definitions
+
+            # if a trace has n locations, we should only parallelize
+            # the reading of events over a number of processes
+            # equal to n at a maximum
+            num_locations = len(trace.definitions._locations)
+            if self.num_processes > num_locations:
+                self.num_processes = num_locations
+
             # close the trace and open it later per process
             trace.close()
+
         self.events = self.read_events()  # events
+
         return pipit.trace.Trace(self.definitions, self.events)
