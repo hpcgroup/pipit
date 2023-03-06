@@ -239,7 +239,7 @@ class Trace:
                     exc_times[curr_parent_idx] -= inc_times[child_idx]
 
             self.events["time.exc"] = exc_times
-           
+
     def create_cct(self):
         """
         Generic function to iterate through the trace events and create a CCT.
@@ -423,7 +423,7 @@ class Trace:
             ]
 
         return communication_matrix
-            
+
     def message_histogram(self, bins=20, **kwargs):
         """Generates histogram of message frequency by size."""
 
