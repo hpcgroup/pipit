@@ -6,6 +6,7 @@
 import numpy as np
 
 from pipit.query import QueryBuilder, Select
+from .graph import Graph, Node
 
 
 class Trace:
@@ -13,10 +14,11 @@ class Trace:
     or more dataframes.
     """
 
-    def __init__(self, definitions, events):
+    def __init__(self, definitions, events, cct=None):
         """Create a new Trace object."""
         self.definitions = definitions
         self.events = events
+        self.cct = cct
 
     @staticmethod
     def from_otf2(dirname, num_processes=None):
@@ -330,35 +332,202 @@ class Trace:
 
         return np.histogram(sizes, bins=bins, **kwargs)
 
-    def select(self, *args, **kwargs):
-        """Creates a QueryBuilder with a Select query."""
-        return QueryBuilder(trace=self).select(*args, **kwargs)
+    def create_cct(self):
+        """
+        Generic function to iterate through the trace events and create a CCT.
+        Uses pipit's graph data structure for this. Populates the trace's CCT
+        field and creates a new column in the trace's Events DataFrame that stores
+        a reference to each row's corresponding node in the CCT.
+        """
 
-    def exclude(self, *args, **kwargs):
-        """Creates a QueryBuilder with an Exclude query."""
-        return QueryBuilder(trace=self).exclude(*args, **kwargs)
+        # only create the cct if it doesn't exist already
+        if self.cct is None:
+            # CCT and list of nodes in DataFrame
+            graph = Graph()
+            graph_nodes = [None] * len(self.events)
 
-    def filter(self, *args, **kwargs):
-        """Creates a QueryBuilder with a Filter query."""
-        return QueryBuilder(trace=self).filter(*args, **kwargs)
+            # determines whether a node exists or not
+            callpath_to_node = dict()
 
-    def sort(self, *args, **kwargs):
-        """Creates a QueryBuilder with a Sort query."""
-        return QueryBuilder(trace=self).sort(*args, **kwargs)
+            node_id = 0  # each node has a unique id
 
-    def limit(self, *args, **kwargs):
-        """Creates a QueryBuilder with a Limit query."""
-        return QueryBuilder(trace=self).limit(*args, **kwargs)
+            # Filter the DataFrame to only Enter/Leave
+            enter_leave_df = self.events.loc[
+                self.events["Event Type"].isin(["Enter", "Leave"])
+            ]
 
-    def get(self, *queries):
-        """Apply queries to this `Trace` instance."""
-        # Apply each query to events DataFrame
-        df = self.events
-        for query in queries:
-            df = query.apply(df, list(queries))
+            # Iterating over process & threads to
+            # read call stack sequentially
+            for process in set(enter_leave_df["Process"]):
+                curr_process_df = enter_leave_df.loc[
+                    enter_leave_df["Process"] == process
+                ]
 
-        # If there are no `Select` queries, then select defaults
-        if not any(isinstance(query, Select) for query in queries):
-            df = Select("defaults").apply(df)
+                for thread in set(curr_process_df["Thread"]):
+                    # filter by both process and thread
+                    filtered_df = curr_process_df.loc[
+                        curr_process_df["Thread"] == thread
+                    ]
 
-        return df
+                    curr_depth, callpath = 0, ""
+
+                    """
+                    Iterating over lists instead of
+                    DataFrame columns is more efficient
+                    """
+                    df_indices = filtered_df.index.to_list()
+                    function_names = filtered_df["Name"].to_list()
+                    event_types = filtered_df["Event Type"].to_list()
+
+                    # stacks used to iterate through the trace and add nodes to the cct
+                    functions_stack, nodes_stack = [], []
+
+                    # iterating over the events of the current thread's trace
+                    for i in range(len(filtered_df)):
+                        curr_df_index, evt_type, function_name = (
+                            df_indices[i],
+                            event_types[i],
+                            function_names[i],
+                        )
+
+                        # encounter a new function through its entry point.
+                        if evt_type == "Enter":
+                            # add the function to the stack and get the call path
+                            functions_stack.append(function_name)
+                            callpath = "->".join(functions_stack)
+
+                            # get the parent node of the function if it exists
+                            parent_node = None if curr_depth == 0 else nodes_stack[-1]
+
+                            if callpath in callpath_to_node:
+                                # don't create new node if callpath is in map
+                                curr_node = callpath_to_node[callpath]
+                            else:
+                                # create new node if callpath isn't in map
+                                curr_node = Node(
+                                    node_id, function_name, parent_node, curr_depth
+                                )
+                                callpath_to_node[callpath] = curr_node
+                                node_id += 1
+
+                                # add node as root or child of its
+                                # parent depending on current depth
+                                graph.add_root(
+                                    curr_node
+                                ) if curr_depth == 0 else parent_node.add_child(
+                                    curr_node
+                                )
+
+                            # Update nodes stack, column, and current depth
+                            nodes_stack.append(curr_node)
+                            graph_nodes[curr_df_index] = curr_node
+                            curr_depth += 1
+                        else:
+                            """
+                            Get the corresponding node from top of stack
+                            once you encounter the Leave event for a function
+                            """
+                            curr_node = nodes_stack.pop()
+
+                            # do we want to store node reference in leave row too?
+                            graph_nodes[curr_df_index] = curr_node
+
+                            # Update functions stack and current depth
+                            functions_stack.pop()
+                            curr_depth -= 1
+
+            # Update the Trace with the generated cct
+            self.events["Graph_Node"] = graph_nodes
+            self.cct = graph
+
+    def __repr__(self):
+        return (
+            super().__repr__()
+            + "\nEvents:\n"
+            + self.events[
+                ["Timestamp (ns)", "Event Type", "Name", "Thread", "Process"]
+            ].to_string(max_rows=25, show_dimensions=True)
+            + "\n\nCCT:\n"
+            + self.cct.__repr__()
+        )
+
+    def _select_cct(self, nodes):
+        """Returns a clone of `self.cct` containing only nodes in `nodes`
+
+        Args:
+            nodes (list of Node): nodes to keep
+        """
+        new_cct = Graph()
+
+        def _add_node_rec(node, parent):
+            keep = node in nodes
+            clone = Node(node.name_id, node.name, node.parent, node.level)
+            keep |= True in [_add_node_rec(child, clone) for child in node.children]
+
+            if keep:
+                if parent is None:
+                    new_cct.add_root(clone)
+                else:
+                    parent.children.append(clone)
+
+            return keep
+
+        for root in self.cct.roots:
+            _add_node_rec(root, None)
+
+        return new_cct
+
+    def select(
+        self, field=None, operator=None, value=None, pandas_expr=None, func=None
+    ):
+        """Applies selection by field name
+
+        Applies a selection along a field, like "Name" or "Process". Can operate
+        on any field that currently exists in the events DataFrame. Supports
+        basic comparisons, like "<", "<=", "==", ">=", ">", "!=", as well as
+        other operations, like "in", "not-in", and "between".
+
+        Args:
+            field (str, optional): The DataFrame field/column name to select by.
+
+            operator (str, optional): The comparison operator to use to evaluate
+                the selection. Allowed operators:
+            "<", "<=", "==", ">=", ">", "!=", "in", "not-in", "between"
+
+            value (optional): The value to compare to. For "in" and "not-in"
+                operations, this can be a list of any size. For "between", this
+                must be a list or tuple of 2 elements. For all other operators,
+                must be a scalar value, like "MPI_Init" or "1.5e+5"
+
+            pandas_expr (str, optional): Instead of providing the field,
+            operator, and value, you may provide a Pandas query expression
+            to select with.
+            See https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.query.html. # noqa: E501
+
+            func (callable[row], optional): Instead of providing the field/
+            operator/value, or providing a Pandas query expression, you
+            may provide a function that is applied to each row of the
+            DataFrame, that returns True or False. This uses the
+            DataFrame.apply function, which is not a vectorized operation,
+            resulting in a significantly slower runtime.
+        """
+        # Filter events
+        if pandas_expr is None and func is None:
+            if operator in ["==", "<", "<=", ">", ">=", "!="]:
+                pandas_expr = f"`{field}` {operator} {value.__repr__()}"
+            elif operator == "in":
+                pandas_expr = f"`{field}`.isin({value.__repr__()})"
+            elif operator == "not-in":
+                pandas_expr = f"-`{field}`.isin({value.__repr__()})"
+            elif operator == "between":
+                pandas_expr = (
+                    f"(`{field}` >= {value[0].__repr__()})"
+                    f"& (`{field}` <= {value[1].__repr__()})"
+                )
+        events = self.events.query(pandas_expr)
+
+        # Filter cct
+        nodes = events["Graph_Node"].unique().tolist()
+        new_cct = self._select_cct(nodes)
+
+        return Trace(self.definitions, events, new_cct)

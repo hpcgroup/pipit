@@ -9,7 +9,7 @@ class Node:
     referenced by any calling_context_id directly under it
     """
 
-    def __init__(self, name_id, name, parent) -> None:
+    def __init__(self, name_id, name, parent, level) -> None:
         self.calling_context_ids = []
         self.name_id = name_id
         self.name = name
@@ -84,13 +84,16 @@ class Node:
         if self.parent is None:
             return 0
         else:
-            return 1 + self.parent.__calculate_level()
+            return 1 + self.parent._calculate_level()
 
     def __eq__(self, obj) -> bool:
         if type(obj) != Node:
             return False
         else:
-            return self.calling_context_ids == obj.calling_context_ids
+            return self.name_id == obj.name_id
+
+    def __hash__(self):
+        return hash(str(self))
 
 
 class Graph:
@@ -109,3 +112,35 @@ class Graph:
 
     def get_node(self, calling_context_id) -> "Node":
         return self.calling_context_id_map.get(str(calling_context_id))
+
+    def __repr__(self):
+        str = ""
+
+        def dfs(node):
+            nonlocal str
+            if node.level == 0:
+                str += node.name + "\n"
+            else:
+                str += "│ " * node.level + "├─ " + node.name + "\n"
+            for child in node.children:
+                dfs(child)
+
+        for root in self.roots:
+            dfs(root)
+        return str
+
+    def _repr_html_(self):
+        str = ""
+
+        def dfs(node):
+            nonlocal str
+            if node.level == 0:
+                str += node.name + "<br/>"
+            else:
+                str += "│ " * node.level + "├─ " + node.name + "<br/>"
+            for child in node.children:
+                dfs(child)
+
+        for root in self.roots:
+            dfs(root)
+        return str
