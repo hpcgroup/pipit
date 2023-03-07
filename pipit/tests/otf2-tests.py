@@ -1,5 +1,5 @@
-# Copyright 2022 Parallel Software and Systems Group, University of Maryland.
-# See the top-level LICENSE file for details.
+# Copyright 2022-2023 Parallel Software and Systems Group, University of
+# Maryland. See the top-level LICENSE file for details.
 #
 # SPDX-License-Identifier: MIT
 
@@ -36,15 +36,15 @@ def test_events(data_dir, ping_pong_otf2_trace):
     # 8 sends per rank, so 16 sends total -> 32 including both enter and leave rows
     assert len(events_df.loc[events_df["Name"] == "MPI_Send"]) == 32
 
-    assert (
-        len(set(events_df["Process"])) == len(set(events_df["Thread"])) == 2
-    )  # 2 ranks for ping pong trace
+    assert len(set(events_df["Process"])) == 2  # 2 ranks for ping pong trace
+
+    assert len(set(events_df["Thread"])) == 1  # 1 thread per rank
+
+    assert len(events_df.loc[events_df["Process"] == 0]) == 54  # 54 events per rank
 
     assert (
-        len(events_df.loc[events_df["Process"] == 0])
-        == len(events_df.loc[events_df["Thread"] == 0])
-        == 54
-    )  # 54 events per rank
+        len(events_df.loc[events_df["Thread"] == 0]) == 108
+    )  # all 108 events associated with the main thread
 
     # timestamps should be sorted in increasing order
     assert (np.diff(events_df["Timestamp (ns)"]) > 0).all()
