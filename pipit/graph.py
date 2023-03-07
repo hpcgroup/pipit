@@ -152,7 +152,8 @@ class Graph:
 
         # Recursively clone and add node to new_graph
         def _add_node_rec(node, parent):
-            # Keep this node if either it is in `nodes`, or if a descendant is in `nodes`
+            # Keep this node if either it is in `nodes`,
+            # or if a descendant is in `nodes`
             keep_node = node in nodes
             clone = Node(node.name_id, node.name, node.parent, node.level)
             keep_node |= any([_add_node_rec(child, clone) for child in node.children])
