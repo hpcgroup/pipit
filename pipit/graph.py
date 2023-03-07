@@ -113,34 +113,61 @@ class Graph:
     def get_node(self, calling_context_id) -> "Node":
         return self.calling_context_id_map.get(str(calling_context_id))
 
+    def __str__(self):
+        str = ""
+
+        num_nodes = 0
+        num_levels = 0
+
+        def dfs(node):
+            nonlocal str, num_nodes, num_levels
+
+            num_nodes += 1
+            num_levels = max(node.level + 1, num_levels)
+
+            if node.level == 0:
+                str += node.__str__() + "\n"
+            else:
+                str += "│ " * node.level + "├─ " + node.__str__() + "\n"
+            for child in node.children:
+                dfs(child)
+
+        for root in self.roots:
+            dfs(root)
+
+        str += f"\n[{num_nodes} nodes x {num_levels} levels]"
+        return str
+
     def __repr__(self):
-        str = ""
+        return self.__str__()
 
-        def dfs(node):
-            nonlocal str
-            if node.level == 0:
-                str += node.name + "\n"
-            else:
-                str += "│ " * node.level + "├─ " + node.name + "\n"
-            for child in node.children:
-                dfs(child)
+    def select(self, nodes):
+        """Returns a clone of this Graph containing only nodes,
+        and ancestors of nodes, in `nodes`
 
+        Args:
+            nodes (list of Node): nodes to keep
+        """
+        new_graph = Graph()
+
+        # Recursively clone and add node to new_graph
+        def _add_node_rec(node, parent):
+            # Keep this node if either it is in `nodes`, or if a descendant is in `nodes`
+            keep_node = node in nodes
+            clone = Node(node.name_id, node.name, node.parent, node.level)
+            keep_node |= any([_add_node_rec(child, clone) for child in node.children])
+
+            if keep_node:
+                if parent is None:
+                    new_graph.add_root(clone)
+                else:
+                    parent.children.append(clone)
+
+            return keep_node
+
+        # Apply to each root (and recursively all children)
         for root in self.roots:
-            dfs(root)
-        return str
+            _add_node_rec(root, None)
 
-    def _repr_html_(self):
-        str = ""
-
-        def dfs(node):
-            nonlocal str
-            if node.level == 0:
-                str += node.name + "<br/>"
-            else:
-                str += "│ " * node.level + "├─ " + node.name + "<br/>"
-            for child in node.children:
-                dfs(child)
-
-        for root in self.roots:
-            dfs(root)
-        return str
+        # Return new_graph containing cloned nodes
+        return new_graph

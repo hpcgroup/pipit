@@ -5,7 +5,6 @@
 
 import numpy as np
 
-from pipit.query import QueryBuilder, Select
 from .graph import Graph, Node
 
 
@@ -440,7 +439,7 @@ class Trace:
             self.events["Graph_Node"] = graph_nodes
             self.cct = graph
 
-    def __repr__(self):
+    def __str__(self):
         return (
             super().__repr__()
             + "\nEvents:\n"
@@ -448,86 +447,16 @@ class Trace:
                 ["Timestamp (ns)", "Event Type", "Name", "Thread", "Process"]
             ].to_string(max_rows=25, show_dimensions=True)
             + "\n\nCCT:\n"
-            + self.cct.__repr__()
+            + self.cct.__str__()
         )
 
-    def _select_cct(self, nodes):
-        """Returns a clone of `self.cct` containing only nodes in `nodes`
+    def __repr__(self):
+        return self.__str__()
 
-        Args:
-            nodes (list of Node): nodes to keep
-        """
-        new_cct = Graph()
+    def filter(self, *filters):
+        trace = self
 
-        def _add_node_rec(node, parent):
-            keep = node in nodes
-            clone = Node(node.name_id, node.name, node.parent, node.level)
-            keep |= True in [_add_node_rec(child, clone) for child in node.children]
+        for filter in filters:
+            trace = filter._apply(trace)
 
-            if keep:
-                if parent is None:
-                    new_cct.add_root(clone)
-                else:
-                    parent.children.append(clone)
-
-            return keep
-
-        for root in self.cct.roots:
-            _add_node_rec(root, None)
-
-        return new_cct
-
-    def select(
-        self, field=None, operator=None, value=None, pandas_expr=None, func=None
-    ):
-        """Applies selection by field name
-
-        Applies a selection along a field, like "Name" or "Process". Can operate
-        on any field that currently exists in the events DataFrame. Supports
-        basic comparisons, like "<", "<=", "==", ">=", ">", "!=", as well as
-        other operations, like "in", "not-in", and "between".
-
-        Args:
-            field (str, optional): The DataFrame field/column name to select by.
-
-            operator (str, optional): The comparison operator to use to evaluate
-                the selection. Allowed operators:
-            "<", "<=", "==", ">=", ">", "!=", "in", "not-in", "between"
-
-            value (optional): The value to compare to. For "in" and "not-in"
-                operations, this can be a list of any size. For "between", this
-                must be a list or tuple of 2 elements. For all other operators,
-                must be a scalar value, like "MPI_Init" or "1.5e+5"
-
-            pandas_expr (str, optional): Instead of providing the field,
-            operator, and value, you may provide a Pandas query expression
-            to select with.
-            See https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.query.html. # noqa: E501
-
-            func (callable[row], optional): Instead of providing the field/
-            operator/value, or providing a Pandas query expression, you
-            may provide a function that is applied to each row of the
-            DataFrame, that returns True or False. This uses the
-            DataFrame.apply function, which is not a vectorized operation,
-            resulting in a significantly slower runtime.
-        """
-        # Filter events
-        if pandas_expr is None and func is None:
-            if operator in ["==", "<", "<=", ">", ">=", "!="]:
-                pandas_expr = f"`{field}` {operator} {value.__repr__()}"
-            elif operator == "in":
-                pandas_expr = f"`{field}`.isin({value.__repr__()})"
-            elif operator == "not-in":
-                pandas_expr = f"-`{field}`.isin({value.__repr__()})"
-            elif operator == "between":
-                pandas_expr = (
-                    f"(`{field}` >= {value[0].__repr__()})"
-                    f"& (`{field}` <= {value[1].__repr__()})"
-                )
-        events = self.events.query(pandas_expr)
-
-        # Filter cct
-        nodes = events["Graph_Node"].unique().tolist()
-        new_cct = self._select_cct(nodes)
-
-        return Trace(self.definitions, events, new_cct)
+        return trace
