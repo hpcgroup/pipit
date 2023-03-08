@@ -327,3 +327,80 @@ class Trace:
         sizes = messages["Attributes"].map(lambda x: x["msg_length"])
 
         return np.histogram(sizes, bins=bins, **kwargs)
+
+    def time_profile(self, num_bins=10):
+        self._match_caller_callee()
+        self.calc_inc_time()
+
+        # Filter by functions
+        all = self.events[self.events["Event Type"] == "Enter"].copy(deep=False)
+        all.rename(
+            columns={
+                "Name": "name",
+                "Timestamp (ns)": "start",
+                "_matching_timestamp": "end",
+            },
+            inplace=True,
+        )
+
+        # Create equal-sized bins
+        edges = np.linspace(0, all.end.max(), num_bins + 1)
+        bins = [(edges[i], edges[i + 1]) for i in range(num_bins)]
+        functions = []
+
+        def calc_exc_time_in_bin(func):
+            # start out with exc times being a copy of inc times
+            exc_times = func["inc_time_in_bin"].copy(deep=False)
+            inc_times = func["inc_time_in_bin"].copy(deep=False)
+
+            # Filter to events that have children
+            filtered_df = func.loc[func["_children"].notnull()]
+            parent_df_indices, children = (
+                list(filtered_df.index),
+                filtered_df["_children"].to_list(),
+            )
+
+            # Iterate through the events that are parents
+            for i in range(len(filtered_df)):
+                curr_parent_idx, curr_children = parent_df_indices[i], children[i]
+                for child_idx in curr_children:
+                    # Subtract child's inclusive time to update parent's exclusive time
+                    exc_times[curr_parent_idx] -= inc_times.get(child_idx, 0)
+
+            func["exc_time_in_bin"] = exc_times
+
+        for start, end in bins:
+            # Find all functions that belong in this bin
+            func = all[~((all.start > end) | (all.end < start))].copy(deep=False)
+
+            # Calculate inc_time_in_bin for each function
+            # Case 1 - Function starts in bin
+            func.loc[func.start >= start, "inc_time_in_bin"] = end - func.start
+
+            # Case 2 - Function ends in bin
+            func.loc[func.end <= end, "inc_time_in_bin"] = func.end - start
+
+            # Case 3 - Function spans bin
+            func.loc[
+                (func.start < start) & (func.end > end),
+                "inc_time_in_bin",
+            ] = (
+                end - start
+            )
+
+            # Case 4 - Function contained in bin
+            func.loc[
+                (func.start >= start) & (func.end <= end),
+                "inc_time_in_bin",
+            ] = (
+                func.end - func.start
+            )
+
+            # Calculate exc_time_in_bin by subtracting inc_time_in_bin for all children
+            calc_exc_time_in_bin(func)
+
+            # Sum across processes
+            agg = func.groupby("name")["exc_time_in_bin"].sum()
+            functions.append(agg.to_dict())
+
+        return (bins, functions)
