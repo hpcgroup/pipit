@@ -11,6 +11,8 @@ from bokeh.models import (
     LinearColorMapper,
     LogColorMapper,
     WheelZoomTool,
+    Grid,
+    FixedTicker,
 )
 from bokeh.palettes import Blues256, Category20_20
 from bokeh.plotting import figure
@@ -168,7 +170,7 @@ def timeline(trace, notebook_url=None):
     max_ts = trace.events["Timestamp (ns)"].max()
 
     # Prepare data for plotting
-    func = trace.events.copy(deep=False)
+    func = trace.events[trace.events["Event Type"] == "Enter"].copy(deep=False)
     func = func.sort_values(by="time.inc", ascending=False)
     func["y"] = func["Process"].astype("int")
     func["Timestamp (ns)"] = func["Timestamp (ns)"].astype("float32")
@@ -191,7 +193,7 @@ def timeline(trace, notebook_url=None):
         ]
 
         # Get 500 largest functions
-        large = in_bounds.head(500)
+        large = in_bounds.head(5000)
         # small = in_bounds.tail(len(in_bounds) - 500)
 
         source.data = large
@@ -222,6 +224,16 @@ def timeline(trace, notebook_url=None):
         line_color="black",
         line_width=0.5,
     )
+
+    # Add custom grid for y-axis
+    p.ygrid.visible = False
+    g = Grid(
+        dimension=1,
+        band_fill_color="gray",
+        band_fill_alpha=0.1,
+        ticker=FixedTicker(ticks=list(np.arange(-1000, 1000) + 0.5)),
+    )
+    p.add_layout(g)
 
     # Additional plot config
     p.yaxis.ticker = BasicTicker(
