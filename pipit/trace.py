@@ -328,7 +328,7 @@ class Trace:
 
         return np.histogram(sizes, bins=bins, **kwargs)
 
-    def flat_profile(self, metric=["Inc Time", "Exc Time"], groupby_column="Name"):
+    def flat_profile(self, metric=["Exc Time"], groupby_column="Name"):
         """
         Arguments:
         metric - a string or list of strings containing the metrics to be aggregated
