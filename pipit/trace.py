@@ -339,7 +339,7 @@ class Trace:
             columns={
                 "Name": "name",
                 "Timestamp (ns)": "start",
-                "Matching Timestamp": "end",
+                "_matching_timestamp": "end",
             },
             inplace=True,
         )
@@ -348,6 +348,27 @@ class Trace:
         edges = np.linspace(0, all.end.max(), num_bins + 1)
         bins = [(edges[i], edges[i + 1]) for i in range(num_bins)]
         functions = []
+
+        def calc_exc_time_in_bin(func):
+            # start out with exc times being a copy of inc times
+            exc_times = func["inc_time_in_bin"].copy(deep=False)
+            inc_times = func["inc_time_in_bin"].copy(deep=False)
+
+            # Filter to events that have children
+            filtered_df = func.loc[func["_children"].notnull()]
+            parent_df_indices, children = (
+                list(filtered_df.index),
+                filtered_df["_children"].to_list(),
+            )
+
+            # Iterate through the events that are parents
+            for i in range(len(filtered_df)):
+                curr_parent_idx, curr_children = parent_df_indices[i], children[i]
+                for child_idx in curr_children:
+                    # Subtract child's inclusive time to update parent's exclusive time
+                    exc_times[curr_parent_idx] -= inc_times.get(child_idx, 0)
+
+            func["exc_time_in_bin"] = exc_times
 
         for start, end in bins:
             # Find all functions that belong in this bin
@@ -377,12 +398,7 @@ class Trace:
             )
 
             # Calculate exc_time_in_bin by subtracting inc_time_in_bin for all children
-            func["_children"] = func["_children"].fillna("").apply(list)
-            func["exc_time_in_bin"] = func["inc_time_in_bin"] - func["_children"].apply(
-                lambda children: func["inc_time_in_bin"]
-                .get(children, pd.Series(dtype="float"))
-                .sum()
-            )
+            calc_exc_time_in_bin(func)
 
             # Sum across processes
             agg = func.groupby("name")["exc_time_in_bin"].sum()
