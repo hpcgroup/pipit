@@ -14,7 +14,7 @@ config = {
                 Axis:
                     axis_label_text_font_style: "bold"
                     axis_label_text_color: "#666666"
-                    minor_tick_line_color: "#C0C0C0
+                    minor_tick_line_color: "#C0C0C0"
                     major_tick_line_color: "#C0C0C0"
                     axis_line_color: "#C0C0C0"
                 Toolbar:
