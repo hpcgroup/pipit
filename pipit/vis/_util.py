@@ -7,6 +7,9 @@ import sys
 
 from bokeh.io import output_notebook, show
 from bokeh.models import CustomJSHover, FuncTickFormatter, PrintfTickFormatter
+from bokeh.themes import Theme
+import yaml
+
 
 import pipit as pp
 
@@ -126,7 +129,7 @@ def getSizeHoverFormatter():
 
 # Helper functions
 def plot(obj, notebook_url=None):
-    """Internal function used to wrap return values from visualizations. If we are in a
+    """Internal function used to wrap return values from plotting functions. If we are in a
         notebook, then `bokeh.io.show` is invoked and the plot is displayed immediately
         in the associated output cell. If we are in the Python shell, then a new Bokeh
         server instance is launched, and the plot is displayed in a new browser tab.
@@ -143,6 +146,12 @@ def plot(obj, notebook_url=None):
     # Wrap the plot in a Bokeh app
     def bkapp(doc):
         doc.add_root(obj)
+        doc.theme = Theme(
+            json=yaml.load(
+                pp.config["vis"]["theme"],
+                Loader=yaml.FullLoader,
+            )
+        )
 
     # Case 1: running unit tests
     if "pytest" in sys.modules:

@@ -1,3 +1,5 @@
+import math
+
 import numpy as np
 import pandas as pd
 from bokeh.models import (
@@ -9,6 +11,7 @@ from bokeh.models import (
     LinearColorMapper,
     LogColorMapper,
 )
+from bokeh.palettes import Blues256
 from bokeh.plotting import figure
 
 from ._util import (
@@ -49,25 +52,34 @@ def comm_matrix(trace, kind="heatmap", mapping="linear", notebook_url=None, **kw
     # Define color mapping
     if mapping == "linear":
         color_mapper = LinearColorMapper(
-            palette="Viridis256", low=1, high=np.amax(comm_matrix)
+            palette=list(reversed(Blues256)), low=1, high=np.amax(comm_matrix)
         )
     elif mapping == "log":
         color_mapper = LogColorMapper(
-            palette="Viridis256", low=1, high=np.amax(comm_matrix)
+            palette=list(reversed(Blues256)), low=1, high=np.amax(comm_matrix)
         )
     else:
         color_mapper = LinearColorMapper(palette="Viridis256", low=1, high=1)
 
     # Create Bokeh plot
     p = figure(
-        height=400,
-        sizing_mode="stretch_width",
         title="Communication Matrix",
         x_axis_label="Sender",
-        x_axis_location="above",
-        x_range=(-0.5, N - 0.5),
         y_axis_label="Receiver",
+        x_range=(-0.5, N - 0.5),
         y_range=(N - 0.5, -0.5),
+        x_axis_location="above",
+        tools=[
+            "pan,reset,wheel_zoom,save",
+            HoverTool(
+                tooltips={
+                    "Sender": "Process $x{0.}",
+                    "Receiver": "Process $y{0.}",
+                    "Bytes": "@image{custom}",
+                },
+                formatters={"@image": getSizeHoverFormatter()},
+            ),
+        ],
     )
 
     # Add heatmap, color bar, and labels
@@ -89,9 +101,9 @@ def comm_matrix(trace, kind="heatmap", mapping="linear", notebook_url=None, **kw
         )
         p.add_layout(color_bar, "right")
 
-        if N <= 16:
+        if N <= 32:
             stacked["color"] = np.where(
-                stacked["volume"] > stacked["volume"].max() / 2, "black", "white"
+                stacked["volume"] > stacked["volume"].max() / 2, "white", "black"
             )
             stacked["volume_formatted"] = stacked["volume"].apply(format_size)
             labels = LabelSet(
@@ -131,18 +143,11 @@ def comm_matrix(trace, kind="heatmap", mapping="linear", notebook_url=None, **kw
     p.yaxis.ticker = BasicTicker(
         base=2, desired_num_ticks=N, min_interval=1, num_minor_ticks=0
     )
+    p.xaxis.major_label_orientation = math.pi / 6
+    p.xgrid.visible = False
+    p.ygrid.visible = False
     p.xaxis.formatter = getProcessTickFormatter()
     p.yaxis.formatter = getProcessTickFormatter()
-    p.add_tools(
-        HoverTool(
-            tooltips={
-                "Sender": "Process $x{0.}",
-                "Receiver": "Process $y{0.}",
-                "Bytes": "@image{custom}",
-            },
-            formatters={"@image": getSizeHoverFormatter()},
-        )
-    )
 
     # Return plot with wrapper function
     return plot(p, notebook_url=notebook_url)
