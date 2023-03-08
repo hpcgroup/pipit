@@ -1,1 +1,1 @@
-from .core import comm_matrix  # noqa: F401
+from .core import comm_matrix, time_profile  # noqa: F401
