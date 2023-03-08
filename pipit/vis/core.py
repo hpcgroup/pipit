@@ -202,7 +202,7 @@ def timeline(trace, notebook_url=None):
         x_range=(min_ts, max_ts),
         y_range=(max(15.5, N - 0.5), -0.5),
         x_axis_location="above",
-        tools="xpan,reset,xwheel_zoom,save,hover",
+        tools="hover,xpan,reset,xwheel_zoom,save",
         output_backend="webgl",
     )
 
