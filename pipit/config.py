@@ -16,11 +16,16 @@ config = {
                     axis_label_text_color: "#666666"
                     minor_tick_line_color: "#C0C0C0"
                     major_tick_line_color: "#C0C0C0"
+                    major_label_text_color: "#898989"
                     axis_line_color: "#C0C0C0"
                 Toolbar:
                     autohide: true
                 HoverTool:
                     point_policy: "follow_mouse"
+                Legend:
+                    label_text_font_size: "9pt"
+                    label_text_color: "#666666"
+                    spacing: 0
         """,
     }
 }
