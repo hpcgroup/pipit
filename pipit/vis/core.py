@@ -11,14 +11,16 @@ from bokeh.models import (
     LinearColorMapper,
     LogColorMapper,
 )
-from bokeh.palettes import Blues256
+from bokeh.palettes import Blues256, Category20_20
 from bokeh.plotting import figure
 
 from ._util import (
     format_size,
+    format_time,
     getProcessTickFormatter,
     getSizeHoverFormatter,
     getSizeTickFormatter,
+    getTimeTickFormatter,
     plot,
 )
 
@@ -155,3 +157,58 @@ def comm_matrix(trace, kind="heatmap", mapping="linear", notebook_url=None, **kw
 
     # Return plot with wrapper function
     return plot(p, notebook_url=notebook_url)
+
+
+def time_profile(trace, notebook_url=None, *args, **kwargs):
+    # Get time profile
+    bins, times = trace.time_profile(*args, **kwargs)
+
+    # Generate x labels
+    xs = [f"{format_time(_bin[0])} - {format_time(_bin[1])}" for _bin in bins]
+
+    # Transform data into expected format for plotting stacked bars
+    data = dict(xs=xs)
+    functions = trace.events[trace.events["Event Type"] == "Enter"]["Name"].unique()
+    for function in functions:
+        data[function] = [func.get(function, 0) for func in times]
+
+    # Create Bokeh plot
+    p = figure(
+        x_range=xs,
+        height=400,
+        title="Time Profile",
+        sizing_mode="stretch_width",
+        y_axis_label="Time Spent (Exc)",
+        toolbar_location="above",
+        x_axis_location="above",
+        tools="hover,xpan,xwheel_zoom,reset",
+    )
+
+    # Add stacked bars
+    p.vbar_stack(
+        functions,
+        x="xs",
+        width=0.9,
+        color=Category20_20[: len(functions)],
+        source=data,
+        legend_label=functions.tolist(),
+    )
+
+    # Additional plot config
+    p.yaxis.formatter = getTimeTickFormatter()
+    p.y_range.start = 0
+    p.xgrid.grid_line_color = None
+    p.axis.minor_tick_line_color = None
+    p.outline_line_color = None
+    p.xaxis.major_label_orientation = math.pi / 6 if len(bins) > 12 else "horizontal"
+    p.legend.label_text_font_size = "12px"
+    p.legend.spacing = 0
+    p.title.text_font_size = "12pt"
+    p.title.text_color = "#555555"
+    p.yaxis.axis_label_text_font_style = "bold"
+
+    # Move legend to right side
+    p.add_layout(p.legend[0], "right")
+
+    # Return plot with wrapper function
+    plot(p, notebook_url=notebook_url)
