@@ -10,8 +10,17 @@ config = {
                     height: 550
                     sizing_mode: "stretch_width"
                     toolbar_location: "above"
+                    outline_line_width: 0
                 Axis:
                     axis_label_text_font_style: "bold"
+                    axis_label_text_color: "#666666"
+                    minor_tick_line_color: "#C0C0C0
+                    major_tick_line_color: "#C0C0C0"
+                    axis_line_color: "#C0C0C0"
+                Toolbar:
+                    autohide: true
+                HoverTool:
+                    point_policy: "follow_mouse"
         """,
     }
 }
