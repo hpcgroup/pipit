@@ -1,5 +1,26 @@
 config = {
     "vis": {
         "notebook_url": "http://localhost:8888",
+        "theme": """
+            attrs:
+                Title:
+                    text_color: "#555555"
+                    text_font_size: "12pt"
+                Plot:
+                    height: 550
+                    sizing_mode: "stretch_width"
+                    toolbar_location: "above"
+                    outline_line_width: 0
+                Axis:
+                    axis_label_text_font_style: "bold"
+                    axis_label_text_color: "#666666"
+                    minor_tick_line_color: "#C0C0C0
+                    major_tick_line_color: "#C0C0C0"
+                    axis_line_color: "#C0C0C0"
+                Toolbar:
+                    autohide: true
+                HoverTool:
+                    point_policy: "follow_mouse"
+        """,
     }
 }
