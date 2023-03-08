@@ -1,2 +1,1 @@
-from .core import comm_matrix  # noqa: F401
-from .timeline import plot_timeline  # noqa: F401
+from .core import comm_matrix, timeline  # noqa: F401

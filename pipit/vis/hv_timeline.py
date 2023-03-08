@@ -112,7 +112,9 @@ def plot_timeline(trace):
                 kdims=["Timestamp (ns)", "yr0", "Matching Timestamp", "yr1"],
                 vdims=["Name", "y", "Inc Time"],
             )
-            .opts(line_width=0.15, line_color="black", fill_color="Name", cmap=color_key)
+            .opts(
+                line_width=0.15, line_color="black", fill_color="Name", cmap=color_key
+            )
             .opts(**ropts)
         )
 

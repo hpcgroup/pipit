@@ -10,15 +10,19 @@ from bokeh.models import (
     LabelSet,
     LinearColorMapper,
     LogColorMapper,
+    WheelZoomTool,
 )
-from bokeh.palettes import Blues256
+from bokeh.palettes import Blues256, Category20_20
 from bokeh.plotting import figure
+from bokeh.transform import factor_cmap
+from bokeh.events import RangesUpdate
 
 from ._util import (
     format_size,
     getProcessTickFormatter,
     getSizeHoverFormatter,
     getSizeTickFormatter,
+    getTimeTickFormatter,
     plot,
 )
 
@@ -138,10 +142,10 @@ def comm_matrix(trace, kind="heatmap", mapping="linear", notebook_url=None, **kw
 
     # Additional plot config
     p.xaxis.ticker = BasicTicker(
-        base=2, desired_num_ticks=N, min_interval=1, num_minor_ticks=0
+        base=2, desired_num_ticks=32, min_interval=1, num_minor_ticks=0
     )
     p.yaxis.ticker = BasicTicker(
-        base=2, desired_num_ticks=N, min_interval=1, num_minor_ticks=0
+        base=2, desired_num_ticks=16, min_interval=1, num_minor_ticks=0
     )
     p.xaxis.major_label_orientation = math.pi / 6
     p.xgrid.visible = False
@@ -150,4 +154,85 @@ def comm_matrix(trace, kind="heatmap", mapping="linear", notebook_url=None, **kw
     p.yaxis.formatter = getProcessTickFormatter()
 
     # Return plot with wrapper function
+    return plot(p, notebook_url=notebook_url)
+
+
+def timeline(trace, notebook_url=None):
+    trace.calc_inc_time()
+    trace._match_events()
+    trace._match_caller_callee()
+
+    # Number of ranks
+    N = int(trace.events["Process"].astype("float").max() + 1)
+    min_ts = trace.events["Timestamp (ns)"].min()
+    max_ts = trace.events["Timestamp (ns)"].max()
+
+    # Prepare data for plotting
+    func = trace.events.copy(deep=False)
+    func = func.sort_values(by="time.inc", ascending=False)
+    func["y"] = func["Process"].astype("int")
+    func["Timestamp (ns)"] = func["Timestamp (ns)"].astype("float32")
+    func["_matching_timestamp"] = func["_matching_timestamp"].astype("float32")
+    func["time.inc"] = func["time.inc"].astype("float32")
+    func = func[["Timestamp (ns)", "_matching_timestamp", "y", "Name"]]
+
+    # Define data source for glyphs
+    source = ColumnDataSource(func.head(0))
+
+    # Callback function that updates Bokeh data source
+    def update_data_source(event):
+        nonlocal source
+        x0 = event.x0 if event is not None else min_ts
+        x1 = event.x1 if event is not None else max_ts
+
+        # Remove events that are out of bounds
+        in_bounds = func[
+            ~((func["_matching_timestamp"] < x0) | (func["Timestamp (ns)"] > x1))
+        ]
+
+        # Get 500 largest functions
+        large = in_bounds.head(500)
+        # small = in_bounds.tail(len(in_bounds) - 500)
+
+        source.data = large
+
+    # Create Bokeh plot
+    p = figure(
+        title="Timeline",
+        x_range=(min_ts, max_ts),
+        y_range=(max(15.5, N - 0.5), -0.5),
+        x_axis_location="above",
+        tools="xpan,reset,xwheel_zoom,save,hover",
+        output_backend="webgl",
+    )
+
+    # Create color map
+    cmap = factor_cmap(
+        "Name", palette=Category20_20, factors=sorted(func["Name"].unique()), end=1
+    )
+
+    # Add bars for functions
+    p.hbar(
+        left="Timestamp (ns)",
+        right="_matching_timestamp",
+        y="y",
+        height=1,
+        source=source,
+        fill_color=cmap,
+        line_color="black",
+        line_width=0.5,
+    )
+
+    # Additional plot config
+    p.yaxis.ticker = BasicTicker(
+        base=2, desired_num_ticks=16, min_interval=1, num_minor_ticks=0
+    )
+    p.xaxis.formatter = getTimeTickFormatter()
+    p.yaxis.formatter = getProcessTickFormatter()
+    p.toolbar.active_scroll = p.select(dict(type=WheelZoomTool))[0]
+    p.on_event(RangesUpdate, update_data_source)
+
+    # Make initial call to our callback
+    update_data_source(None)
+
     return plot(p, notebook_url=notebook_url)
