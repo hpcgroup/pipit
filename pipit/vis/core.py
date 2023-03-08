@@ -63,15 +63,23 @@ def comm_matrix(trace, kind="heatmap", mapping="linear", notebook_url=None, **kw
 
     # Create Bokeh plot
     p = figure(
-        height=500,
-        sizing_mode="stretch_width",
         title="Communication Matrix",
         x_axis_label="Sender",
-        x_axis_location="above",
-        x_range=(-0.5, N - 0.5),
         y_axis_label="Receiver",
+        x_range=(-0.5, N - 0.5),
         y_range=(N - 0.5, -0.5),
-        toolbar_location="above",
+        x_axis_location="above",
+        tools=[
+            "pan,reset,wheel_zoom,save",
+            HoverTool(
+                tooltips={
+                    "Sender": "Process $x{0.}",
+                    "Receiver": "Process $y{0.}",
+                    "Bytes": "@image{custom}",
+                },
+                formatters={"@image": getSizeHoverFormatter()},
+            ),
+        ],
     )
 
     # Add heatmap, color bar, and labels
@@ -140,18 +148,6 @@ def comm_matrix(trace, kind="heatmap", mapping="linear", notebook_url=None, **kw
     p.ygrid.visible = False
     p.xaxis.formatter = getProcessTickFormatter()
     p.yaxis.formatter = getProcessTickFormatter()
-    p.add_tools(
-        HoverTool(
-            tooltips={
-                "Sender": "Process $x{0.}",
-                "Receiver": "Process $y{0.}",
-                "Bytes": "@image{custom}",
-            },
-            formatters={"@image": getSizeHoverFormatter()},
-        )
-    )
-    p.title.text_font_size = "12pt"
-    p.title.text_color = "#555555"
 
     # Return plot with wrapper function
     return plot(p, notebook_url=notebook_url)

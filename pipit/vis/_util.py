@@ -7,6 +7,9 @@ import sys
 
 from bokeh.io import output_notebook, show
 from bokeh.models import CustomJSHover, FuncTickFormatter, PrintfTickFormatter
+from bokeh.themes import Theme
+import yaml
+
 
 import pipit as pp
 
@@ -143,6 +146,12 @@ def plot(obj, notebook_url=None):
     # Wrap the plot in a Bokeh app
     def bkapp(doc):
         doc.add_root(obj)
+        doc.theme = Theme(
+            json=yaml.load(
+                pp.config["vis"]["theme"],
+                Loader=yaml.FullLoader,
+            )
+        )
 
     # Case 1: running unit tests
     if "pytest" in sys.modules:
