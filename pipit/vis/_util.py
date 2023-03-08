@@ -126,7 +126,7 @@ def getSizeHoverFormatter():
 
 # Helper functions
 def plot(obj, notebook_url=None):
-    """Internal function used to wrap return values from visualizations. If we are in a
+    """Internal function used to wrap return values from plotting functions. If we are in a
         notebook, then `bokeh.io.show` is invoked and the plot is displayed immediately
         in the associated output cell. If we are in the Python shell, then a new Bokeh
         server instance is launched, and the plot is displayed in a new browser tab.
