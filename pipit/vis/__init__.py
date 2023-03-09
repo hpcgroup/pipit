@@ -1,1 +1,1 @@
-from .core import comm_matrix  # noqa: F401
+from .core import comm_matrix, message_histogram  # noqa: F401

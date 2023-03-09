@@ -154,3 +154,31 @@ def comm_matrix(trace, kind="heatmap", mapping="linear", notebook_url=None, **kw
 
     # Return plot with wrapper function
     return plot(p, notebook_url=notebook_url)
+
+
+def message_histogram(trace, bins=20, notebook_url=None, **kwargs):
+    """Plots histogram of message frequency by size"""
+
+    # Get histogram
+    hist, edges = trace.message_histogram(bins, **kwargs)
+    xs = [
+        f"{format_size(edges[i])} - {format_size(edges[i+1])}" for i in range(len(hist))
+    ]
+
+    # Create bokeh plot
+    p = figure(
+        title="Message Histogram",
+        x_range=xs,
+        y_range=(0, np.max(hist) + np.max(hist) / 4),
+        x_axis_label="Message size",
+        y_axis_label="Count",
+        tools="xpan,xwheel_zoom,hover,save,reset",
+        sizing_mode="stretch_width",
+    )
+
+    p.vbar(x=xs, top=hist, bottom=0, width=0.5, fill_alpha=0.6)
+
+    p.xaxis.major_label_orientation = math.pi / 6 if bins > 12 else "horizontal"
+    p.xgrid.visible = False
+
+    return plot(p, notebook_url=notebook_url)
