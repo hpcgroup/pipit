@@ -22,6 +22,7 @@ from ._util import (
     getSizeTickFormatter,
     getTimeTickFormatter,
     plot,
+    get_html_tooltips,
 )
 
 
@@ -71,17 +72,7 @@ def comm_matrix(trace, kind="heatmap", mapping="linear", notebook_url=None, **kw
         x_range=(-0.5, N - 0.5),
         y_range=(N - 0.5, -0.5),
         x_axis_location="above",
-        tools=[
-            "pan,reset,wheel_zoom,save",
-            HoverTool(
-                tooltips={
-                    "Sender": "Process $x{0.}",
-                    "Receiver": "Process $y{0.}",
-                    "Bytes": "@image{custom}",
-                },
-                formatters={"@image": getSizeHoverFormatter()},
-            ),
-        ],
+        tools="hover,pan,reset,wheel_zoom,save",
         sizing_mode="stretch_width",
     )
 
@@ -153,6 +144,17 @@ def comm_matrix(trace, kind="heatmap", mapping="linear", notebook_url=None, **kw
     p.xaxis.major_label_orientation = math.pi / 6 if N > 12 else "horizontal"
     p.xaxis.formatter = getProcessTickFormatter()
     p.yaxis.formatter = getProcessTickFormatter()
+
+    # Configure hover
+    hover = p.select(HoverTool)
+    hover.tooltips = get_html_tooltips(
+        {
+            "Sender": "Process $x{0.}",
+            "Receiver": "Process $y{0.}",
+            "Bytes": "@image{custom}",
+        }
+    )
+    hover.formatters = {"@image": getSizeHoverFormatter()}
 
     # Return plot with wrapper function
     return plot(p, notebook_url=notebook_url)
