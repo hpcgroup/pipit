@@ -5,10 +5,10 @@ config = {
             attrs:
                 Title:
                     text_color: "#555555"
-                    text_font_size: "12pt"
+                    text_font_size: "11pt"
                 Plot:
                     height: 550
-                    sizing_mode: "stretch_width"
+                    width: 800
                     toolbar_location: "above"
                     outline_line_width: 0
                 Axis:
