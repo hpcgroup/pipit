@@ -23,7 +23,7 @@ jobs:
       - name: Install Python packages
         run: |
           python -m pip install --upgrade pip
-          pip install --upgrade numpy pandas pytest
+          pip install --upgrade numpy pandas pytest datashader
           pip install bokeh==2.4.3
 
       - name: Lint and format check with flake8 and black
@@ -52,7 +52,7 @@ jobs:
       - name: Install Python packages
         run: |
           python -m pip install --upgrade pip
-          pip install --upgrade numpy pandas pytest
+          pip install --upgrade numpy pandas pytest datashader
           pip install bokeh==2.4.3
 
       - name: Basic test with pytest
