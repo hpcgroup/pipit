@@ -280,11 +280,11 @@ def timeline(trace, notebook_url=None):
         dimension=1,
         band_fill_color="gray",
         band_fill_alpha=0.1,
-        ticker=FixedTicker(ticks=list(np.arange(-1000, 1000) + 0.5)),
+        ticker=FixedTicker(ticks=list(np.arange(0, 1000) + 0.5)),
     )
     g2 = Grid(
         dimension=1,
-        ticker=FixedTicker(ticks=list(np.arange(-1000, 1000) + 0.5)),
+        ticker=FixedTicker(ticks=list(np.arange(0, 1000) + 0.5)),
         level="overlay",
     )
     p.add_layout(g1)
