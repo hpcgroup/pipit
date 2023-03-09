@@ -232,8 +232,7 @@ def timeline(trace, notebook_url=None):
         # Generate image
         img = ds.tf.shade(
             agg,
-            color_key=[scale_hex(hex, 0.75) for hex in palette],
-            min_alpha=200,
+            color_key=[scale_hex(hex, 0.7) for hex in palette],
         )
 
         # Update CDS
@@ -256,9 +255,15 @@ def timeline(trace, notebook_url=None):
         sizing_mode="stretch_width",
     )
 
-    # Create color map
-    cmap = factor_cmap(
+    # Create color maps
+    fill_cmap = factor_cmap(
         "Name", palette=palette, factors=sorted(func["Name"].unique()), end=1
+    )
+    line_cmap = factor_cmap(
+        "Name",
+        palette=[scale_hex(hex, 0.7) for hex in palette],
+        factors=sorted(func["Name"].unique()),
+        end=1,
     )
 
     # Add bars for large functions
@@ -268,9 +273,9 @@ def timeline(trace, notebook_url=None):
         y="y",
         height=1,
         source=hbar_source,
-        fill_color=cmap,
-        line_color="rgba(0,0,0,0.2)",
-        line_width=1,
+        fill_color=fill_cmap,
+        line_color=line_cmap,
+        legend_field="Name",
     )
 
     # Add raster for small functions
@@ -284,13 +289,7 @@ def timeline(trace, notebook_url=None):
         band_fill_alpha=0.1,
         ticker=FixedTicker(ticks=list(np.arange(0, 1000) + 0.5)),
     )
-    g2 = Grid(
-        dimension=1,
-        ticker=FixedTicker(ticks=list(np.arange(0, 1000) + 0.5)),
-        level="overlay",
-    )
     p.add_layout(g1)
-    p.add_layout(g2)
 
     # Additional plot config
     p.yaxis.ticker = BasicTicker(
@@ -300,6 +299,9 @@ def timeline(trace, notebook_url=None):
     p.yaxis.formatter = getProcessTickFormatter()
     p.toolbar.active_scroll = p.select(dict(type=WheelZoomTool))[0]
     p.on_event(RangesUpdate, update_data_source)
+
+    # Move legend to the right
+    p.add_layout(p.legend[0], "right")
 
     # Make initial call to our callback
     update_data_source(None)
