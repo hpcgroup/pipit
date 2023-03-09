@@ -89,6 +89,7 @@ def comm_matrix(trace, kind="heatmap", mapping="linear", notebook_url=None, **kw
                 formatters={"@image": getSizeHoverFormatter()},
             ),
         ],
+        sizing_mode="stretch_width",
     )
 
     # Add heatmap, color bar, and labels
