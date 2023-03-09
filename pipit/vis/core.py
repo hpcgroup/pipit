@@ -179,6 +179,7 @@ def time_profile(trace, notebook_url=None, *args, **kwargs):
         y_axis_label="Time Spent (Exc)",
         x_axis_location="above",
         tools="hover,xpan,xwheel_zoom,reset,save",
+        sizing_mode="stretch_width",
     )
 
     # Add stacked bars
