@@ -195,3 +195,28 @@ def in_notebook():
     except AttributeError:
         return False
     return True
+
+
+def clamp(val, minimum, maximum):
+    """Clamps value to minimum and maximum bounds"""
+    if val < minimum:
+        return minimum
+    if val > maximum:
+        return maximum
+    return val
+
+
+def scale_hex(hex, scale):
+    """Multiplies a hex color by a scalar, returns result in hex"""
+    hex = hex.strip("#")
+
+    if scale < 0 or len(hex) != 6:
+        return hex
+
+    r, g, b = int(hex[:2], 16), int(hex[2:4], 16), int(hex[4:], 16)
+
+    r = int(clamp(r * scale, 0, 255))
+    g = int(clamp(g * scale, 0, 255))
+    b = int(clamp(b * scale, 0, 255))
+
+    return "#%02x%02x%02x" % (r, g, b)

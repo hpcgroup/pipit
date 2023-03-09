@@ -14,7 +14,7 @@ from bokeh.models import (
     Grid,
     FixedTicker,
 )
-from bokeh.palettes import Blues256, Category20_20
+from bokeh.palettes import Blues256, Category20_20, Category20b_20, Category20c_20
 from bokeh.plotting import figure
 from bokeh.transform import factor_cmap
 from bokeh.events import RangesUpdate
@@ -26,7 +26,10 @@ from ._util import (
     getSizeTickFormatter,
     getTimeTickFormatter,
     plot,
+    scale_hex,
 )
+
+import datashader as ds
 
 
 def comm_matrix(trace, kind="heatmap", mapping="linear", notebook_url=None, **kwargs):
@@ -160,12 +163,19 @@ def comm_matrix(trace, kind="heatmap", mapping="linear", notebook_url=None, **kw
 
 
 def timeline(trace, notebook_url=None):
+    """Plots a Trace's events against a horizontal time axis.
+
+    Args:
+        trace (pipit.Trace): Trace whose events are being plotted.
+        notebook_url (str, optional): The URL of the current Jupyter notebook.
+            Defaults to url set in `pp.config["vis"]["notebook_url"]`.
+    """
+    # Generate necessary metrics
     trace.calc_inc_time()
     trace._match_events()
     trace._match_caller_callee()
 
-    # Number of ranks
-    N = int(trace.events["Process"].astype("float").max() + 1)
+    num_ranks = int(trace.events["Process"].astype("float").max() + 1)
     min_ts = trace.events["Timestamp (ns)"].min()
     max_ts = trace.events["Timestamp (ns)"].max()
 
@@ -175,15 +185,21 @@ def timeline(trace, notebook_url=None):
     func["y"] = func["Process"].astype("int")
     func["Timestamp (ns)"] = func["Timestamp (ns)"].astype("float32")
     func["_matching_timestamp"] = func["_matching_timestamp"].astype("float32")
-    func["time.inc"] = func["time.inc"].astype("float32")
     func = func[["Timestamp (ns)", "_matching_timestamp", "y", "Name"]]
 
-    # Define data source for glyphs
-    source = ColumnDataSource(func.head(0))
+    # Prepare colors
+    palette = list(Category20_20) + list(Category20b_20) + list(Category20c_20)
 
-    # Callback function that updates Bokeh data source
+    # Define CDS for glyphs
+    hbar_source = ColumnDataSource(func.head(0))
+    image_source = ColumnDataSource(
+        data=dict(
+            image=[np.zeros((50, 16), dtype=np.uint32)], x=[0], y=[0], dw=[0], dh=[0]
+        )
+    )
+
+    # Callback function that updates CDS
     def update_data_source(event):
-        nonlocal source
         x0 = event.x0 if event is not None else min_ts
         x1 = event.x1 if event is not None else max_ts
 
@@ -192,17 +208,45 @@ def timeline(trace, notebook_url=None):
             ~((func["_matching_timestamp"] < x0) | (func["Timestamp (ns)"] > x1))
         ]
 
-        # Get 500 largest functions
+        # Update CDS to keep 5000 largest functions
         large = in_bounds.head(5000)
-        # small = in_bounds.tail(len(in_bounds) - 500)
+        hbar_source.data = large
 
-        source.data = large
+        # Rasterize the rest
+        small = in_bounds.tail(len(in_bounds) - 5000)
+
+        # Create a new Datashader canvas based on plot properties
+        cvs = ds.Canvas(
+            plot_width=1200 if p.inner_width == 0 else p.inner_width,
+            plot_height=num_ranks,
+            x_range=(x0, x1),
+            y_range=(-0.5, num_ranks - 0.5),
+        )
+
+        # Feed the data into datashader
+        agg = cvs.points(small, x="Timestamp (ns)", y="y", agg=ds.count_cat("Name"))
+
+        # Generate image
+        img = ds.tf.shade(
+            agg,
+            color_key=[scale_hex(hex, 0.75) for hex in palette],
+            min_alpha=200,
+        )
+
+        # Update CDS
+        image_source.data = dict(
+            image=[np.flipud(img.to_numpy())],
+            x=[x0],
+            y=[num_ranks - 0.5],
+            dw=[x1 - x0],
+            dh=[num_ranks],
+        )
 
     # Create Bokeh plot
     p = figure(
         title="Timeline",
         x_range=(min_ts, max_ts),
-        y_range=(max(15.5, N - 0.5), -0.5),
+        y_range=(max(15.5, num_ranks - 0.5), -0.5),
         x_axis_location="above",
         tools="hover,xpan,reset,xwheel_zoom,save",
         output_backend="webgl",
@@ -210,30 +254,39 @@ def timeline(trace, notebook_url=None):
 
     # Create color map
     cmap = factor_cmap(
-        "Name", palette=Category20_20, factors=sorted(func["Name"].unique()), end=1
+        "Name", palette=palette, factors=sorted(func["Name"].unique()), end=1
     )
 
-    # Add bars for functions
+    # Add bars for large functions
     p.hbar(
         left="Timestamp (ns)",
         right="_matching_timestamp",
         y="y",
         height=1,
-        source=source,
+        source=hbar_source,
         fill_color=cmap,
-        line_color="black",
-        line_width=0.5,
+        line_color="rgba(0,0,0,0.2)",
+        line_width=1,
     )
 
-    # Add custom grid for y-axis
+    # Add raster for small functions
+    p.image_rgba(source=image_source)
+
+    # Add custom grids for y-axis
     p.ygrid.visible = False
-    g = Grid(
+    g1 = Grid(
         dimension=1,
         band_fill_color="gray",
         band_fill_alpha=0.1,
         ticker=FixedTicker(ticks=list(np.arange(-1000, 1000) + 0.5)),
     )
-    p.add_layout(g)
+    g2 = Grid(
+        dimension=1,
+        ticker=FixedTicker(ticks=list(np.arange(-1000, 1000) + 0.5)),
+        level="overlay",
+    )
+    p.add_layout(g1)
+    p.add_layout(g2)
 
     # Additional plot config
     p.yaxis.ticker = BasicTicker(
@@ -247,4 +300,5 @@ def timeline(trace, notebook_url=None):
     # Make initial call to our callback
     update_data_source(None)
 
+    # Return plot with wrapper function
     return plot(p, notebook_url=notebook_url)
