@@ -121,6 +121,10 @@ def comm_matrix(trace, kind="heatmap", mapping="linear", notebook_url=None, **kw
             )
             p.add_layout(labels)
 
+        # Hide grid for heatmap
+        p.xgrid.visible = False
+        p.ygrid.visible = False
+
     # Add circles
     if kind == "scatterplot":
         # Normalize circle size
@@ -135,19 +139,17 @@ def comm_matrix(trace, kind="heatmap", mapping="linear", notebook_url=None, **kw
             y="receiver",
             size="volume_normalized",
             source=ColumnDataSource(stacked),
-            # color={"field": "image", "transform": color_mapper},
+            alpha=0.6,
         )
 
     # Additional plot config
     p.xaxis.ticker = BasicTicker(
-        base=2, desired_num_ticks=N, min_interval=1, num_minor_ticks=0
+        base=2, desired_num_ticks=min(N, 32), min_interval=1, num_minor_ticks=0
     )
     p.yaxis.ticker = BasicTicker(
-        base=2, desired_num_ticks=N, min_interval=1, num_minor_ticks=0
+        base=2, desired_num_ticks=min(N, 16), min_interval=1, num_minor_ticks=0
     )
-    p.xaxis.major_label_orientation = math.pi / 6
-    p.xgrid.visible = False
-    p.ygrid.visible = False
+    p.xaxis.major_label_orientation = math.pi / 6 if N > 12 else "horizontal"
     p.xaxis.formatter = getProcessTickFormatter()
     p.yaxis.formatter = getProcessTickFormatter()
 
