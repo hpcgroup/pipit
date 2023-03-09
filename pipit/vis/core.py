@@ -11,8 +11,9 @@ from bokeh.models import (
     LinearColorMapper,
     LogColorMapper,
 )
-from bokeh.palettes import Blues256, Category20_20
+from bokeh.palettes import Blues256, Category20_20, Category20b_20, Category20c_20
 from bokeh.plotting import figure
+from bokeh.transform import factor_cmap
 
 from ._util import (
     format_size,
@@ -23,6 +24,7 @@ from ._util import (
     getTimeTickFormatter,
     plot,
     get_html_tooltips,
+    getTimeHoverFormatter,
 )
 
 
@@ -183,15 +185,18 @@ def time_profile(trace, notebook_url=None, *args, **kwargs):
         sizing_mode="stretch_width",
     )
 
+    # Prepare colors
+    palette = list(Category20_20) + list(Category20b_20) + list(Category20c_20)
+
     # Add stacked bars
     p.vbar_stack(
         functions,
         x="xs",
         width=0.5,
-        color=Category20_20[: len(functions)],
+        color=palette[: len(functions)],
         source=data,
         legend_label=functions.tolist(),
-        fill_alpha=0.6,
+        fill_alpha=1.0,
     )
 
     # Additional plot config
@@ -204,6 +209,13 @@ def time_profile(trace, notebook_url=None, *args, **kwargs):
 
     # Move legend to right side
     p.add_layout(p.legend[0], "right")
+
+    # Configure hover
+    hover = p.select(HoverTool)
+    hover.tooltips = get_html_tooltips(
+        {"Name": "$name", "Bin": "@xs", "Time Spent": "@$name{custom}"}
+    )
+    hover.formatters = {f"@{{{f}}}": getTimeHoverFormatter() for f in functions}
 
     # Return plot with wrapper function
     plot(p, notebook_url=notebook_url)
