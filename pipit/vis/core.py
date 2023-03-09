@@ -177,7 +177,6 @@ def time_profile(trace, notebook_url=None, *args, **kwargs):
         x_range=xs,
         x_axis_label="Time Bin",
         y_axis_label="Time Spent (Exc)",
-        x_axis_location="above",
         tools="hover,xpan,xwheel_zoom,reset,save",
         sizing_mode="stretch_width",
     )
@@ -186,10 +185,11 @@ def time_profile(trace, notebook_url=None, *args, **kwargs):
     p.vbar_stack(
         functions,
         x="xs",
-        width=0.9,
+        width=0.5,
         color=Category20_20[: len(functions)],
         source=data,
         legend_label=functions.tolist(),
+        fill_alpha=0.6,
     )
 
     # Additional plot config
