@@ -253,6 +253,7 @@ def timeline(trace, notebook_url=None):
         x_axis_location="above",
         tools="hover,xpan,reset,xwheel_zoom,save",
         output_backend="webgl",
+        sizing_mode="stretch_width",
     )
 
     # Create color map
