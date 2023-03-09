@@ -25,8 +25,10 @@ from ._util import (
     getSizeHoverFormatter,
     getSizeTickFormatter,
     getTimeTickFormatter,
+    getTimeHoverFormatter,
     plot,
     scale_hex,
+    get_html_tooltips,
 )
 
 import datashader as ds
@@ -188,7 +190,9 @@ def timeline(trace, notebook_url=None):
     func["y"] = func["Process"].astype("int")
     func["Timestamp (ns)"] = func["Timestamp (ns)"].astype("float32")
     func["_matching_timestamp"] = func["_matching_timestamp"].astype("float32")
-    func = func[["Timestamp (ns)", "_matching_timestamp", "y", "Name"]]
+    func = func[
+        ["Timestamp (ns)", "_matching_timestamp", "y", "Name", "time.inc", "Process"]
+    ]
 
     # Prepare colors
     palette = list(Category20_20) + list(Category20b_20) + list(Category20c_20)
@@ -267,7 +271,7 @@ def timeline(trace, notebook_url=None):
     )
 
     # Add bars for large functions
-    p.hbar(
+    hbar = p.hbar(
         left="Timestamp (ns)",
         right="_matching_timestamp",
         y="y",
@@ -305,6 +309,14 @@ def timeline(trace, notebook_url=None):
 
     # Make initial call to our callback
     update_data_source(None)
+
+    # Hover config
+    hover = p.select(HoverTool)
+    hover.tooltips = get_html_tooltips(
+        {"Name": "@Name", "Process": "@Process", "Inc Time": "@{time.inc}{custom}"}
+    )
+    hover.formatters = {"@{time.inc}": getTimeHoverFormatter()}
+    hover.renderers = [hbar]
 
     # Return plot with wrapper function
     return plot(p, notebook_url=notebook_url)
