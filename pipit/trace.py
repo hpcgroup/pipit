@@ -116,20 +116,17 @@ class Trace:
             self.events = self.events.astype({"_matching_event": "Int32"})
 
     def _match_caller_callee(self):
-        """Matches callers (parents) to callees (children) and adds three
+        """Matches callers (parents) to callees (children) and adds two
         columns to the dataframe:
-        _depth, _parent, and _children
+        _parent, and _children
 
-        _depth is level in the call tree starting at 0.
         _parent is the dataframe index of a row's parent event.
         _children is a list of dataframe indices of a row's children events.
         """
 
         if "_children" not in self.events.columns:
             children = [None] * len(self.events)
-            depth, parent = [float("nan")] * len(self.events), [float("nan")] * len(
-                self.events
-            )
+            parent = [float("nan")] * len(self.events)
 
             # only using enter and leave rows
             # to determine calling relationships
@@ -147,8 +144,7 @@ class Trace:
                         curr_process_df["Thread"] == thread
                     ]
 
-                    # Depth is the level in the
-                    # Call Tree starting from 0
+                    # Level in CCT starting from 0
                     curr_depth = 0
 
                     stack = []
@@ -176,30 +172,25 @@ class Trace:
 
                                 parent[curr_df_index] = parent_df_index
 
-                            depth[curr_df_index] = curr_depth
                             curr_depth += 1
 
                             # add enter dataframe index to stack
                             stack.append(curr_df_index)
                         else:
                             # pop event off stack once matching leave found
-                            # Note: depth, parent, and children for a leave row
+                            # Note: parent, and children for a leave row
                             # can be found using the matching index that
                             # corresponds to the enter row
                             stack.pop()
 
                             curr_depth -= 1
 
-            self.events["_depth"], self.events["_parent"], self.events["_children"] = (
-                depth,
-                parent,
-                children,
-            )
+            self.events["_parent"], self.events["_children"] = parent, children
 
-            self.events = self.events.astype({"_depth": "Int32", "_parent": "Int32"})
+            self.events = self.events.astype({"_parent": "Int32"})
 
             self.events = self.events.astype(
-                {"_depth": "category", "_parent": "category"}
+                {"_parent": "category"}
             )
 
     def calc_inc_time(self):
@@ -313,7 +304,7 @@ class Trace:
                             else:
                                 # create new node if callpath isn't in map
                                 curr_node = Node(
-                                    node_id, function_name, parent_node, curr_depth
+                                    node_id, parent_node, curr_depth
                                 )
                                 callpath_to_node[callpath] = curr_node
                                 node_id += 1
@@ -332,10 +323,10 @@ class Trace:
                             curr_depth += 1
                         else:
                             """
-                            Get the corresponding node from top of stack
-                            once you encounter the Leave event for a function
+                            Pop node from top of stack once you
+                            encounter the Leave event for a function
                             """
-                            curr_node = nodes_stack.pop()
+                            nodes_stack.pop()
 
                             # Update functions stack and current depth
                             functions_stack.pop()
