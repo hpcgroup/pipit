@@ -1,5 +1,5 @@
-# Copyright 2022 Parallel Software and Systems Group, University of Maryland.
-# See the top-level LICENSE file for details.
+# Copyright 2022-2023 Parallel Software and Systems Group, University of
+# Maryland.  See the top-level LICENSE file for details.
 #
 # SPDX-License-Identifier: MIT
 
@@ -43,7 +43,7 @@ def test_events(data_dir, ping_pong_projections_trace):
         .loc[events_df["Event Type"] == "Enter"]
         .loc[events_df["Name"] == "Processing"]
     ) == 161
-    # PE0 has 140 Begin Processing Events
+    # PE0 has 146 Begin Processing Events
     len(
         events_df.loc[events_df["Process"] == 1]
         .loc[events_df["Event Type"] == "Enter"]
