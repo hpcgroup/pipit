@@ -229,7 +229,7 @@ class Trace:
 
             self.events["time.exc"] = exc_times
 
-    def create_cct(self):
+    def _create_cct(self):
         """
         Generic function to iterate through the trace events and create a CCT.
         Uses pipit's graph data structure for this. Populates the trace's CCT

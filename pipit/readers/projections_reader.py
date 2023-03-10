@@ -281,7 +281,10 @@ class ProjectionsReader:
         # Concatinate the dataframes list into dataframe containing entire trace
         trace_df = pandas.concat(dataframes_list, ignore_index=True)
 
-        return pipit.trace.Trace(None, trace_df)
+        trace = pipit.trace.Trace(None, trace_df, None)
+        trace._create_cct()
+
+        return trace
 
     def _read_log_file(self, pe_num: int) -> pandas.DataFrame:
         # has information needed in sts file

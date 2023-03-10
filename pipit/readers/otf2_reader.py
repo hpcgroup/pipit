@@ -434,6 +434,6 @@ class OTF2Reader:
         self.events = self.read_events()  # events
 
         trace = pipit.trace.Trace(self.definitions, self.events, None)
-        trace.create_cct()  # create cct
+        trace._create_cct()  # create cct
 
         return trace
