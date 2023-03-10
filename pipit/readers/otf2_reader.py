@@ -3,6 +3,7 @@
 #
 # SPDX-License-Identifier: MIT
 
+import otf2
 import pandas as pd
 import multiprocessing as mp
 import pipit.trace
