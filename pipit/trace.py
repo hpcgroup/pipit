@@ -189,9 +189,7 @@ class Trace:
 
             self.events = self.events.astype({"_parent": "Int32"})
 
-            self.events = self.events.astype(
-                {"_parent": "category"}
-            )
+            self.events = self.events.astype({"_parent": "category"})
 
     def calc_inc_time(self):
         # Adds "time.inc" column
@@ -303,9 +301,7 @@ class Trace:
                                 curr_node = callpath_to_node[callpath]
                             else:
                                 # create new node if callpath isn't in map
-                                curr_node = Node(
-                                    node_id, parent_node, curr_depth
-                                )
+                                curr_node = Node(node_id, parent_node, curr_depth)
                                 callpath_to_node[callpath] = curr_node
                                 node_id += 1
 

@@ -70,12 +70,7 @@ class Node:
         return return_list
 
     def __str__(self) -> str:
-        return (
-            "ID: "
-            + str(self._pipit_nid)
-            + " -- Level: "
-            + str(self.level)
-        )
+        return "ID: " + str(self._pipit_nid) + " -- Level: " + str(self.level)
 
     def _calculate_level(self):
         """private function to get depth of node"""
@@ -101,7 +96,4 @@ class Graph:
         self.roots.append(node)
 
     def __str__(self) -> str:
-        return (
-            "Roots: "
-            + str([str(curr_root) for curr_root in self.roots])
-        )
+        return "Roots: " + str([str(curr_root) for curr_root in self.roots])
