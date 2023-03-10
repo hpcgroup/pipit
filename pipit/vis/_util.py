@@ -203,14 +203,14 @@ def get_html_tooltips(tooltips_dict):
         html += f"""
             <div>
                 <span style=\"font-size: 12px; font-weight: bold;\">{k}:</span>&nbsp;
-                <span style=\"font-size: 12px; font-family: monospace;\">{v}</span>&nbsp;
+                <span style=\"font-size: 12px; font-family: monospace;\">{v}</span>
             </div>
         """
-    html += f"""
+    html += """
         <style>
-            div.bk-tooltip-content > div > div:not(:first-child) {{
+            div.bk-tooltip-content > div > div:not(:first-child) {
                 display:none !important;
-            }}
+            }
         </style>
     """
     return html
