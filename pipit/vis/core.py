@@ -13,7 +13,6 @@ from bokeh.models import (
 )
 from bokeh.palettes import Blues256, Category20_20, Category20b_20, Category20c_20
 from bokeh.plotting import figure
-from bokeh.transform import factor_cmap
 
 from ._util import (
     format_size,
