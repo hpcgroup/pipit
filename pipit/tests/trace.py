@@ -103,4 +103,3 @@ def test_match_caller_callee(data_dir, ping_pong_otf2_trace):
 
     # all events of the ping pong trace are roots with no children
     assert set(df.loc[df["Event Type"] == "Enter"]["Depth"]) == set([0])
-    
