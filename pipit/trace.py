@@ -362,7 +362,7 @@ class Trace:
 
         return np.histogram(sizes, bins=bins, **kwargs)
 
-    def flat_profile(self, metric=["Exc Time"], groupby_column="Name"):
+    def flat_profile(self, metrics=None, groupby_column="Name"):
         """
         Arguments:
         metric - a string or list of strings containing the metrics to be aggregated
@@ -373,39 +373,12 @@ class Trace:
         for the grouped by columns.
         """
 
-        if "Inc Time" in metric and "Inc Time" not in self.events.columns:
-            self.calc_inc_time()
-        if "Exc Time" in metric and "Exc Time" not in self.events.columns:
-            self.calc_exc_time()
+        metrics = self.inc_metrics + self.exc_metrics if metrics is None else metrics
 
         return (
             self.events.loc[self.events["Event Type"] == "Enter"]
-            .groupby(groupby_column, observed=True)[metric]
+            .groupby([groupby_column, "Process"], observed=True)[metrics]
             .sum()
-        )
-
-    def metric_per_func_occurrence(self, metric="Exc Time", groupby_column="Name"):
-        """
-        Arguments:
-        metric - a string that can be either "Exc Time" or "Inc Time"
-        groupby_column - a string or list of strings containing the column(s)
-                         to be grouped by
-
-        Returns:
-        A dictionary where the keys are the set of groupby column values
-        (ex: function names) and the values are lists containing the metrics
-        for every individual function occurrence corresponding to the key
-        (ex: exclusive times).
-        """
-
-        if metric == "Exc Time" and "Exc Time" not in self.events.columns:
-            self.calc_exc_time()
-        elif metric == "Inc Time" and "Inc Time" not in self.events.columns:
-            self.calc_inc_time()
-
-        return (
-            self.events.loc[self.events["Event Type"] == "Enter"]
-            .groupby(groupby_column, observed=True)[metric]
-            .apply(list)
-            .to_dict()
+            .groupby(groupby_column)
+            .mean()
         )
