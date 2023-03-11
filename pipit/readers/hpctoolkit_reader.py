@@ -18,7 +18,7 @@ class MetaReader:
     def __init__(self, file_location):
 
         # open the file to ready in binary mode (rb) 
-        self.meta_file = open(file_location, "rb")
+        self.file = open(file_location, "rb")
         
         # setting necessary read options
         self.byte_order = "little"
@@ -80,7 +80,7 @@ class MetaReader:
         # Now to the actual reading of the meta.db file
 
         # reading the meta.db header
-        self.__read_meta_header()
+        self.__read_common_header()
 
         # now let's read all the sections
         for section_name in self.read_order:
@@ -92,9 +92,35 @@ class MetaReader:
 
     def get_name_from_context_id(self, context_id: int):
         context: dict = self.context_map[context_id]
-        function: dict = self.functions_list[context["function_index"]]
-        function_name: str = self.common_strings[function["string_index"]]
-        return function_name
+        if "string_index" in context:
+            return self.common_strings[context["string_index"]]
+        # context = {"relation": relation, "lexical_type": lexical_type, \
+        #                "function_index": function_index, \
+        #                "source_file_index": source_file_index, \
+        #                "source_file_line": source_file_line, \
+        #                "load_module_index":load_module_index, \
+        #                "load_module_offset": load_module_offset}
+        
+        ret_str = ""
+        load_module_index = context["load_module_index"]
+        source_file_index = context["source_file_index"]
+        source_file_line = context["source_file_line"]
+        function_index = context["function_index"]
+        if load_module_index != None:
+            load_module = self.load_modules_list[load_module_index]
+            module_string = self.common_strings[load_module["string_index"]]
+            ret_str += module_string + "::"
+        if source_file_index != None:
+            source_file = self.source_files_list[source_file_index]
+            source_file_string = self.common_strings[source_file["string_index"]]
+            ret_str += source_file_string + "::"
+        if function_index != None:
+            function = self.functions_list[function_index]
+            function_string = self.common_strings[function["string_index"]]
+            ret_str += function_string + "::"
+        if source_file_line != None:
+            ret_str += "::" + str(source_file_line)
+        return ret_str
         
 
     def __read_common_header(self) -> None:
@@ -106,32 +132,17 @@ class MetaReader:
 
         # read Magic identifier ("HPCPROF-tracedb_")
         # first ten buyes are HPCTOOLKIT in ASCII 
-        identifier = str(self.meta_file.read(10), encoding=self.encoding)
+        identifier = str(self.file.read(10), encoding=self.encoding)
         assert(identifier == "HPCTOOLKIT")
 
         # next 4 bytes (u8) are the "Specific format identifier"
-        format_identifier = int.from_bytes(self.meta_file.read(4), byteorder=self.byte_order, signed=self.signed)
+        format_identifier = str(self.file.read(4), encoding=self.encoding)
+        assert(format_identifier == "meta")
 
         # next byte (u8) contains the "Common major version, currently 4"
-        self.major_version = int.from_bytes(self.meta_file.read(1), byteorder=self.byte_order, signed=self.signed) 
+        self.major_version = int.from_bytes(self.file.read(1), byteorder=self.byte_order, signed=self.signed) 
         # next byte (u8) contains the "Specific minor version"
-        self.minor_version = int.from_bytes(self.meta_file.read(1), byteorder=self.byte_order, signed=self.signed) 
-
-    def __read_meta_header(self) -> None:
-        """ 
-        Reads meta.db file header with version 4.0
-
-        Documentation: https://gitlab.com/hpctoolkit/hpctoolkit/-/blob/develop/doc/FORMATS.md#metadb-version-40
-        """
-
-        # reading the common .db file header
-        self.__read_common_header()
-
-        # Reading meta header
-        # this header starts at 0x10
-        # going to that section just in case
-        if self.meta_file.tell() != 0x10:
-            self.meta_file.seek(0x10)
+        self.minor_version = int.from_bytes(self.file.read(1), byteorder=self.byte_order, signed=self.signed) 
 
         self.section_pointer = []
         self.section_size = []
@@ -139,9 +150,11 @@ class MetaReader:
         #   - First 8 bytes specify the total size of the section (in bytes)
         #   - Last 8 bytes specify a pointer to the beggining of the section
         for i in range(len(self.read_order)):
-            self.section_size.append(int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed))
-            self.section_pointer.append(int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed))
+            self.section_size.append(int.from_bytes(self.file.read(8), byteorder=self.byte_order, signed=self.signed))
+            self.section_pointer.append(int.from_bytes(self.file.read(8), byteorder=self.byte_order, signed=self.signed))
 
+
+        
     def __read_general_properties_section(self, section_pointer: int, section_size: int) -> None:
         """Reads the general properties of the trace. 
         Sets:
@@ -154,9 +167,9 @@ class MetaReader:
         """
         
         # go to the right spot in the file
-        self.meta_file.seek(section_pointer)
-        title_pointer = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
-        description_pointer = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
+        self.file.seek(section_pointer)
+        title_pointer = int.from_bytes(self.file.read(8), byteorder=self.byte_order, signed=self.signed)
+        description_pointer = int.from_bytes(self.file.read(8), byteorder=self.byte_order, signed=self.signed)
 
         self.database_title = self.__read_string(title_pointer)
         self.database_description = self.__read_string(description_pointer)
@@ -171,7 +184,7 @@ class MetaReader:
 
     def __read_common_string_table_section(self, section_pointer: int, section_size: int) -> None:
         # Let's go to the section
-        self.meta_file.seek(section_pointer)
+        self.file.seek(section_pointer)
         
         # We know that this section is just a densely packed list of strings,
         # seperated by the null character
@@ -179,7 +192,7 @@ class MetaReader:
         # split them by the null character
 
         # Reading entire section into a string
-        total_section: str = str(self.meta_file.read(section_size), encoding='UTF-8')
+        total_section: str = str(self.file.read(section_size), encoding='UTF-8')
         
         # Splitting entire section into list of strings
         self.common_strings: list[str] = total_section.split("\0")
@@ -208,14 +221,14 @@ class MetaReader:
         Documentation: https://gitlab.com/hpctoolkit/hpctoolkit/-/blob/develop/doc/FORMATS.md#metadb-load-modules-section
         """
         # go to the right spot in meta.db
-        self.meta_file.seek(section_pointer)
+        self.file.seek(section_pointer)
         
         # Load modules used in this database 
-        self.load_modules_pointer = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
+        self.load_modules_pointer = int.from_bytes(self.file.read(8), byteorder=self.byte_order, signed=self.signed)
         # Number of load modules listed in this section (u32)
-        num_load_modules = int.from_bytes(self.meta_file.read(4), byteorder=self.byte_order, signed=self.signed)
+        num_load_modules = int.from_bytes(self.file.read(4), byteorder=self.byte_order, signed=self.signed)
         # Size of a Load Module Specification, currently 16 (u16)
-        self.load_module_size = int.from_bytes(self.meta_file.read(2), byteorder=self.byte_order, signed=self.signed)
+        self.load_module_size = int.from_bytes(self.file.read(2), byteorder=self.byte_order, signed=self.signed)
         
         
         # Going to store file's path in self.load_modules_list.
@@ -225,14 +238,14 @@ class MetaReader:
        
         for i in range(num_load_modules):
             current_index = self.load_modules_pointer + (i * self.load_module_size)
-            self.meta_file.seek(current_index)
+            self.file.seek(current_index)
 
             # Flags -- Reserved for future use (u32)
-            flags = int.from_bytes(self.meta_file.read(4), byteorder=self.byte_order, signed=self.signed)
+            flags = int.from_bytes(self.file.read(4), byteorder=self.byte_order, signed=self.signed)
             # empty space that we need to skip
-            self.meta_file.read(4)
+            self.file.read(4)
             # Full path to the associated application binary
-            path_pointer = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
+            path_pointer = int.from_bytes(self.file.read(8), byteorder=self.byte_order, signed=self.signed)
             module_map = {"string_index": self.common_string_index_map[path_pointer]}
             self.load_modules_list.append(module_map)
 
@@ -241,10 +254,10 @@ class MetaReader:
         Helper function to read a string from the file starting at the file_pointer
         and ending at the first occurence of the null character
         """
-        self.meta_file.seek(file_pointer)
+        self.file.seek(file_pointer)
         name = ""
         while True:
-            read = str(self.meta_file.read(1), encoding='UTF-8')
+            read = str(self.file.read(1), encoding='UTF-8')
             if read == "\0":
                 break
             name += read
@@ -264,18 +277,18 @@ class MetaReader:
         """
 
         # go to correct section of file
-        self.meta_file.seek(section_pointer)
+        self.file.seek(section_pointer)
 
         # Human-readable names for Identifier kinds
-        names_pointer_pointer = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
+        names_pointer_pointer = int.from_bytes(self.file.read(8), byteorder=self.byte_order, signed=self.signed)
         # Number of names listed in this section
-        num_names = int.from_bytes(self.meta_file.read(1), byteorder=self.byte_order, signed=self.signed)
+        num_names = int.from_bytes(self.file.read(1), byteorder=self.byte_order, signed=self.signed)
 
         self.identifier_names: list[str] = []
 
         for i in range(num_names):
-            self.meta_file.seek(names_pointer_pointer + (i * 8))
-            names_pointer = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
+            self.file.seek(names_pointer_pointer + (i * 8))
+            names_pointer = int.from_bytes(self.file.read(8), byteorder=self.byte_order, signed=self.signed)
             self.identifier_names.append(self.__read_string(names_pointer))
     
     def __read_performance_metrics_section(self, section_pointer: int, section_size: int) -> None:
@@ -284,32 +297,27 @@ class MetaReader:
         """
         return
         # go to correct spot in the file
-        self.meta_file.seek(section_pointer)
+        self.file.seek(section_pointer)
 
         # Descriptions of performance metrics
-        metrics_pointer = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
+        metrics_pointer = int.from_bytes(self.file.read(8), byteorder=self.byte_order, signed=self.signed)
         # Number of performance metrics (u32)
-        num_metrics = int.from_bytes(self.meta_file.read(4), byteorder=self.byte_order, signed=self.signed)
+        num_metrics = int.from_bytes(self.file.read(4), byteorder=self.byte_order, signed=self.signed)
         # Size of the {MD} structure, currently 32 (u8)
-        metric_size = int.from_bytes(self.meta_file.read(1), byteorder=self.byte_order, signed=self.signed)
+        metric_size = int.from_bytes(self.file.read(1), byteorder=self.byte_order, signed=self.signed)
         # Size of the {PSI} structure, currently 16 (u8)
-        PSI_size = int.from_bytes(self.meta_file.read(1), byteorder=self.byte_order, signed=self.signed)
+        PSI_size = int.from_bytes(self.file.read(1), byteorder=self.byte_order, signed=self.signed)
         # Size of the {SS} structure, currently 24 (u8)
-        SS_size = int.from_bytes(self.meta_file.read(1), byteorder=self.byte_order, signed=self.signed)
+        SS_size = int.from_bytes(self.file.read(1), byteorder=self.byte_order, signed=self.signed)
         # Descriptions of propgation scopes
-        pScopes = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
+        pScopes = int.from_bytes(self.file.read(8), byteorder=self.byte_order, signed=self.signed)
         # Number of propgation scopes (u16)
-        nScopes = int.from_bytes(self.meta_file.read(2), byteorder=self.byte_order, signed=self.signed)
+        nScopes = int.from_bytes(self.file.read(2), byteorder=self.byte_order, signed=self.signed)
         # Size of the {PS} structure, currently 16 (u8)
-        num_PS = int.from_bytes(self.meta_file.read(1), byteorder=self.byte_order, signed=self.signed)
+        num_PS = int.from_bytes(self.file.read(1), byteorder=self.byte_order, signed=self.signed)
 
         # one byte empty
-        self.meta_file.read(1)
-
-
-
-
-    
+        self.file.read(1)
 
     def __get_function_index(self, function_pointer: int) -> int:
         """
@@ -328,23 +336,23 @@ class MetaReader:
         """
         
         # go to correct section in file
-        self.meta_file.seek(section_pointer)
+        self.file.seek(section_pointer)
 
         
-        self.functions_array_pointer = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
-        num_functions = int.from_bytes(self.meta_file.read(4), byteorder=self.byte_order, signed=self.signed)
-        self.function_size = int.from_bytes(self.meta_file.read(2), byteorder=self.byte_order, signed=self.signed)
+        self.functions_array_pointer = int.from_bytes(self.file.read(8), byteorder=self.byte_order, signed=self.signed)
+        num_functions = int.from_bytes(self.file.read(4), byteorder=self.byte_order, signed=self.signed)
+        self.function_size = int.from_bytes(self.file.read(2), byteorder=self.byte_order, signed=self.signed)
         
         self.functions_list: list[dict] = []
         for i in range(num_functions):
             current_index = self.functions_array_pointer + (i * self.function_size)
-            self.meta_file.seek(current_index)
-            function_name_pointer = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
-            modules_pointer = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
-            modules_offset = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
-            file_pointer = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
-            source_line = int.from_bytes(self.meta_file.read(4), byteorder=self.byte_order, signed=self.signed)
-            flags = int.from_bytes(self.meta_file.read(4), byteorder=self.byte_order, signed=self.signed)
+            self.file.seek(current_index)
+            function_name_pointer = int.from_bytes(self.file.read(8), byteorder=self.byte_order, signed=self.signed)
+            modules_pointer = int.from_bytes(self.file.read(8), byteorder=self.byte_order, signed=self.signed)
+            modules_offset = int.from_bytes(self.file.read(8), byteorder=self.byte_order, signed=self.signed)
+            file_pointer = int.from_bytes(self.file.read(8), byteorder=self.byte_order, signed=self.signed)
+            source_line = int.from_bytes(self.file.read(4), byteorder=self.byte_order, signed=self.signed)
+            flags = int.from_bytes(self.file.read(4), byteorder=self.byte_order, signed=self.signed)
             source_file_index = None
             load_module_index = None
             function_name_index = None
@@ -377,19 +385,19 @@ class MetaReader:
         Documentation: https://gitlab.com/hpctoolkit/hpctoolkit/-/blob/develop/doc/FORMATS.md#metadb-source-files-section
         """
 
-        self.meta_file.seek(section_pointer)
+        self.file.seek(section_pointer)
         
         # Source files used in this database 
-        self.source_files_pointer = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
+        self.source_files_pointer = int.from_bytes(self.file.read(8), byteorder=self.byte_order, signed=self.signed)
 
         # Number of source files listed in this section (u32)
-        num_files = int.from_bytes(self.meta_file.read(4), byteorder=self.byte_order, signed=self.signed)
+        num_files = int.from_bytes(self.file.read(4), byteorder=self.byte_order, signed=self.signed)
         
         # Size of a Source File Specification, currently 16 (u16)
-        self.source_file_size = int.from_bytes(self.meta_file.read(2), byteorder=self.byte_order, signed=self.signed)
+        self.source_file_size = int.from_bytes(self.file.read(2), byteorder=self.byte_order, signed=self.signed)
         
         # Looping through individual files to get there information now
-        self.meta_file.seek(self.source_files_pointer)
+        self.file.seek(self.source_files_pointer)
 
         # Going to store file's path in self.files_list.
         # Each will contain the index of file's path string in 
@@ -397,15 +405,15 @@ class MetaReader:
         self.source_files_list: list[dict] = []
         for i in range(num_files):
             # Reading information about each individual source file
-            self.meta_file.seek(self.source_files_pointer + (i * self.source_file_size))
+            self.file.seek(self.source_files_pointer + (i * self.source_file_size))
 
-            flag = int.from_bytes(self.meta_file.read(4), byteorder=self.byte_order, signed=self.signed)
+            flag = int.from_bytes(self.file.read(4), byteorder=self.byte_order, signed=self.signed)
             # empty space that we need to skip
-            self.meta_file.read(4)
+            self.file.read(4)
             # Path to the source file. Absolute, or relative to the root database directory.
             # The string pointed to by pPath is completely within the Common String Table section,
             # including the terminating NUL byte.
-            file_path_pointer = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
+            file_path_pointer = int.from_bytes(self.file.read(8), byteorder=self.byte_order, signed=self.signed)
             string_index = self.common_string_index_map[file_path_pointer]
             source_file_map = {"string_index": string_index}
             self.source_files_list.append(source_file_map)
@@ -425,14 +433,14 @@ class MetaReader:
         # Reading "Context Tree" section header
 
         # make sure we're in the right spot of the file
-        self.meta_file.seek(section_pointer)
+        self.file.seek(section_pointer)
 
         # ({Entry}[nEntryPoints]*)
-        entry_points_array_pointer = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
+        entry_points_array_pointer = int.from_bytes(self.file.read(8), byteorder=self.byte_order, signed=self.signed)
         # (u16)
-        num_entry_points = int.from_bytes(self.meta_file.read(2), byteorder=self.byte_order, signed=self.signed)
+        num_entry_points = int.from_bytes(self.file.read(2), byteorder=self.byte_order, signed=self.signed)
         # (u8)
-        entry_point_size = int.from_bytes(self.meta_file.read(1), byteorder=self.byte_order, signed=self.signed)
+        entry_point_size = int.from_bytes(self.file.read(1), byteorder=self.byte_order, signed=self.signed)
                 
         for i in range (num_entry_points):
             current_pointer = entry_points_array_pointer + (i * entry_point_size)
@@ -447,33 +455,34 @@ class MetaReader:
         Documentation: https://gitlab.com/hpctoolkit/hpctoolkit/-/blob/develop/doc/FORMATS.md#metadb-context-tree-section
         """
 
-        self.meta_file.seek(entry_point_pointer)
+        self.file.seek(entry_point_pointer)
 
         # Reading information about child contexts
         # Total size of *pChildren (I call pChildren children_pointer), in bytes (u64)
-        children_size = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
+        children_size = int.from_bytes(self.file.read(8), byteorder=self.byte_order, signed=self.signed)
         # Pointer to the array of child contexts
-        children_pointer = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
+        children_pointer = int.from_bytes(self.file.read(8), byteorder=self.byte_order, signed=self.signed)
 
         # Reading information about this context
         # Unique identifier for this context (u32)
-        context_id = int.from_bytes(self.meta_file.read(4), byteorder=self.byte_order, signed=self.signed)
+        context_id = int.from_bytes(self.file.read(4), byteorder=self.byte_order, signed=self.signed)
         # Type of entry point used here (u16)
-        entry_point_type = int.from_bytes(self.meta_file.read(2), byteorder=self.byte_order, signed=self.signed)
+        entry_point_type = int.from_bytes(self.file.read(2), byteorder=self.byte_order, signed=self.signed)
         # next 2 bytes are blank
-        self.meta_file.read(2)
+        self.file.read(2)
         # Human-readable name for the entry point
-        pretty_name_pointer = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
+        pretty_name_pointer = int.from_bytes(self.file.read(8), byteorder=self.byte_order, signed=self.signed)
+        # map context for this context
+        string_index = self.common_string_index_map[pretty_name_pointer] 
+        context = {"string_index": string_index}
+        self.context_map[context_id] = context
         # Create Node for this context
-        node: Node = Node(None, None, None)
+        node: Node = Node(context_id, None, None)
         node.add_calling_context_id(context_id)
         # Adding the Node to the CCT
         self.cct.add_root(node)
         self.cct.add_to_map(context_id, node)
 
-        # map context for this context 
-        context = {"string_index": self.common_string_index_map[pretty_name_pointer]}
-        self.context_map[context_id] = context
 
         # Reading the children contexts
         self.__read_children_contexts(children_pointer, children_size, node)
@@ -487,53 +496,43 @@ class MetaReader:
 
         if total_size <= 0 or context_array_pointer <= 0:
             return
-        self.meta_file.seek(context_array_pointer)
+        self.file.seek(context_array_pointer)
         index = 0
         while(index < total_size):
             # Reading information about child contexts (as in the children of this context)
             # Total size of *pChildren (I call pChildren children_pointer), in bytes (u64)
-            children_size = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
+            children_size = int.from_bytes(self.file.read(8), byteorder=self.byte_order, signed=self.signed)
             index += 8
             # Pointer to the array of child contexts
-            children_pointer = int.from_bytes(self.meta_file.read(8), byteorder=self.byte_order, signed=self.signed)
+            children_pointer = int.from_bytes(self.file.read(8), byteorder=self.byte_order, signed=self.signed)
             index += 8
 
             # Reading information about this context
             # Unique identifier for this context (u32)
-            context_id = int.from_bytes(self.meta_file.read(4), byteorder=self.byte_order, signed=self.signed)
+            context_id = int.from_bytes(self.file.read(4), byteorder=self.byte_order, signed=self.signed)
             index += 4
             # Reading flags (u8)
-            flags = int.from_bytes(self.meta_file.read(1), byteorder=self.byte_order, signed=self.signed)
+            flags = int.from_bytes(self.file.read(1), byteorder=self.byte_order, signed=self.signed)
             index += 1
             # Relation this context has with its parent (u8)
-            relation = int.from_bytes(self.meta_file.read(1), byteorder=self.byte_order, signed=self.signed)
+            relation = int.from_bytes(self.file.read(1), byteorder=self.byte_order, signed=self.signed)
             index += 1
             # Type of lexical context represented (u8)
-            lexical_type = int.from_bytes(self.meta_file.read(1), byteorder=self.byte_order, signed=self.signed)
+            lexical_type = int.from_bytes(self.file.read(1), byteorder=self.byte_order, signed=self.signed)
             index += 1
             # Size of flex, in u8[8] "words" (bytes / 8) (u8)
-            num_flex_words = int.from_bytes(self.meta_file.read(1), byteorder=self.byte_order, signed=self.signed)
+            num_flex_words = int.from_bytes(self.file.read(1), byteorder=self.byte_order, signed=self.signed)
             index += 1
             # Bitmask for defining propagation scopes (u16) 
-            propogation = int.from_bytes(self.meta_file.read(2), byteorder=self.byte_order, signed=self.signed)
+            propogation = int.from_bytes(self.file.read(2), byteorder=self.byte_order, signed=self.signed)
             index += 2
             # Empty space
-            self.meta_file.read(6)
+            self.file.read(6)
             index += 6
 
             # reading flex
-            flex = self.meta_file.read(8 * num_flex_words)
+            flex = self.file.read(8 * num_flex_words)
             index += (8 * num_flex_words)
-
-            # Creating Node for this context
-            node = Node(None, None, parent_node)
-            node.add_calling_context_id(context_id)
-
-            # Connecting this node to the parent node
-            parent_node.add_child(node)
-
-            # Adding this node to the graph
-            self.cct.add_to_map(context_id, node)
 
             function_index: int = None
             source_file_index: int = None
@@ -583,191 +582,325 @@ class MetaReader:
             
             self.context_map[context_id] = context
 
+            # Creating Node for this context
+            
+            node = Node(context_id, None, parent_node)
+            node.add_calling_context_id(context_id)
+
+            # Connecting this node to the parent node
+            parent_node.add_child(node)
+
+            # Adding this node to the graph
+            self.cct.add_to_map(context_id, node)
+
+
             # recursively call this function to add more children
-            return_address = self.meta_file.tell()
+            return_address = self.file.tell()
             self.__read_children_contexts(children_pointer, children_size, node)
-            self.meta_file.seek(return_address)
+            self.file.seek(return_address)
 
 
 
-
-
-
-
-
-       
-
-
-class ExperimentReaderOld:
-    def __init__(self, file_location):
-        self.tree = ElementTree(file=file_location)
-        self._create_identifier_name_table()
-
-    def get_function_name(self, procedure_table_id):
-        """return function name, given a procedure_table_id"""
-
-        procedure_table_search = ".//Procedure[@i='" + procedure_table_id + "']"
-        procedure = self.tree.find(procedure_table_search)
-        return procedure.get("n")
-
-    def _create_identifier_name_table(self):
-        self.identifier_name_table = {}
-        for identifier in list(list(list(list(self.tree.getroot())[1])[0])[0]):
-            identifier_map = identifier.attrib
-            self.identifier_name_table[int(identifier_map["i"])] = identifier_map["n"]
-
-    def get_identifier_name(self, kind):
-        return self.identifier_name_table[kind]
-
-    def get_min_max_time(self):
-        # gets the start and end time of the program
-
-        search = './/TraceDB[@i="0"]'
-        e = self.tree.find(search)
-        time = (int(e.get("db-min-time")), int(e.get("db-max-time")))
-        return time
-
-    def create_graph(self):
-        """Traverses through the experiment.xml's SecCallPathProfileData tag,
-        creating a Node for every PF tag and adding it to the Graph
-        """
-
-        graph = Graph()
-        call_path_data = list(list(self.tree.getroot())[-1])[-1]
-        root_elems = list(call_path_data)
-        for root_elem in root_elems:
-            node = self.graph_helper(None, root_elem, graph)
-            if node is not None:
-                graph.add_root(node)
-
-        return graph
-
-    def graph_helper(self, parent_node: Node, curr_element: Element, graph: Graph):
-        """Recursive helper function for creating the graph - if the current
-        item in the SecCallPathProfileData is 'PF' add a node, otherwise create
-        an association between the id and the last node
-        """
-        if curr_element.tag == "PF":
-            procedure_table_id = curr_element.attrib["n"]
-            function_name = self.get_function_name(procedure_table_id)
-            new_node = Node(procedure_table_id, function_name, parent_node)
-            if parent_node is not None:
-                parent_node.add_child(new_node)
-
-            for child_elem in list(curr_element):
-                self.graph_helper(new_node, child_elem, graph)
-            return new_node
-
-        else:
-            calling_context_id = curr_element.attrib.get("it")
-            if calling_context_id is not None:
-                parent_node.add_calling_context_id(calling_context_id)
-                graph.add_to_map(calling_context_id, parent_node)
-
-            for child_elem in list(curr_element):
-                self.graph_helper(parent_node, child_elem, graph)
-            return None
-
+ 
 
 class ProfileReader:
-    # class to read data from profile.db file
+    # class to read self.data from profile.db file
 
     def __init__(self, file_location, meta_reader):
+        print("Profile Reader")
         # gets the pi_ptr variable to be able to read the identifier tuples
         self.meta_reader: MetaReader = meta_reader
 
+        # open the file to ready in binary mode (rb) 
         self.file = open(file_location, "rb")
-        file = self.file
-        file.seek(0x28)
+        
+        # setting necessary read options
+        self.byte_order = "little"
+        self.signed = False
+        self.encoding = "ASCII"
 
-        # need to test to see if correct
-        byte_order = "big"
-        signed = False
+        # The meta.db header consists of the common .db header and n sections.
+        # We're going to do a little set up work, so that's easy to change if 
+        # any revisions change the orders.
 
-        # Profile Info section offset (pi_ptr)
-        self.pi_ptr = int.from_bytes(file.read(8), byteorder=byte_order, signed=signed)
+        # We're are going to specify 2 maps:
+        #   - One dictionary maps the section name to an index 
+        #       (which follows the order that the sections are seen
+        #        in the meta.db header)
+        #   - The second dictionary maps the section name to a 
+        #       function that reads the section. Each function is defined
+        #       as __read_<section_name>_section(self, section_pointer: int, section_size: int) -> None 
 
-    def read_info(self, prof_info_idx):
-        """Given a prof_info_id, returns the heirarchal identifier tuples
-        associated with it - information such as thread id, mpi_rank,
-        node_id, etc.
+        # Here I'm mapping the section name to it's order in the meta.db header
+        header_map = {"Profiles Information": 0, "Hierarchical Identifier Tuples": 1}
+        
+        # Now let's create a function to section map
+        reader_map = { "Profiles Information": self.__read_profiles_information_section, \
+                        "Hierarchical Identifier Tuples": self.__read_hit_section }
+        # Another thing thing that we should consider is the order to read the sections.
+        # Here is a list of section references (x -> y means x references y)
+        #   - "Profiles Information" -> "Hierarchical Identifier Tuples"  
+        # 
+        # Thus we want to keep this order when reading sections:
+        # "Profiles Information" -> "Hierarchical Identifier Tuples"
+        # Here I'm specifying the order of reading the file
+        self.read_order = ["Hierarchical Identifier Tuples", "Profiles Information"]
+
+
+        
+        # Let's make sure that we include every section in the read order and reader_map
+        assert set(self.read_order) == set(header_map) and set(header_map) == set(reader_map)
+
+
+        # Now to the actual reading of the meta.db file
+
+        # reading the meta.db header
+        self.__read_common_header()
+
+        # now let's read all the sections
+        for section_name in self.read_order:
+            section_index = header_map[section_name]
+            section_pointer = self.section_pointer[section_index]
+            section_size = self.section_size[section_index]
+            section_reader = reader_map[section_name]
+            section_reader(section_pointer, section_size)
+
+    def __read_profiles_information_section(self, section_pointer: int, section_size: int) -> None:
         """
-        byte_order = "big"
-        signed = False
-        file = self.file
-
-        # Profile Info
-        file.seek(self.pi_ptr + (prof_info_idx * 52))
-        idt_ptr = int.from_bytes(file.read(8), byteorder=byte_order, signed=signed)
-
-        # Hierarchical Identifier Tuple
-        file.seek(idt_ptr)
-        num_tuples = int.from_bytes(file.read(2), byteorder=byte_order, signed=signed)
-        tuples_list = []
-        for i in range(0, num_tuples, 1):
-            kind = int.from_bytes(file.read(2), byteorder=byte_order, signed=signed)
-            kind = kind & 0x3FFF
-            p_val = int.from_bytes(file.read(8), byteorder=byte_order, signed=signed)
-            # l_val = int.from_bytes(file.read(8), byteorder=byte_order, signed=signed)
-            file.read(8)
-            identifier_name = self.meta_reader.get_identifier_name(kind)
-            tuples_list.append((identifier_name, p_val))
-        return tuples_list
-
-
-class HPCToolkitReader:
-    def __init__(self, dir_name) -> None:
-        self.dir_name = dir_name  # directory of hpctoolkit trace files being read
-
-    def read(self):
-        """This function reads through the trace.db file with two nested loops -
-        The outer loop iterates on the rank of the process while the inner
-        loop Iterates through each trace line for the given rank and adds it
-        to the dictionary
+        Reads Profile Information section.
+        
+        Documentation: https://gitlab.com/hpctoolkit/hpctoolkit/-/blob/develop/doc/FORMATS.md#profiledb-profile-info-section
         """
-        dir_location = self.dir_name  # directory of hpctoolkit trace files being read
 
-        # open file
-        file = open(dir_location + "/trace.db", "rb")
+        self.file.seek(section_pointer)
 
-        meta_reader = MetaReader(dir_location + "/meta.db")
+        # Description for each profile (u64)
+        profiles_pointer = int.from_bytes(self.file.read(8), byteorder=self.byte_order, signed=self.signed) 
+        # Number of profiles listed in this section (u32)
+        num_profiles = int.from_bytes(self.file.read(4), byteorder=self.byte_order, signed=self.signed) 
+        # Size of a {PI} structure, currently 40 (u8)
+        profile_size = int.from_bytes(self.file.read(1), byteorder=self.byte_order, signed=self.signed) 
 
-        profile_reader = ProfileReader(dir_location + "/profile.db", meta_reader)
+        self.profile_info_list = []
 
-        # create graph
-        graph = meta_reader.cct
+        for i in range(num_profiles):
+            file_index = profiles_pointer + (i * profile_size)
+            self.file.seek(file_index)
+            # Header for the values for this profile
+            psvb = self.file.read(0x20)
+            # Identifier tuple for this profile
+            hit_pointer = int.from_bytes(self.file.read(8), byteorder=self.byte_order, signed=self.signed) 
+            # (u32)
+            flags = int.from_bytes(self.file.read(4), byteorder=self.byte_order, signed=self.signed)
+            profile_map = {"hit_pointer": hit_pointer, "flags": flags, "psvb": psvb}
+            self.profile_info_list.append(profile_map)
+            # print(flags == 0)
+            if hit_pointer == 0:
+                print("hit pointer is 0")
+                print("flags are ", flags)
+                print('-------------------found summary profile')
+                self.summary_profile_index = i
+
+
+    def get_hit_from_profile(self, index: int) -> list:
+        profile = self.profile_info_list[index]
+        hit_pointer = profile["hit_pointer"]
+        if hit_pointer != 0:
+            return self.hit_map[hit_pointer]
+        else: 
+            profile = self.profile_info_list[self.summary_profile_index]
+            hit_pointer = profile["hit_pointer"]
+            return self.hit_map[hit_pointer]
+            
+
+    
+    def __read_hit_section(self, section_pointer: int, section_size: int) -> None:
+        """
+        Reads Hierarchical Identifier Tuples section of profile.db
+
+        Documentation: https://gitlab.com/hpctoolkit/hpctoolkit/-/blob/develop/doc/FORMATS.md#profiledb-hierarchical-identifier-tuple-section
+        """
+        # let's get to the correct spot in the file
+        self.file.seek(section_pointer)
+        print("Section Size", section_size)
+
+        self.hit_map = {}
+
+        while((self.file.tell() - section_pointer) < section_size):
+
+            # hit pointer
+            hit_pointer = self.file.tell()
+
+            # print((self.file.tell() - section_pointer))
+            # Number of identifications in this tuple (u16)
+            num_tuples = int.from_bytes(self.file.read(2), byteorder=self.byte_order, signed=self.signed) 
+
+            # empty space
+            self.file.read(6)
+
+            # Identifications for an application thread
+            # Read H.I.T.s
+            tuples_list = []
+            for i in range(num_tuples):
+                # One of the values listed in the meta.db Identifier Names section. (u8)
+                kind = int.from_bytes(self.file.read(1), byteorder=self.byte_order, signed=self.signed)
+                # empty space
+                self.file.read(1)
+                # flag
+                flags = int.from_bytes(self.file.read(2), byteorder=self.byte_order, signed=self.signed)
+                # Logical identifier value, may be arbitrary but dense towards 0. (u32)
+                logical_id = int.from_bytes(self.file.read(4), byteorder=self.byte_order, signed=self.signed)
+                # Physical identifier value, eg. hostid or PCI bus index. (u64)
+                physical_id = int.from_bytes(self.file.read(8), byteorder=self.byte_order, signed=self.signed)
+                identifier_name = self.meta_reader.get_identifier_name(kind)
+                tuples_list.append((identifier_name, physical_id))
+            self.hit_map[hit_pointer] = tuples_list
+        print(self.hit_map)
+
+    
+    def __read_common_header(self) -> None:
+        """ 
+        Reads common .db file header version 4.0
+        
+        Documentation: https://gitlab.com/hpctoolkit/hpctoolkit/-/blob/develop/doc/FORMATS.md#common-file-structure
+        """
 
         # read Magic identifier ("HPCPROF-tracedb_")
-        # encoding = "ASCII"  # idk just guessing rn
-        # identifier = str(file.read(16), encoding)
-        file.read(16)
+        # first ten buyes are HPCTOOLKIT in ASCII 
+        identifier = str(self.file.read(10), encoding=self.encoding)
+        assert(identifier == "HPCTOOLKIT")
 
-        # read version
-        # version_major = file.read(1)
-        # version_minor = file.read(1)
-        file.read(2)
+        # next 4 bytes (u8) are the "Specific format identifier"
+        format_identifier = str(self.file.read(4), encoding=self.encoding)
+        assert(format_identifier == "prof")
 
-        # need to test to see if correct
-        byte_order = "big"
-        signed = False
+        # next byte (u8) contains the "Common major version, currently 4"
+        self.major_version = int.from_bytes(self.file.read(1), byteorder=self.byte_order, signed=self.signed) 
+        # next byte (u8) contains the "Specific minor version"
+        self.minor_version = int.from_bytes(self.file.read(1), byteorder=self.byte_order, signed=self.signed) 
 
-        # Number of trace lines (num_traces)
-        # num_traces = int.from_bytes(file.read(4), byteorder=byte_order, signed=signed)
-        file.read(4)
+        self.section_pointer = []
+        self.section_size = []
+        # In the header each section is given 16 bytes:
+        #   - First 8 bytes specify the total size of the section (in bytes)
+        #   - Last 8 bytes specify a pointer to the beggining of the section
+        for i in range(len(self.read_order)):
+            self.section_size.append(int.from_bytes(self.file.read(8), byteorder=self.byte_order, signed=self.signed))
+            self.section_pointer.append(int.from_bytes(self.file.read(8), byteorder=self.byte_order, signed=self.signed))
 
-        # Number of sections (num_sec)
-        # num_sections = int.from_bytes(file.read(2), byteorder=byte_order,
-        # signed=signed)
-        file.read(2)
 
-        # Trace Header section size (hdr_size)
-        hdr_size = int.from_bytes(file.read(8), byteorder=byte_order, signed=signed)
+class TraceReader:
+    def __init__(self, file_location: str, meta_reader: MetaReader, profile_reader: ProfileReader) -> None:
+        # open file
+        self.file = open(file_location, "rb")
+        self.meta_reader = meta_reader
+        self.profile_reader = profile_reader
+        
+        # setting necessary read options
+        self.byte_order = "little"
+        self.signed = False
+        self.encoding = "ASCII"
 
-        # Trace Header section offset (hdr_ptr)
-        hdr_ptr = int.from_bytes(file.read(8), byteorder=byte_order, signed=signed)
-        # print("hdr_size: ", hdr_size)
+        # The trace.db header consists of the common .db header and n sections.
+        # We're going to do a little set up work, so that's easy to change if 
+        # any revisions change the orders.
 
-        data = {
+        # We're are going to specify 2 maps:
+        #   - One dictionary maps the section name to an index 
+        #       (which follows the order that the sections are seen
+        #        in the meta.db header)
+        #   - The second dictionary maps the section name to a 
+        #       function that reads the section. Each function is defined
+        #       as __read_<section_name>_section(self, section_pointer: int, section_size: int) -> None 
+
+        # Here I'm mapping the section name to it's order in the meta.db header
+        header_map = {"Context Trace Headers": 0}
+        
+        # Now let's create a function to section map
+        reader_map = {"Context Trace Headers": self.__read_trace_headers_section}
+        
+        # Another thing thing that we should consider is the order to read the sections.
+        # Here I'm specifying the order of reading the file
+        self.read_order = ["Context Trace Headers"]
+
+
+        
+        # Let's make sure that we include every section in the read order and reader_map
+        assert set(self.read_order) == set(header_map) and set(header_map) == set(reader_map)
+
+
+        # Now to the actual reading of the meta.db file
+
+        # reading the meta.db header
+        self.__read_common_header()
+
+        # now let's read all the sections
+        for section_name in self.read_order:
+            section_index = header_map[section_name]
+            section_pointer = self.section_pointer[section_index]
+            section_size = self.section_size[section_index]
+            section_reader = reader_map[section_name]
+            section_reader(section_pointer, section_size)
+
+
+    def __read_common_header(self) -> None:
+        """ 
+        Reads common .db file header version 4.0
+        
+        Documentation: https://gitlab.com/hpctoolkit/hpctoolkit/-/blob/develop/doc/FORMATS.md#common-file-structure
+        """
+
+        # read Magic identifier ("HPCPROF-tracedb_")
+        # first ten buyes are HPCTOOLKIT in ASCII 
+        identifier = str(self.file.read(10), encoding=self.encoding)
+        assert(identifier == "HPCTOOLKIT")
+
+        # next 4 bytes (u8) are the "Specific format identifier"
+        format_identifier = str(self.file.read(4), encoding=self.encoding)
+        assert(format_identifier == "trce")
+
+        # next byte (u8) contains the "Common major version, currently 4"
+        self.major_version = int.from_bytes(self.file.read(1), byteorder=self.byte_order, signed=self.signed) 
+        # next byte (u8) contains the "Specific minor version"
+        self.minor_version = int.from_bytes(self.file.read(1), byteorder=self.byte_order, signed=self.signed) 
+
+        self.section_pointer = []
+        self.section_size = []
+        # In the header each section is given 16 bytes:
+        #   - First 8 bytes specify the total size of the section (in bytes)
+        #   - Last 8 bytes specify a pointer to the beggining of the section
+        for i in range(len(self.read_order)):
+            self.section_size.append(int.from_bytes(self.file.read(8), byteorder=self.byte_order, signed=self.signed))
+            self.section_pointer.append(int.from_bytes(self.file.read(8), byteorder=self.byte_order, signed=self.signed))
+
+
+
+    def __read_trace_headers_section(self, section_pointer: int, section_size: int) -> None:
+        """ 
+        Reader Context Trace Headers section of trace.db 
+        
+        Documentation: https://gitlab.com/hpctoolkit/hpctoolkit/-/blob/develop/doc/FORMATS.md#tracedb-context-trace-headers-section
+        """
+
+        # get to the right place in the file
+        self.file.seek(section_pointer)
+        
+        # Header for each trace (u64)
+        trace_headers_pointer = int.from_bytes(self.file.read(8), byteorder=self.byte_order, signed=self.signed)
+        # Number of traces listed in this section (u32)
+        num_trace_headers = int.from_bytes(self.file.read(4), byteorder=self.byte_order, signed=self.signed)
+        # Size of a {TH} structure, currently 24
+        trace_header_size = int.from_bytes(self.file.read(1), byteorder=self.byte_order, signed=self.signed)
+
+        # empty space
+        self.file.read(3)
+
+        # Smallest timestamp of the traces listed in *pTraces (u64)
+        self.min_time_stamp = int.from_bytes(self.file.read(8), byteorder=self.byte_order, signed=self.signed)
+        # Largest timestamp of the traces listed in *pTraces (u64)
+        self.max_time_stamp = int.from_bytes(self.file.read(8), byteorder=self.byte_order, signed=self.signed)
+
+        self.data = {
             "Timestamp (ns)": [],
             "Event Type": [],
             "Name": [],
@@ -776,125 +909,352 @@ class HPCToolkitReader:
             "Host": [],
             "Node": [],
         }
-        # min_max_time = experiment_reader.get_min_max_time()
-        min_max_time = [0, 0]
+        print('min time', self.min_time_stamp)
+        print('max time', self.max_time_stamp)
 
-        # cycle through trace headers (each iteration in this outer loop is a seperate
-        # process/thread/rank)
-        for i in range(0, hdr_size, 22):
-            # proc_num = int(i / 22)
-            file.seek(hdr_ptr + i)
+        for i in range(num_trace_headers):
+            header_pointer = trace_headers_pointer + (i * trace_header_size)
+            self.__read_single_trace_header(header_pointer)
 
-            # prof_info_idx (in profile.db)
-            prof_info_idx = int.from_bytes(
-                file.read(4), byteorder=byte_order, signed=signed
+    def __read_single_trace_header(self, header_pointer: int) -> None:
+        """
+        Reads a single trace header and all trace elements associated with it
+        """
+        self.file.seek(header_pointer)
+
+        # Index of a profile listed in the profile.db
+        profile_index = int.from_bytes(self.file.read(4), byteorder=self.byte_order, signed=self.signed)
+        hit = self.profile_reader.get_hit_from_profile(profile_index)
+
+        # empty space
+        self.file.read(4)
+
+        start_pointer = int.from_bytes(self.file.read(8), byteorder=self.byte_order, signed=self.signed)
+        end_pointer = int.from_bytes(self.file.read(8), byteorder=self.byte_order, signed=self.signed)
+
+        self.file.seek(start_pointer)
+
+        last_id = -1
+        last_node = None
+
+
+        while(self.file.tell() < end_pointer):
+            # Timestamp (nanoseconds since epoch)
+            timestamp = (
+                int.from_bytes(self.file.read(8), byteorder=self.byte_order, signed=self.signed)
+                - self.min_time_stamp
             )
-            proc_num = profile_reader.read_info(prof_info_idx)
-            # file.read(4)
 
-            # Trace type
-            # trace_type = int.from_bytes(
-            #     file.read(2), byteorder=byte_order, signed=signed
-            # )
-            file.read(2)
+            # Sample calling context id (in experiment.xml)
+            # can use this to get name of function from experiement.xml
+            # Procedure tab
+            calling_context_id = int.from_bytes(
+                self.file.read(4), byteorder=self.byte_order, signed=self.signed
+            )
 
-            # Offset of Trace Line start (line_ptr)
-            line_ptr = int.from_bytes(file.read(8), byteorder=byte_order, signed=signed)
+            if calling_context_id == 0:
+                # process is idling
+                last_id = -1
+                last_node = None
+                continue
 
-            # Offset of Trace Line one-after-end (line_end)
-            line_end = int.from_bytes(file.read(8), byteorder=byte_order, signed=signed)
+            # checking to see if the last event wasn't the same
+            # if it was then we skip it, as to not have multiple sets of
+            # open/close events for a function that it's still in
+            if last_id != calling_context_id:
 
-            last_id = -1
+                # updating the trace_db
 
-            last_node = None
+                node = self.meta_reader.cct.get_node(calling_context_id)  # the node in the Graph
 
-            # iterate through every trace event in the process
-            for j in range(line_ptr, line_end, 12):
-                file.seek(j)
+                # closing functions exited
+                close_node = last_node
+                intersect_level = -1
+                # print("context is", calling_context_id)
+                # print(set(self.meta_reader.context_map))
+                # print("node has name", self.meta_reader.get_name_from_context_id(calling_context_id))
+                if calling_context_id == 0:
+                    for x in self.meta_reader.functions_list:
+                        print(self.meta_reader.common_strings[x['string_index']])
+                intersect_node = node.get_intersection(last_node)
 
-                # Timestamp (nanoseconds since epoch)
-                timestamp = (
-                    int.from_bytes(file.read(8), byteorder=byte_order, signed=signed)
-                    - min_max_time[0]
-                )
+                # this is the highest node that last_node and node have in
+                # common we want to close every enter time event higher
+                # than than interest node, because those functions have
+                # exited
 
-                # Sample calling context id (in experiment.xml)
-                # can use this to get name of function from experiement.xml
-                # Procedure tab
-                calling_context_id = int.from_bytes(
-                    file.read(4), byteorder=byte_order, signed=signed
-                )
+                if intersect_node is not None:
+                    intersect_level = intersect_node.get_level()
+                while (
+                    close_node is not None
+                    and close_node.get_level() > intersect_level
+                ):
+                    self.data["Name"].append(self.meta_reader.get_name_from_context_id(close_node.calling_context_ids[0]))
+                    self.data["Event Type"].append("Leave")
+                    self.data["Timestamp (ns)"].append(timestamp)
+                    self.data["Process"].append(hit[1][1])
+                    self.data["Thread"].append(hit[2][1])
+                    self.data["Host"].append(hit[0][1])
+                    self.data["Node"].append(close_node)
+                    close_node = close_node.parent
 
-                # checking to see if the last event wasn't the same
-                # if it was then we skip it, as to not have multiple sets of
-                # open/close events for a function that it's still in
-                if last_id != calling_context_id:
-                    # updating the trace_db
+                # creating new rows for the new functions entered
+                enter_list: list[Node] = node.get_node_list(intersect_level)
+                # the list of nodes higher than interesect_level
+                # (the level of interesect_node)
 
-                    node = graph.get_node(calling_context_id)  # the node in the Graph
+                # all of the nodes in this list have entered into the
+                # function since the last poll so we want to create entries
+                # in the self.data for the Enter event
+                for enter_node in enter_list[::-1]:
+                    self.data["Name"].append(self.meta_reader.get_name_from_context_id(enter_node.calling_context_ids[0]))
+                    self.data["Event Type"].append("Enter")
+                    self.data["Timestamp (ns)"].append(timestamp)
+                    self.data["Process"].append(hit[1][1])
+                    self.data["Thread"].append(hit[2][1])
+                    self.data["Host"].append(hit[0][1])
+                    self.data["Node"].append(enter_node)
+                last_node = node
 
-                    # closing functions exited
-                    close_node = last_node
-                    intersect_level = -1
-                    intersect_node = node.get_intersection(last_node)
-                    # this is the highest node that last_node and node have in
-                    # common we want to close every enter time event higher
-                    # than than interest node, because those functions have
-                    # exited
+            last_id = calling_context_id  # updating last_id
 
-                    if intersect_node is not None:
-                        intersect_level = intersect_node.get_level()
-                    while (
-                        close_node is not None
-                        and close_node.get_level() > intersect_level
-                    ):
-                        data["Name"].append(close_node.name)
-                        data["Event Type"].append("Leave")
-                        data["Timestamp (ns)"].append(timestamp)
-                        data["Process"].append(proc_num[1][1])
-                        data["Thread"].append(proc_num[2][1])
-                        data["Host"].append(proc_num[0][1])
-                        data["Node"].append(close_node)
-                        close_node = close_node.parent
+        # adding last self.data for trace df
+        close_node = last_node
 
-                    # creating new rows for the new functions entered
-                    enter_list = node.get_node_list(intersect_level)
-                    # the list of nodes higher than interesect_level
-                    # (the level of interesect_node)
+        # after reading through all the trace lines, some Enter events will
+        # not have matching Leave events, as the functions were still
+        # running in the last poll.  Here we are adding Leave events to all
+        # of the remaining unmatched Enter events
+        while close_node is not None:
+            self.data["Name"].append(close_node.name)
+            self.data["Event Type"].append("Leave")
+            self.data["Timestamp (ns)"].append(self.max_time_stamp - self.min_time_stamp)
+            self.data["Process"].append(hit[1][1])
+            self.data["Thread"].append(hit[2][1])
+            self.data["Host"].append(hit[0][1])
+            self.data["Node"].append(close_node)
+            close_node = close_node.parent
 
-                    # all of the nodes in this list have entered into the
-                    # function since the last poll so we want to create entries
-                    # in the data for the Enter event
-                    for enter_node in enter_list[::-1]:
-                        data["Name"].append(enter_node.name)
-                        data["Event Type"].append("Enter")
-                        data["Timestamp (ns)"].append(timestamp)
-                        data["Process"].append(proc_num[1][1])
-                        data["Thread"].append(proc_num[2][1])
-                        data["Host"].append(proc_num[0][1])
-                        data["Node"].append(enter_node)
-                    last_node = node
 
-                last_id = calling_context_id  # updating last_id
 
-            # adding last data for trace df
-            close_node = last_node
 
-            # after reading through all the trace lines, some Enter events will
-            # not have matching Leave events, as the functions were still
-            # running in the last poll.  Here we are adding Leave events to all
-            # of the remaining unmatched Enter events
-            while close_node is not None:
-                data["Name"].append(close_node.name)
-                data["Event Type"].append("Leave")
-                data["Timestamp (ns)"].append(min_max_time[1] - min_max_time[0])
-                data["Process"].append(proc_num[1][1])
-                data["Thread"].append(proc_num[2][1])
-                data["Host"].append(proc_num[0][1])
-                data["Node"].append(close_node)
-                close_node = close_node.parent
 
-        trace_df = pd.DataFrame(data)
+
+
+
+
+    # def read(self):
+    #     """This function reads through the trace.db file with two nested loops -
+    #     The outer loop iterates on the rank of the process while the inner
+    #     loop Iterates through each trace line for the given rank and adds it
+    #     to the dictionary
+    #     """
+    #     dir_location = self.dir_name  # directory of hpctoolkit trace files being read
+
+        
+    #     meta_reader = MetaReader(dir_location + "/meta.db")
+
+    #     profile_reader = ProfileReader(dir_location + "/profile.db", meta_reader)
+
+    #     # create graph
+    #     graph = meta_reader.cct
+
+    #     # read Magic identifier ("HPCPROF-tracedb_")
+    #     # encoding = "ASCII"  # idk just guessing rn
+    #     # identifier = str(file.read(16), encoding)
+    #     file.read(16)
+
+    #     # read version
+    #     # version_major = file.read(1)
+    #     # version_minor = file.read(1)
+    #     file.read(2)
+
+    #     # need to test to see if correct
+    #     byte_order = "big"
+    #     signed = False
+
+    #     # Number of trace lines (num_traces)
+    #     # num_traces = int.from_bytes(file.read(4), byteorder=byte_order, signed=signed)
+    #     file.read(4)
+
+    #     # Number of sections (num_sec)
+    #     # num_sections = int.from_bytes(file.read(2), byteorder=byte_order,
+    #     # signed=signed)
+    #     file.read(2)
+
+    #     # Trace Header section size (hdr_size)
+    #     hdr_size = int.from_bytes(file.read(8), byteorder=byte_order, signed=signed)
+
+    #     # Trace Header section offset (hdr_ptr)
+    #     hdr_ptr = int.from_bytes(file.read(8), byteorder=byte_order, signed=signed)
+    #     # print("hdr_size: ", hdr_size)
+
+    #     self.data = {
+    #         "Timestamp (ns)": [],
+    #         "Event Type": [],
+    #         "Name": [],
+    #         "Thread": [],
+    #         "Process": [],
+    #         "Host": [],
+    #         "Node": [],
+    #     }
+    #     # min_max_time = experiment_reader.get_min_max_time()
+    #     min_max_time = [0, 0]
+
+    #     # cycle through trace headers (each iteration in this outer loop is a seperate
+    #     # process/thread/rank)
+    #     for i in range(0, hdr_size, 22):
+    #         # hit = int(i / 22)
+    #         file.seek(hdr_ptr + i)
+
+    #         # prof_info_idx (in profile.db)
+    #         prof_info_idx = int.from_bytes(
+    #             file.read(4), byteorder=byte_order, signed=signed
+    #         )
+    #         hit = profile_reader.read_info(prof_info_idx)
+    #         # file.read(4)
+
+    #         # Trace type
+    #         # trace_type = int.from_bytes(
+    #         #     file.read(2), byteorder=byte_order, signed=signed
+    #         # )
+    #         file.read(2)
+
+    #         # Offset of Trace Line start (line_ptr)
+    #         line_ptr = int.from_bytes(file.read(8), byteorder=byte_order, signed=signed)
+
+    #         # Offset of Trace Line one-after-end (line_end)
+    #         line_end = int.from_bytes(file.read(8), byteorder=byte_order, signed=signed)
+
+    #         last_id = -1
+
+    #         last_node = None
+
+    #         # iterate through every trace event in the process
+    #         for j in range(line_ptr, line_end, 12):
+    #             file.seek(j)
+
+    #             # Timestamp (nanoseconds since epoch)
+    #             timestamp = (
+    #                 int.from_bytes(file.read(8), byteorder=byte_order, signed=signed)
+    #                 - min_max_time[0]
+    #             )
+
+    #             # Sample calling context id (in experiment.xml)
+    #             # can use this to get name of function from experiement.xml
+    #             # Procedure tab
+    #             calling_context_id = int.from_bytes(
+    #                 file.read(4), byteorder=byte_order, signed=signed
+    #             )
+
+    #             # checking to see if the last event wasn't the same
+    #             # if it was then we skip it, as to not have multiple sets of
+    #             # open/close events for a function that it's still in
+    #             if last_id != calling_context_id:
+
+    #                 # updating the trace_db
+
+    #                 node = graph.get_node(calling_context_id)  # the node in the Graph
+
+    #                 # closing functions exited
+    #                 close_node = last_node
+    #                 intersect_level = -1
+    #                 intersect_node = node.get_intersection(last_node)
+    #                 # this is the highest node that last_node and node have in
+    #                 # common we want to close every enter time event higher
+    #                 # than than interest node, because those functions have
+    #                 # exited
+
+    #                 if intersect_node is not None:
+    #                     intersect_level = intersect_node.get_level()
+    #                 while (
+    #                     close_node is not None
+    #                     and close_node.get_level() > intersect_level
+    #                 ):
+    #                     self.data["Name"].append(close_node.name)
+    #                     self.data["Event Type"].append("Leave")
+    #                     self.data["Timestamp (ns)"].append(timestamp)
+    #                     self.data["Process"].append(hit[1][1])
+    #                     self.data["Thread"].append(hit[2][1])
+    #                     self.data["Host"].append(hit[0][1])
+    #                     self.data["Node"].append(close_node)
+    #                     close_node = close_node.parent
+
+    #                 # creating new rows for the new functions entered
+    #                 enter_list = node.get_node_list(intersect_level)
+    #                 # the list of nodes higher than interesect_level
+    #                 # (the level of interesect_node)
+
+    #                 # all of the nodes in this list have entered into the
+    #                 # function since the last poll so we want to create entries
+    #                 # in the self.data for the Enter event
+    #                 for enter_node in enter_list[::-1]:
+    #                     self.data["Name"].append(enter_node.name)
+    #                     self.data["Event Type"].append("Enter")
+    #                     self.data["Timestamp (ns)"].append(timestamp)
+    #                     self.data["Process"].append(hit[1][1])
+    #                     self.data["Thread"].append(hit[2][1])
+    #                     self.data["Host"].append(hit[0][1])
+    #                     self.data["Node"].append(enter_node)
+    #                 last_node = node
+
+    #             last_id = calling_context_id  # updating last_id
+
+    #         # adding last self.data for trace df
+    #         close_node = last_node
+
+    #         # after reading through all the trace lines, some Enter events will
+    #         # not have matching Leave events, as the functions were still
+    #         # running in the last poll.  Here we are adding Leave events to all
+    #         # of the remaining unmatched Enter events
+    #         while close_node is not None:
+    #             self.data["Name"].append(close_node.name)
+    #             self.data["Event Type"].append("Leave")
+    #             self.data["Timestamp (ns)"].append(min_max_time[1] - min_max_time[0])
+    #             self.data["Process"].append(hit[1][1])
+    #             self.data["Thread"].append(hit[2][1])
+    #             self.data["Host"].append(hit[0][1])
+    #             self.data["Node"].append(close_node)
+    #             close_node = close_node.parent
+
+    #     trace_df = pd.DataFrame(self.data)
+    #     # Need to sort df by timestamp then index
+    #     # (since many events occur at the same timestamp)
+
+    #     # rename the index axis, so we can sort with it
+    #     trace_df.rename_axis("index", inplace=True)
+
+    #     # sort by timestamp then index
+    #     trace_df.sort_values(
+    #         by=["Timestamp (ns)", "index"],
+    #         axis=0,
+    #         ascending=True,
+    #         inplace=True,
+    #         ignore_index=True,
+    #     )
+
+    #     trace_df = trace_df.astype(
+    #         {
+    #             "Event Type": "category",
+    #             "Name": "category",
+    #             "Thread": "category",
+    #             "Process": "category",
+    #             "Host": "category",
+    #         }
+    #     )
+
+    #     self.trace_df = trace_df
+    #     return pipit.trace.Trace(None, trace_df)
+
+
+class HPCToolkitReader:
+    def __init__(self, directory: str) -> None:
+        self.meta_reader: MetaReader = MetaReader(directory + "/meta.db")
+        self.profile_reader = ProfileReader(directory + "/profile.db", self.meta_reader)
+        self.trace_reader = TraceReader(directory + "/trace.db", self.meta_reader, self.profile_reader)
+
+    def get_trace(self) -> pipit.trace.Trace:
+        trace_df = pd.DataFrame(self.trace_reader.data)
         # Need to sort df by timestamp then index
         # (since many events occur at the same timestamp)
 
@@ -923,10 +1283,15 @@ class HPCToolkitReader:
         self.trace_df = trace_df
         return pipit.trace.Trace(None, trace_df)
 
-
 def main():
     meta_loc = '/Users/movsesyanae/Programming/Research/pipit_data/hpctoolkit-lulesh2.0-database/meta.db'
     x = MetaReader(meta_loc)
-    y = HPCToolkitReader('/Users/movsesyanae/Programming/Research/pipit_data/hpctoolkit-lulesh2.0-database/')
+    # y = TraceReader('/Users/movsesyanae/Programming/Research/pipit_data/hpctoolkit-lulesh2.0-database/trace.db',None, None)
+    z = HPCToolkitReader('/Users/movsesyanae/Programming/Research/pipit_data/hpctoolkit-lulesh2.0-database')
+    trace = z.get_trace()
+    t = trace.events
+    t = t.loc[t['Process'] == 9]
+    print(t.head(10))
+    print("hello")
 if __name__ == "__main__":
     main()
