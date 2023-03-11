@@ -195,7 +195,7 @@ class OTF2Reader:
             # note: the below lists are for storing logical ids
             process_ids, thread_ids = [], []
 
-            # dictionary mapping metric names to lists storing their values
+            # list of metric members of in the definitions
             metric_names = set(
                 self.definitions.loc[
                     self.definitions["Definition Type"] == "MetricMember"
@@ -203,11 +203,14 @@ class OTF2Reader:
                 .map(lambda attr: attr["name"])
                 .to_list()
             )
+
+            # maps each metric to a list of its values
             metrics_dict = {metric_name: [] for metric_name in metric_names}
 
-            # used to keep track of last timestamp that a metric was read at
-            last_metric_timestamp = -1
-            last_metrics = set()
+            # used to keep track of information about
+            # the most recent metrics that were read
+            prev_metric_time = -1
+            prev_metrics = set()
 
             # iterates through the events and processes them
             for loc_event in loc_events:
@@ -219,27 +222,49 @@ class OTF2Reader:
                 # Support for GPU events has to be
                 # added and unified across readers.
                 if str(loc.type)[13:] == "CPU_THREAD":
+                    # don't add metric events as a separate row,
+                    # and add their values into columns instead
                     if type(event) == otf2.events.Metric:
+                        # Since the location is a cpu thread, we know
+                        # that the metric event is of type MetricClass,
+                        # which has a list of MetricMembers.
                         metrics = list(
                             map(lambda metric: metric.name, event.metric.members)
                         )
                         metric_values = event.values
 
+                        # append the values for the metrics
+                        # to their appropriate lists
                         for i in range(len(metrics)):
                             metrics_dict[metrics[i]].append(metric_values[i])
 
-                        last_metric_timestamp = event.time
-                        last_metrics = set(metrics)
+                        # store the metrics and their timestamp
+                        prev_metric_time = event.time
+                        prev_metrics = set(metrics)
                     else:
-                        if event.time == last_metric_timestamp:
-                            for metric in metric_names - last_metrics:
+                        # MetricClass metric events are synchronous
+                        # and coupled with an enter or leave event that
+                        # has the same timestamp,
+                        if event.time == prev_metric_time:
+                            # once an enter or leave that is paired with some metrics
+                            # is encountered, add placeholders for all the metric lists
+                            # which aren't paired with this event
+                            for metric in metric_names - prev_metrics:
                                 metrics_dict[metric].append(float("nan"))
                         else:
+                            # if the event is not paired with any metric, then
+                            # add placeholders for all the metric lists
                             for metric in metric_names:
                                 metrics_dict[metric].append(float("nan"))
 
-                        last_metric_timestamp = -1
-                        last_metrics = set()
+                        # reset these as a metric event was not read
+                        prev_metric_time = -1
+                        prev_metrics = set()
+
+                        """
+                        Below is code to read the primary information about the
+                        non-metric event, such as location, attributes, etc.
+                        """
 
                         process_id = loc.group._ref
                         process_ids.append(process_id)

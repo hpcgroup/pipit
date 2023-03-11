@@ -15,9 +15,13 @@ class Trace:
         """Create a new Trace object."""
         self.definitions = definitions
         self.events = events
+
+        # list of numeric columns which we can calculate inc/exc metrics with
         self.numeric_cols = list(
             self.events.select_dtypes(include=[np.number]).columns.values
         )
+
+        # will store columns names for inc/exc metrics
         self.inc_metrics = []
         self.exc_metrics = []
 
@@ -76,6 +80,7 @@ class Trace:
                 has_thread = False
 
             for curr_loc in exec_locations:
+                # only filter by thread if the trace has a thread column
                 if has_thread:
                     curr_process, curr_thread = curr_loc
                     filtered_df = enter_leave_df.loc[
@@ -155,6 +160,7 @@ class Trace:
                 has_thread = False
 
             for curr_loc in exec_locations:
+                # only filter by thread if the trace has a thread column
                 if has_thread:
                     curr_process, curr_thread = curr_loc
                     filtered_df = enter_leave_df.loc[
@@ -216,34 +222,45 @@ class Trace:
             self.events = self.events.astype({"_parent": "category"})
 
     def calc_inc(self, columns=None):
+        # if no columns are specified by the user, then we calculate
+        # inclusive metrics for all the numeric columns in the trace
         columns = self.numeric_cols if columns is None else columns
 
+        # pair enter and leave rows
         if "_matching_event" not in self.events.columns:
             self._match_events()
 
         enter_df = self.events.loc[self.events["Event Type"] == "Enter"]
 
+        # calculate inclusive metric for each column specified
         for col in columns:
+            # name of column for this inclusive metric
             metric_col_name = (
                 "time" if col == "Timestamp (ns)" else col.lower()
             ) + ".inc"
 
             if metric_col_name not in self.events.columns:
+                # calculate the inclusive metric by subtracting
+                # the values at the enter rows from the values
+                # at the corresponding leave rows
                 self.events.loc[
                     self.events["Event Type"] == "Enter", metric_col_name
                 ] = (
                     self.events[col][enter_df["_matching_event"]].values
                     - enter_df[col].values
                 )
+
                 self.inc_metrics.append(metric_col_name)
 
-    # have to keep track of list of exc columns in trace
     def calc_exc(self, columns=None):
+        # calculate exc metrics for all numeric columns if not specified
         columns = self.numeric_cols if columns is None else columns
 
+        # match caller and callee rows
         if "_children" not in self.events.columns:
             self._match_caller_callee()
 
+        # exclusive metrics only change for rows that have children
         filtered_df = self.events.loc[self.events["_children"].notnull()]
         parent_df_indices, children = (
             list(filtered_df.index),
@@ -251,21 +268,26 @@ class Trace:
         )
 
         for col in columns:
+            # get the corresponding inclusive column name for this metric
             inc_col_name = ("time" if col == "Timestamp (ns)" else col.lower()) + ".inc"
             if inc_col_name not in self.events.columns:
                 self.calc_inc([col])
 
+            # name of column for this exclusive metric
             metric_col_name = (
                 "time" if col == "Timestamp (ns)" else col.lower()
             ) + ".exc"
 
             if metric_col_name not in self.events.columns:
+                # exc metric starts out as a copy of the inc metric values
                 exc_values = self.events[inc_col_name].to_list()
                 inc_values = self.events[inc_col_name].to_list()
 
                 for i in range(len(filtered_df)):
                     curr_parent_idx, curr_children = parent_df_indices[i], children[i]
                     for child_idx in curr_children:
+                        # subtract each child's inclusive metric from the total
+                        # to calculate the exclusive metric for the parent
                         exc_values[curr_parent_idx] -= inc_values[child_idx]
 
                 self.events[metric_col_name] = exc_values
