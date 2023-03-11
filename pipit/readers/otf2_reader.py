@@ -27,9 +27,11 @@ class OTF2Reader:
     def field_to_val(self, field):
         """
         Handles otf2 and _otf2 objects
+
         Arguments:
         field: an otf2 object, _otf2 object, or any other field
         that can have different data types such as strings, ints, etc
+
         Returns:
         if otf2 definition, a string representation of the definition and
         its ID such as "Region 19" that the user can use to refer back
@@ -37,6 +39,7 @@ class OTF2Reader:
         else if other otf2 or _otf2 objects, a simple string representation of
         the object
         else don't make any changes
+
         This function also ensures that there is no pickling of otf2 or _otf2
         objects, which could cause errors
         """
@@ -74,8 +77,10 @@ class OTF2Reader:
     def handle_data(self, data):
         """
         Handles different data structures
+
         Arguments:
         data: could be a list, tuple, set, dict, or any other python data type
+
         Returns:
         the same data structure as the passed argument but field_to_val is applied
         to all of the values it contains
@@ -137,9 +142,11 @@ class OTF2Reader:
     def events_reader(self, rank_size):
         """
         Serial events reader that reads a subset of the trace
+
         Arguments:
         rank_size: a tuple containing the rank of the process
         and the size/total number of processors that are being used
+        
         Returns:
         a dictionary with a subset of the trace events that can be converted
         to a dataframe
