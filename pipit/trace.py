@@ -397,6 +397,16 @@ class Trace:
 
         metrics = self.inc_metrics + self.exc_metrics if metrics is None else metrics
 
+        """
+        This first groups by both the process and the specified groupby column (like name).
+        It then sums up the metrics for each combination of the process and the groupby column.
+        Then, we group by the groupby column and take a mean over the processes.
+
+        Example:
+        If groupby column was "Name", this would return the average
+        metric value per process for each function name.
+        """
+
         return (
             self.events.loc[self.events["Event Type"] == "Enter"]
             .groupby([groupby_column, "Process"], observed=True)[metrics]
