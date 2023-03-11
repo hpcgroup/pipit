@@ -11,11 +11,10 @@ class Trace:
     or more dataframes.
     """
 
-    def __init__(self, definitions, events, cct=None):
+    def __init__(self, definitions, events):
         """Create a new Trace object."""
         self.definitions = definitions
         self.events = events
-        self.cct = cct
 
     @staticmethod
     def from_otf2(dirname, num_processes=None):

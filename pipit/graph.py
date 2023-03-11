@@ -84,7 +84,7 @@ class Node:
         if self.parent is None:
             return 0
         else:
-            return 1 + self.parent._calculate_level()
+            return 1 + self.parent.__calculate_level()
 
     def __eq__(self, obj) -> bool:
         if type(obj) != Node:
