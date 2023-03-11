@@ -91,11 +91,7 @@ class Filter:
         else:
             events = trace.events[trace.events.apply(self.func, axis=1)].reset_index()
 
-        # Filter cct
-        nodes = events["Graph_Node"].unique().tolist()
-        cct = trace.cct.select(nodes)
-
-        return Trace(trace.definitions, events, cct)
+        return Trace(trace.definitions, events, trace.cct)
 
 
 class And(Filter):

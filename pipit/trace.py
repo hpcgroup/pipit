@@ -5,8 +5,6 @@
 
 import numpy as np
 
-from .graph import Graph, Node
-
 
 class Trace:
     """A trace dataset is read into an object of this type, which includes one
@@ -330,128 +328,6 @@ class Trace:
         sizes = messages["Attributes"].map(lambda x: x["msg_length"])
 
         return np.histogram(sizes, bins=bins, **kwargs)
-
-    def create_cct(self):
-        """
-        Generic function to iterate through the trace events and create a CCT.
-        Uses pipit's graph data structure for this. Populates the trace's CCT
-        field and creates a new column in the trace's Events DataFrame that stores
-        a reference to each row's corresponding node in the CCT.
-        """
-
-        # only create the cct if it doesn't exist already
-        if self.cct is None:
-            # CCT and list of nodes in DataFrame
-            graph = Graph()
-            graph_nodes = [None] * len(self.events)
-
-            # determines whether a node exists or not
-            callpath_to_node = dict()
-
-            node_id = 0  # each node has a unique id
-
-            # Filter the DataFrame to only Enter/Leave
-            enter_leave_df = self.events.loc[
-                self.events["Event Type"].isin(["Enter", "Leave"])
-            ]
-
-            # Iterating over process & threads to
-            # read call stack sequentially
-            for process in set(enter_leave_df["Process"]):
-                curr_process_df = enter_leave_df.loc[
-                    enter_leave_df["Process"] == process
-                ]
-
-                for thread in set(curr_process_df["Thread"]):
-                    # filter by both process and thread
-                    filtered_df = curr_process_df.loc[
-                        curr_process_df["Thread"] == thread
-                    ]
-
-                    curr_depth, callpath = 0, ""
-
-                    """
-                    Iterating over lists instead of
-                    DataFrame columns is more efficient
-                    """
-                    df_indices = filtered_df.index.to_list()
-                    function_names = filtered_df["Name"].to_list()
-                    event_types = filtered_df["Event Type"].to_list()
-
-                    # stacks used to iterate through the trace and add nodes to the cct
-                    functions_stack, nodes_stack = [], []
-
-                    # iterating over the events of the current thread's trace
-                    for i in range(len(filtered_df)):
-                        curr_df_index, evt_type, function_name = (
-                            df_indices[i],
-                            event_types[i],
-                            function_names[i],
-                        )
-
-                        # encounter a new function through its entry point.
-                        if evt_type == "Enter":
-                            # add the function to the stack and get the call path
-                            functions_stack.append(function_name)
-                            callpath = "->".join(functions_stack)
-
-                            # get the parent node of the function if it exists
-                            parent_node = None if curr_depth == 0 else nodes_stack[-1]
-
-                            if callpath in callpath_to_node:
-                                # don't create new node if callpath is in map
-                                curr_node = callpath_to_node[callpath]
-                            else:
-                                # create new node if callpath isn't in map
-                                curr_node = Node(
-                                    node_id, function_name, parent_node, curr_depth
-                                )
-                                callpath_to_node[callpath] = curr_node
-                                node_id += 1
-
-                                # add node as root or child of its
-                                # parent depending on current depth
-                                graph.add_root(
-                                    curr_node
-                                ) if curr_depth == 0 else parent_node.add_child(
-                                    curr_node
-                                )
-
-                            # Update nodes stack, column, and current depth
-                            nodes_stack.append(curr_node)
-                            graph_nodes[curr_df_index] = curr_node
-                            curr_depth += 1
-                        else:
-                            """
-                            Get the corresponding node from top of stack
-                            once you encounter the Leave event for a function
-                            """
-                            curr_node = nodes_stack.pop()
-
-                            # do we want to store node reference in leave row too?
-                            graph_nodes[curr_df_index] = curr_node
-
-                            # Update functions stack and current depth
-                            functions_stack.pop()
-                            curr_depth -= 1
-
-            # Update the Trace with the generated cct
-            self.events["Graph_Node"] = graph_nodes
-            self.cct = graph
-
-    def __str__(self):
-        return (
-            super().__repr__()
-            + "\nEvents:\n"
-            + self.events[
-                ["Timestamp (ns)", "Event Type", "Name", "Thread", "Process"]
-            ].to_string(max_rows=25, show_dimensions=True)
-            + "\n\nCCT:\n"
-            + self.cct.__str__()
-        )
-
-    def __repr__(self):
-        return self.__str__()
 
     def filter(self, *filters):
         trace = self
