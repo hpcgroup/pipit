@@ -327,6 +327,9 @@ class OTF2Reader:
         )
 
         for metric, metric_values in metrics_dict.items():
+            # only add columns of metrics which are populated with
+            # some values (sometimes a metric could be defined but not
+            # appear in the trace itself)
             if not np.isnan(metric_values).all():
                 trace_df[metric] = metric_values
 
