@@ -84,6 +84,7 @@ class OTF2Reader:
         Returns:
         the same data structure as the passed argument but field_to_val is applied
         to all of the values it contains
+        
         Note: all of the below cases handle the case where the data structure
         could be nested, which is always possibility depending on the trace's
         specific attributes
@@ -146,7 +147,7 @@ class OTF2Reader:
         Arguments:
         rank_size: a tuple containing the rank of the process
         and the size/total number of processors that are being used
-        
+
         Returns:
         a dictionary with a subset of the trace events that can be converted
         to a dataframe
