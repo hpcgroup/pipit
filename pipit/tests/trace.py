@@ -49,9 +49,9 @@ def test_match_events(data_dir, ping_pong_otf2_trace):
     # timestamps.  Compares the values of these lists to ensure the pairing
     # functions produced correct results.
     rank_0_indices = rank_0_df.index.to_list()
-    rank_0_matching_indices = rank_0_df["Matching Index"].to_list()
+    rank_0_matching_indices = rank_0_df["_matching_event"].to_list()
     rank_0_timestamps = rank_0_df["Timestamp (ns)"].to_list()
-    rank_0_matching_timestamps = rank_0_df["Matching Timestamp"].to_list()
+    rank_0_matching_timestamps = rank_0_df["_matching_timestamp"].to_list()
 
     # All events in ping pong trace are at level 0 of the call tree, so the
     # leave row occurs immediately after the enter. The below assertions test
@@ -70,9 +70,9 @@ def test_match_events(data_dir, ping_pong_otf2_trace):
 
     # tests all the same as mentioned above, except for rank 1 as well
     rank_1_indices = rank_1_df.index.to_list()
-    rank_1_matching_indices = rank_1_df["Matching Index"].to_list()
+    rank_1_matching_indices = rank_1_df["_matching_event"].to_list()
     rank_1_timestamps = rank_1_df["Timestamp (ns)"].to_list()
-    rank_1_matching_timestamps = rank_1_df["Matching Timestamp"].to_list()
+    rank_1_matching_timestamps = rank_1_df["_matching_timestamp"].to_list()
 
     for i in range(len(rank_1_df)):
         if i % 2 == 0:
@@ -85,12 +85,12 @@ def test_match_events(data_dir, ping_pong_otf2_trace):
     # Checks that the Matching Indices and Timestamps for the Enter rows are
     # greater than that of the Leave rows.
     assert (
-        np.array(df.loc[df["Event Type"] == "Enter"]["Matching Index"])
-        > np.array(df.loc[df["Event Type"] == "Leave"]["Matching Index"])
+        np.array(df.loc[df["Event Type"] == "Enter"]["_matching_event"])
+        > np.array(df.loc[df["Event Type"] == "Leave"]["_matching_event"])
     ).all()
     assert (
-        np.array(df.loc[df["Event Type"] == "Enter"]["Matching Timestamp"])
-        > np.array(df.loc[df["Event Type"] == "Leave"]["Matching Timestamp"])
+        np.array(df.loc[df["Event Type"] == "Enter"]["_matching_timestamp"])
+        > np.array(df.loc[df["Event Type"] == "Leave"]["_matching_timestamp"])
     ).all()
 
 
@@ -102,4 +102,4 @@ def test_match_caller_callee(data_dir, ping_pong_otf2_trace):
     df = trace.events
 
     # all events of the ping pong trace are roots with no children
-    assert set(df.loc[df["Event Type"] == "Enter"]["Depth"]) == set([0])
+    assert len(df.loc[(df["Event Type"] == "Enter") & (df["_parent"].notnull())]) == 0
