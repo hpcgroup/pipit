@@ -72,9 +72,7 @@ class Node:
 
     def __str__(self) -> str:
         return (
-            self.name
-            + ": "
-            + str(self.calling_context_ids)
+            str(self.calling_context_ids)
             + " -- level: "
             + str(self.level)
         )
@@ -108,4 +106,4 @@ class Graph:
         self.roots.append(node)
 
     def get_node(self, calling_context_id) -> "Node":
-        return self.calling_context_id_map.get(str(calling_context_id))
+        return self.calling_context_id_map.get(calling_context_id)
