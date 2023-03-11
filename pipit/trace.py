@@ -351,7 +351,6 @@ class Trace:
         def calc_exc_time_in_bin(func):
             # start out with exc times being a copy of inc times
             exc_times = func["inc_time_in_bin"].copy(deep=False)
-            inc_times = func["inc_time_in_bin"].copy(deep=False)
 
             # Filter to events that have children
             filtered_df = func.loc[func["_children"].notnull()]
@@ -363,9 +362,12 @@ class Trace:
             # Iterate through the events that are parents
             for i in range(len(filtered_df)):
                 curr_parent_idx, curr_children = parent_df_indices[i], children[i]
-                for child_idx in curr_children:
-                    # Subtract child's inclusive time to update parent's exclusive time
-                    exc_times[curr_parent_idx] -= inc_times.get(child_idx, 0)
+
+                # Only consider inc times of children in current bin
+                children_in_bin = list(set(curr_children).intersection(set(func.index)))
+                exc_times[curr_parent_idx] -= func["inc_time_in_bin"][
+                    children_in_bin
+                ].sum()
 
             func["exc_time_in_bin"] = exc_times
 
