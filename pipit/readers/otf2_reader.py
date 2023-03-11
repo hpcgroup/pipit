@@ -196,7 +196,13 @@ class OTF2Reader:
             process_ids, thread_ids = [], []
 
             # dictionary mapping metric names to lists storing their values
-            metric_names = set(self.definitions.loc[self.definitions["Definition Type"] == "MetricMember"]["Attributes"].map(lambda attr: attr["name"]).to_list())
+            metric_names = set(
+                self.definitions.loc[
+                    self.definitions["Definition Type"] == "MetricMember"
+                ]["Attributes"]
+                .map(lambda attr: attr["name"])
+                .to_list()
+            )
             metrics_dict = {metric_name: [] for metric_name in metric_names}
 
             # used to keep track of last timestamp that a metric was read at
@@ -209,10 +215,14 @@ class OTF2Reader:
                 # location could be thread, process, etc
                 loc, event = loc_event[0], loc_event[1]
 
-                # To Do: Support for GPU events has to be added and unified across readers.
+                # To Do:
+                # Support for GPU events has to be
+                # added and unified across readers.
                 if str(loc.type)[13:] == "CPU_THREAD":
                     if type(event) == otf2.events.Metric:
-                        metrics = list(map(lambda metric: metric.name, event.metric.members))
+                        metrics = list(
+                            map(lambda metric: metric.name, event.metric.members)
+                        )
                         metric_values = event.values
 
                         for i in range(len(metrics)):
@@ -222,7 +232,7 @@ class OTF2Reader:
                         last_metrics = set(metrics)
                     else:
                         if event.time == last_metric_timestamp:
-                            for metric in (metric_names - last_metrics):
+                            for metric in metric_names - last_metrics:
                                 metrics_dict[metric].append(float("nan"))
                         else:
                             for metric in metric_names:
@@ -230,14 +240,16 @@ class OTF2Reader:
 
                         last_metric_timestamp = -1
                         last_metrics = set()
-                
+
                         process_id = loc.group._ref
                         process_ids.append(process_id)
 
                         # subtract the minimum location number of a process
                         # from the location number to get threads numbered
                         # 0 to (num_threads per process - 1) for each process.
-                        thread_ids.append(loc._ref - self.process_threads_map[process_id])
+                        thread_ids.append(
+                            loc._ref - self.process_threads_map[process_id]
+                        )
 
                         # type of event - enter, leave, or other types
                         event_type = str(type(event))[20:-2]

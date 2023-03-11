@@ -15,6 +15,11 @@ class Trace:
         """Create a new Trace object."""
         self.definitions = definitions
         self.events = events
+        self.numeric_cols = list(
+            self.events.select_dtypes(include=[np.number]).columns.values
+        )
+        self.inc_metrics = []
+        self.exc_metrics = []
 
     @staticmethod
     def from_otf2(dirname, num_processes=None):
@@ -73,9 +78,14 @@ class Trace:
             for curr_loc in exec_locations:
                 if has_thread:
                     curr_process, curr_thread = curr_loc
-                    filtered_df = enter_leave_df.loc[(enter_leave_df["Process"] == curr_process) & (enter_leave_df["Thread"] == curr_thread)]
+                    filtered_df = enter_leave_df.loc[
+                        (enter_leave_df["Process"] == curr_process)
+                        & (enter_leave_df["Thread"] == curr_thread)
+                    ]
                 else:
-                    filtered_df = enter_leave_df.loc[(enter_leave_df["Process"] == curr_loc)]
+                    filtered_df = enter_leave_df.loc[
+                        (enter_leave_df["Process"] == curr_loc)
+                    ]
 
                 stack = []
 
@@ -147,9 +157,14 @@ class Trace:
             for curr_loc in exec_locations:
                 if has_thread:
                     curr_process, curr_thread = curr_loc
-                    filtered_df = enter_leave_df.loc[(enter_leave_df["Process"] == curr_process) & (enter_leave_df["Thread"] == curr_thread)]
+                    filtered_df = enter_leave_df.loc[
+                        (enter_leave_df["Process"] == curr_process)
+                        & (enter_leave_df["Thread"] == curr_thread)
+                    ]
                 else:
-                    filtered_df = enter_leave_df.loc[(enter_leave_df["Process"] == curr_loc)]
+                    filtered_df = enter_leave_df.loc[
+                        (enter_leave_df["Process"] == curr_loc)
+                    ]
 
                 # Depth is the level in the
                 # Call Tree starting from 0
@@ -165,9 +180,7 @@ class Trace:
                     curr_df_index, evt_type = df_indices[i], event_types[i]
 
                     if evt_type == "Enter":
-                        if (
-                            curr_depth > 0
-                        ):  # if event is a child of some other event
+                        if curr_depth > 0:  # if event is a child of some other event
                             parent_df_index = stack[-1]
 
                             if children[parent_df_index] is None:
@@ -200,47 +213,63 @@ class Trace:
 
             self.events = self.events.astype({"_parent": "Int32"})
 
-            self.events = self.events.astype(
-                {"_parent": "category"}
-            )
+            self.events = self.events.astype({"_parent": "category"})
 
-    def calc_inc_time(self):
-        # Adds "time.inc" column
-        if "time.inc" not in self.events.columns:
-            if "_matching_timestamp" not in self.events.columns:
-                self._match_events()
+    def calc_inc(self, columns=None):
+        columns = self.numeric_cols if columns is None else columns
 
-            # Uses matching timestamp to calculate the inclusive time
-            self.events.loc[self.events["Event Type"] == "Enter", "time.inc"] = (
-                self.events["_matching_timestamp"] - self.events["Timestamp (ns)"]
-            )
+        if "_matching_event" not in self.events.columns:
+            self._match_events()
 
-    def calc_exc_time(self):
-        if "time.exc" not in self.events.columns:
-            if "time.inc" not in self.events.columns:
-                self.calc_inc_time()
-            if "_children" not in self.events.columns:
-                self._match_caller_callee()
+        enter_df = self.events.loc[self.events["Event Type"] == "Enter"]
 
-            # start out with exc times being a copy of inc times
-            exc_times = self.events["time.inc"].to_list()
-            inc_times = self.events["time.inc"].to_list()
+        for col in columns:
+            metric_col_name = (
+                "time" if col == "Timestamp (ns)" else col.lower()
+            ) + ".inc"
 
-            # Filter to events that have children
-            filtered_df = self.events.loc[self.events["_children"].notnull()]
-            parent_df_indices, children = (
-                list(filtered_df.index),
-                filtered_df["_children"].to_list(),
-            )
+            if metric_col_name not in self.events.columns:
+                self.events.loc[
+                    self.events["Event Type"] == "Enter", metric_col_name
+                ] = (
+                    self.events[col][enter_df["_matching_event"]].values
+                    - enter_df[col].values
+                )
+                self.inc_metrics.append(metric_col_name)
 
-            # Iterate through the events that are parents
-            for i in range(len(filtered_df)):
-                curr_parent_idx, curr_children = parent_df_indices[i], children[i]
-                for child_idx in curr_children:
-                    # Subtract child's inclusive time to update parent's exclusive time
-                    exc_times[curr_parent_idx] -= inc_times[child_idx]
+    # have to keep track of list of exc columns in trace
+    def calc_exc(self, columns=None):
+        columns = self.numeric_cols if columns is None else columns
 
-            self.events["time.exc"] = exc_times
+        if "_children" not in self.events.columns:
+            self._match_caller_callee()
+
+        filtered_df = self.events.loc[self.events["_children"].notnull()]
+        parent_df_indices, children = (
+            list(filtered_df.index),
+            filtered_df["_children"].to_list(),
+        )
+
+        for col in columns:
+            inc_col_name = ("time" if col == "Timestamp (ns)" else col.lower()) + ".inc"
+            if inc_col_name not in self.events.columns:
+                self.calc_inc([col])
+
+            metric_col_name = (
+                "time" if col == "Timestamp (ns)" else col.lower()
+            ) + ".exc"
+
+            if metric_col_name not in self.events.columns:
+                exc_values = self.events[inc_col_name].to_list()
+                inc_values = self.events[inc_col_name].to_list()
+
+                for i in range(len(filtered_df)):
+                    curr_parent_idx, curr_children = parent_df_indices[i], children[i]
+                    for child_idx in curr_children:
+                        exc_values[curr_parent_idx] -= inc_values[child_idx]
+
+                self.events[metric_col_name] = exc_values
+                self.exc_metrics.append(metric_col_name)
 
     def comm_matrix(self, output="size"):
         """
