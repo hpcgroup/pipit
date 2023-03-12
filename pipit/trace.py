@@ -4,6 +4,7 @@
 # SPDX-License-Identifier: MIT
 
 import numpy as np
+from .filter import Filter
 
 
 class Trace:
@@ -328,10 +329,22 @@ class Trace:
 
         return np.histogram(sizes, bins=bins, **kwargs)
 
-    def filter(self, *filters):
-        trace = self
+    def filter(self, *args, **kwargs):
+        """Filters the trace by field
 
-        for filter in filters:
-            trace = filter._apply(trace)
+        Accepts either arguments used to create a Filter object, or a list of
+        Filter objects.
 
-        return trace
+        Returns:
+            pipit.Trace: New Trace instance containing the filtered events
+        """
+        if all(isinstance(arg, Filter) for arg in args):
+            # args are all filters -> apply each filter one-by-one
+            trace = self
+            for filter in args:
+                trace = filter._apply(trace)
+
+            return trace
+        else:
+            # create a filter from args
+            return self.filter(Filter(*args, **kwargs))

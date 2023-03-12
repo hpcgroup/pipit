@@ -2,7 +2,7 @@ from pipit import Trace
 
 
 class Filter:
-    """Applies a selection along a field, like "Name" or "Process". Can operate
+    """Represents a selection along a field, like "Name" or "Process". Can operate
     on any field that currently exists in the events DataFrame. Supports
     basic comparisons, like "<", "<=", "==", ">=", ">", "!=", as well as
     other operations, like "in", "not-in", and "between".
@@ -87,11 +87,13 @@ class Filter:
     def _apply(self, trace):
         # Filter events using either DataFrame.query or DataFrame.apply
         if self.func is None:
-            events = trace.events.query(self._get_pandas_expr()).reset_index()
+            events = trace.events.query(self._get_pandas_expr())
         else:
-            events = trace.events[trace.events.apply(self.func, axis=1)].reset_index()
+            events = trace.events[trace.events.apply(self.func, axis=1)]
 
-        return Trace(trace.definitions, events, trace.cct)
+        # TODO: filter cct?
+
+        return Trace(trace.definitions, events)
 
 
 class And(Filter):
