@@ -5,7 +5,9 @@
 
 import pytest
 import numpy as np
+import pandas as pd
 from pipit import Trace
+from pipit.filter import Filter
 
 
 @pytest.mark.xfail(reason="Allow this to fail until otf2 has a pip package.")
@@ -103,3 +105,101 @@ def test_match_caller_callee(data_dir, ping_pong_otf2_trace):
 
     # all events of the ping pong trace are roots with no children
     assert set(df.loc[df["Event Type"] == "Enter"]["Depth"]) == set([0])
+
+
+@pytest.mark.xfail(reason="Allow this to fail until otf2 has a pip package.")
+def test_filter(data_dir, ping_pong_otf2_trace):
+    trace = Trace.from_otf2(str(ping_pong_otf2_trace))
+
+    def all_equal(*dfs):
+        return all([dfs[0].equals(df) for df in dfs])
+
+    # Basic filter tests
+    assert all_equal(
+        trace.filter("Process", "==", 0).events,
+        trace.filter(Filter("Process", "==", 0)).events,
+        trace.filter(Filter(expr="`Process` == 0")).events,
+        trace.filter(Filter(func=lambda x: x["Process"] == 0)).events,
+        trace.events[trace.events["Process"] == 0],
+    )
+
+    assert all_equal(
+        trace.filter("Process", "!=", 0).events,
+        trace.filter(Filter("Process", "!=", 0)).events,
+        trace.filter(Filter(expr="`Process` != 0")).events,
+        trace.filter(Filter(func=lambda x: x["Process"] != 0)).events,
+        trace.events[trace.events["Process"] != 0],
+    )
+
+    assert all_equal(
+        trace.filter("Timestamp (ns)", ">", 1.33e8).events,
+        trace.filter(Filter("Timestamp (ns)", ">", 1.33e8)).events,
+        trace.filter(Filter(expr="`Timestamp (ns)` > 1.33e8")).events,
+        trace.filter(Filter(func=lambda x: x["Timestamp (ns)"] > 1.33e8)).events,
+        trace.events[trace.events["Timestamp (ns)"] > 1.33e8],
+    )
+
+    assert all_equal(
+        trace.filter("Timestamp (ns)", "<", 1.33e8).events,
+        trace.filter(Filter("Timestamp (ns)", "<", 1.33e8)).events,
+        trace.filter(Filter(expr="`Timestamp (ns)` < 1.33e8")).events,
+        trace.filter(Filter(func=lambda x: x["Timestamp (ns)"] < 1.33e8)).events,
+        trace.events[trace.events["Timestamp (ns)"] < 1.33e8],
+    )
+
+    assert all_equal(
+        trace.filter("Name", "in", ["MPI_Send", "MPI_Recv"]).events,
+        trace.filter(Filter("Name", "in", ["MPI_Send", "MPI_Recv"])).events,
+        trace.filter(Filter(expr='`Name`.isin(["MPI_Send", "MPI_Recv"])')).events,
+        trace.filter(
+            Filter(func=lambda x: x["Name"] in ["MPI_Send", "MPI_Recv"])
+        ).events,
+        trace.events[trace.events["Name"].isin(["MPI_Send", "MPI_Recv"])],
+    )
+
+    assert all_equal(
+        trace.filter("Name", "not-in", ["MPI_Send", "MPI_Recv"]).events,
+        trace.filter(Filter("Name", "not-in", ["MPI_Send", "MPI_Recv"])).events,
+        trace.filter(Filter(expr='~`Name`.isin(["MPI_Send", "MPI_Recv"])')).events,
+        trace.filter(
+            Filter(func=lambda x: x["Name"] not in ["MPI_Send", "MPI_Recv"])
+        ).events,
+        trace.events[~trace.events["Name"].isin(["MPI_Send", "MPI_Recv"])],
+    )
+
+    assert all_equal(
+        trace.filter("Timestamp (ns)", "between", [1.33e8, 1.36e8]).events,
+        trace.filter(Filter("Timestamp (ns)", "between", [1.33e8, 1.36e8])).events,
+        trace.filter(
+            Filter(expr="(`Timestamp (ns)` > 1.33e8) & (`Timestamp (ns)` < 1.36e8)")
+        ).events,
+        trace.filter(
+            Filter(
+                func=lambda x: (x["Timestamp (ns)"] > 1.33e8)
+                & (x["Timestamp (ns)"] < 1.36e8)
+            )
+        ).events,
+        trace.events[
+            (trace.events["Timestamp (ns)"] > 1.33e8)
+            & (trace.events["Timestamp (ns)"] < 1.36e8)
+        ],
+    )
+
+    # Compound filter tests
+    f1 = Filter("Timestamp (ns)", "between", [1.33e8, 1.36e8])
+    f2 = Filter("Name", "in", ["MPI_Send", "MPI_Recv"])
+    f3 = Filter("Process", "==", 0)
+
+    assert all_equal(
+        trace.filter(f1 & f2 & f3).events,
+        trace.filter(f1).filter(f2).filter(f3).events,
+    )
+
+    assert all_equal(
+        trace.filter(f1 | f2 | f3).events,
+        pd.concat(
+            [trace.filter(f1).events, trace.filter(f2).events, trace.filter(f3).events]
+        )
+        .drop_duplicates(subset=["Timestamp (ns)", "Process", "Thread", "Name"])
+        .sort_index(),
+    )

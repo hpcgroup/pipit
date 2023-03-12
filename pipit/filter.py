@@ -1,4 +1,4 @@
-from pipit import Trace
+import pipit
 
 
 class Filter:
@@ -93,7 +93,7 @@ class Filter:
 
         # TODO: filter cct?
 
-        return Trace(trace.definitions, events)
+        return pipit.Trace(trace.definitions, events)
 
 
 class And(Filter):
