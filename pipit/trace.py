@@ -6,6 +6,8 @@
 import numpy as np
 from .filter import Filter
 
+import warnings
+
 
 class Trace:
     """A trace dataset is read into an object of this type, which includes one
@@ -16,6 +18,26 @@ class Trace:
         """Create a new Trace object."""
         self.definitions = definitions
         self.events = events
+        self._validate()
+
+    def _validate(self):
+        """Issue warning if required columns are not in the events DataFrame,
+        or if number of Enter/Leave events don't match"""
+        if (
+            not {"Timestamp (ns)", "Event Type", "Name", "Process"}.issubset(
+                self.events.columns
+            )
+            or abs(
+                len(self.events[self.events["Event Type"] == "Enter"])
+                - len(self.events[self.events["Event Type"] == "Leave"])
+            )
+            > 1
+        ):
+            warnings.warn(
+                "This Trace instance is invalid, as it is missing one or more required "
+                "rows or columns. You may continue working with it, but the Pipit API "
+                "may produce undesirable or incorrect results."
+            )
 
     @staticmethod
     def from_otf2(dirname, num_processes=None):
@@ -338,6 +360,8 @@ class Trace:
         Returns:
             pipit.Trace: New Trace instance containing the filtered events
         """
+        self._match_events()
+
         if all(isinstance(arg, Filter) for arg in args):
             # args are all filters -> apply each filter one-by-one
             trace = self

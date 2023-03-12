@@ -8,14 +8,22 @@ class Filter:
     other operations, like "in", "not-in", and "between".
     """
 
-    def __init__(self, field=None, operator=None, value=None, expr=None, func=None):
+    def __init__(
+        self,
+        field=None,
+        operator=None,
+        value=None,
+        expr=None,
+        func=None,
+        keep_invalid=False,
+    ):
         """
         Args:
             field (str, optional): The DataFrame field/column name to select by.
 
             operator (str, optional): The comparison operator to use to evaluate
                 the selection. Allowed operators:
-            "<", "<=", "==", ">=", ">", "!=", "in", "not-in", "between"
+                "<", "<=", "==", ">=", ">", "!=", "in", "not-in", "between"
 
             value (optional): The value to compare to. For "in" and "not-in"
                 operations, this can be a list of any size. For "between", this
@@ -23,22 +31,26 @@ class Filter:
                 must be a scalar value, like "MPI_Init" or "1.5e+5"
 
             pandas_expr (str, optional): Instead of providing the field,
-            operator, and value, you may provide a Pandas query expression
-            to select with.
-            See https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.query.html. # noqa: E501
+                operator, and value, you may provide a Pandas query expression
+                to select with.
+                See https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.query.html. # noqa: E501
 
             func (callable[row], optional): Instead of providing the field/
-            operator/value, or providing a Pandas query expression, you
-            may provide a function that is applied to each row of the
-            DataFrame, that returns True or False. This uses the
-            DataFrame.apply function, which is not a vectorized operation,
-            resulting in a significantly slower runtime.
+                operator/value, or providing a Pandas query expression, you
+                may provide a function that is applied to each row of the
+                DataFrame, that returns True or False. This uses the
+                DataFrame.apply function, which is not a vectorized operation,
+                resulting in a significantly slower runtime.
+
+            keep_invalid (bool, optional): Whether to keep Enter/Leave events whose
+                matching event did not make the selection. Defaults to False.
         """
         self.field = field
         self.operator = operator
         self.value = value
         self.expr = expr
         self.func = func
+        self.keep_invalid = keep_invalid
 
     def _get_pandas_expr(self):
         """
@@ -90,6 +102,10 @@ class Filter:
             events = trace.events.query(self._get_pandas_expr())
         else:
             events = trace.events[trace.events.apply(self.func, axis=1)]
+
+        # Remove invalid events
+        if not self.keep_invalid:
+            events = events[events["_matching_event"].isin(events.index)]
 
         # TODO: filter cct?
 
