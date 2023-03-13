@@ -3,12 +3,10 @@
 #
 # SPDX-License-Identifier: MIT
 
-import pytest
 import numpy as np
 from pipit import Trace
 
 
-@pytest.mark.xfail(reason="Allow this to fail until otf2 has a pip package.")
 def test_comm_matrix(data_dir, ping_pong_otf2_trace):
     # bytes sent between pairs of processes
     size_comm_matrix = Trace.from_otf2(str(ping_pong_otf2_trace)).comm_matrix()
@@ -34,7 +32,6 @@ def test_comm_matrix(data_dir, ping_pong_otf2_trace):
     assert count_comm_matrix[0][1] == count_comm_matrix[1][0] == 8
 
 
-@pytest.mark.xfail(reason="Allow this to fail until otf2 has a pip package.")
 def test_match_events(data_dir, ping_pong_otf2_trace):
     trace = Trace.from_otf2(str(ping_pong_otf2_trace))
     trace._match_events()
@@ -94,7 +91,6 @@ def test_match_events(data_dir, ping_pong_otf2_trace):
     ).all()
 
 
-@pytest.mark.xfail(reason="Allow this to fail until otf2 has a pip package.")
 def test_match_caller_callee(data_dir, ping_pong_otf2_trace):
     trace = Trace.from_otf2(str(ping_pong_otf2_trace))
     trace._match_caller_callee()
