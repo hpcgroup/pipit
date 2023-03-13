@@ -3,7 +3,6 @@
 #
 # SPDX-License-Identifier: MIT
 
-import pytest
 import numpy as np
 from pipit import Trace
 
