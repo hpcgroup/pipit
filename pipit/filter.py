@@ -121,7 +121,10 @@ class Filter:
         # Remove events whose matching events did not make filter
         # Ensures that returned Trace is valid
         if not self.keep_invalid:
-            events = events[events["_matching_event"].isin(events.index)]
+            events = events[
+                (~(events["Event Type"].isin(["Enter", "Leave"])))
+                | (events["_matching_event"].isin(events.index))
+            ]
 
         # TODO: filter CCT?
 
@@ -170,7 +173,7 @@ class Not(Filter):
 
     def _get_pandas_expr(self):
         # pandas query expression that negates filters
-        return f"!({self.filter._get_pandas_expr()})"
+        return f"~({self.filter._get_pandas_expr()})"
 
     def __repr__(self):
         return f"Not ({self.filter.__repr__()})"
