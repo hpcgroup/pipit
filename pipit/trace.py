@@ -4,7 +4,6 @@
 # SPDX-License-Identifier: MIT
 
 import numpy as np
-from .filter import Filter
 
 import warnings
 
@@ -360,15 +359,20 @@ class Trace:
         Returns:
             pipit.Trace: New Trace instance containing the filtered events
         """
+        # import this lazily to avoid circular dependencies
+        from .filter import Filter
+
+        # Match events, in case a Filter has keep_invalid=False
         self._match_events()
 
+        # If arguments are all Filter instances, then apply each one
         if all(isinstance(arg, Filter) for arg in args):
-            # args are all filters -> apply each filter one-by-one
             trace = self
+
             for filter in args:
                 trace = filter._apply(trace)
 
             return trace
         else:
-            # create a filter from args
+            # Create a new Filter instance from arguments, and apply it
             return self.filter(Filter(*args, **kwargs))
