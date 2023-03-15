@@ -607,7 +607,6 @@ class ProfileReader:
     # class to read self.data from profile.db file
 
     def __init__(self, file_location, meta_reader):
-        print("Profile Reader")
         # gets the pi_ptr variable to be able to read the identifier tuples
         self.meta_reader: MetaReader = meta_reader
 
@@ -755,7 +754,6 @@ class ProfileReader:
                 identifier_name = self.meta_reader.get_identifier_name(kind)
                 tuples_list.append((identifier_name, physical_id))
             self.hit_map[hit_pointer] = tuples_list
-        print(self.hit_map)
 
     
     def __read_common_header(self) -> None:
@@ -922,20 +920,25 @@ class TraceReader:
         """
         self.file.seek(header_pointer)
 
-        # Index of a profile listed in the profile.db
+        # Index of a profile listed in the profile.db (u32)
         profile_index = int.from_bytes(self.file.read(4), byteorder=self.byte_order, signed=self.signed)
         hit = self.profile_reader.get_hit_from_profile(profile_index)
 
         # empty space
         self.file.read(4)
-
+        # Pointer to the first element of the trace line (array)
         start_pointer = int.from_bytes(self.file.read(8), byteorder=self.byte_order, signed=self.signed)
+        # Pointer to the after-end element of the trace line (array)
         end_pointer = int.from_bytes(self.file.read(8), byteorder=self.byte_order, signed=self.signed)
 
         self.file.seek(start_pointer)
 
-        last_id = -1
-        last_node = None
+        # setting up some variables
+        last_id = -1  # refers to the previous context id
+        last_node: Node = None # refers to the node associated with the last context
+        context_id: int = -1  # refers to the current context id
+        current_node: Node = None  # refers to the current node associated with the current context id
+        common_node: Node = None  # refers to the least common ancestor between common_node and last_node 
 
 
         while(self.file.tell() < end_pointer):
@@ -948,92 +951,63 @@ class TraceReader:
             # Sample calling context id (in experiment.xml)
             # can use this to get name of function from experiement.xml
             # Procedure tab
-            calling_context_id = int.from_bytes(
+            context_id = int.from_bytes(
                 self.file.read(4), byteorder=self.byte_order, signed=self.signed
             )
 
-            if calling_context_id == 0:
-                # process is idling
-                last_id = -1
-                last_node = None
+            if context_id == last_id:
+                # nothing changed between samples.
+                # means we don't have to do anything
                 continue
-
-            # checking to see if the last event wasn't the same
-            # if it was then we skip it, as to not have multiple sets of
-            # open/close events for a function that it's still in
-            if last_id != calling_context_id:
-
-                # updating the trace_db
-
-                node = self.meta_reader.cct.get_node(calling_context_id)  # the node in the Graph
-
-                # closing functions exited
-                close_node = last_node
-                intersect_level = -1
-                # print("context is", calling_context_id)
-                # print(set(self.meta_reader.context_map))
-                # print("node has name", self.meta_reader.get_name_from_context_id(calling_context_id))
-                if calling_context_id == 0:
-                    for x in self.meta_reader.functions_list:
-                        print(self.meta_reader.common_strings[x['string_index']])
-                intersect_node = node.get_intersection(last_node)
-
-                # this is the highest node that last_node and node have in
-                # common we want to close every enter time event higher
-                # than than interest node, because those functions have
-                # exited
-
-                if intersect_node is not None:
-                    intersect_level = intersect_node.get_level()
-                while (
-                    close_node is not None
-                    and close_node.get_level() > intersect_level
-                ):
-                    self.data["Name"].append(self.meta_reader.get_name_from_context_id(close_node.calling_context_ids[0]))
+            elif context_id == 0:
+                # process is idling
+                current_node = None
+            else:
+                # at a new non-idle context
+                current_node = self.meta_reader.cct.get_node(context_id)
+            
+            # First we want to close all the "enter" events from the last sample
+            # that aren't still running 
+            if last_node != None:
+                if current_node == None:
+                    common_node: Node = None
+                else:
+                    common_node: Node = current_node.get_intersection(last_node)
+                
+                # closing each "enter" column until we reach the common_node
+                while last_node != common_node:
+                    self.data["Name"].append(self.meta_reader.get_name_from_context_id(last_node.calling_context_ids[0]))
                     self.data["Event Type"].append("Leave")
                     self.data["Timestamp (ns)"].append(timestamp)
                     self.data["Process"].append(hit[1][1])
                     self.data["Thread"].append(hit[2][1])
                     self.data["Host"].append(hit[0][1])
-                    self.data["Node"].append(close_node)
-                    close_node = close_node.parent
-
-                # creating new rows for the new functions entered
-                enter_list: list[Node] = node.get_node_list(intersect_level)
-                # the list of nodes higher than interesect_level
-                # (the level of interesect_node)
-
-                # all of the nodes in this list have entered into the
-                # function since the last poll so we want to create entries
-                # in the self.data for the Enter event
-                for enter_node in enter_list[::-1]:
-                    self.data["Name"].append(self.meta_reader.get_name_from_context_id(enter_node.calling_context_ids[0]))
+                    self.data["Node"].append(last_node)
+                    last_node = last_node.parent
+            # Now we want to add all the new "enter" events after
+            # the common_node event
+            if current_node != None:
+                if common_node == None:
+                    intersect_level = 0
+                else:
+                    intersect_level = common_node.get_level()
+                entry_nodes = current_node.get_node_list(intersect_level)
+                for i in range(len(entry_nodes)):
+                    entry_node = entry_nodes[-1 * i - 1]
+                    entry_name = self.meta_reader.get_name_from_context_id(entry_node.calling_context_ids[0])
+                    self.data["Name"].append(entry_name)
                     self.data["Event Type"].append("Enter")
                     self.data["Timestamp (ns)"].append(timestamp)
                     self.data["Process"].append(hit[1][1])
                     self.data["Thread"].append(hit[2][1])
                     self.data["Host"].append(hit[0][1])
-                    self.data["Node"].append(enter_node)
-                last_node = node
+                    self.data["Node"].append(entry_node)
+                    
 
-            last_id = calling_context_id  # updating last_id
+            last_node = current_node
+            last_id = context_id
 
-        # adding last self.data for trace df
-        close_node = last_node
 
-        # after reading through all the trace lines, some Enter events will
-        # not have matching Leave events, as the functions were still
-        # running in the last poll.  Here we are adding Leave events to all
-        # of the remaining unmatched Enter events
-        while close_node is not None:
-            self.data["Name"].append(close_node.name)
-            self.data["Event Type"].append("Leave")
-            self.data["Timestamp (ns)"].append(self.max_time_stamp - self.min_time_stamp)
-            self.data["Process"].append(hit[1][1])
-            self.data["Thread"].append(hit[2][1])
-            self.data["Host"].append(hit[0][1])
-            self.data["Node"].append(close_node)
-            close_node = close_node.parent
 
 
 
@@ -1143,18 +1117,18 @@ class TraceReader:
     #             # Sample calling context id (in experiment.xml)
     #             # can use this to get name of function from experiement.xml
     #             # Procedure tab
-    #             calling_context_id = int.from_bytes(
+    #             context_id = int.from_bytes(
     #                 file.read(4), byteorder=byte_order, signed=signed
     #             )
 
     #             # checking to see if the last event wasn't the same
     #             # if it was then we skip it, as to not have multiple sets of
     #             # open/close events for a function that it's still in
-    #             if last_id != calling_context_id:
+    #             if last_id != context_id:
 
     #                 # updating the trace_db
 
-    #                 node = graph.get_node(calling_context_id)  # the node in the Graph
+    #                 node = graph.get_node(context_id)  # the node in the Graph
 
     #                 # closing functions exited
     #                 close_node = last_node
@@ -1198,7 +1172,7 @@ class TraceReader:
     #                     self.data["Node"].append(enter_node)
     #                 last_node = node
 
-    #             last_id = calling_context_id  # updating last_id
+    #             last_id = context_id  # updating last_id
 
     #         # adding last self.data for trace df
     #         close_node = last_node
@@ -1290,8 +1264,8 @@ def main():
     z = HPCToolkitReader('/Users/movsesyanae/Programming/Research/pipit_data/hpctoolkit-lulesh2.0-database')
     trace = z.get_trace()
     t = trace.events
-    t = t.loc[t['Process'] == 9]
-    print(t.head(10))
+    t = t.loc[t['Process'] == 9].loc[t['Thread'] == 3]
+    print(t.to_string())
     print("hello")
 if __name__ == "__main__":
     main()
