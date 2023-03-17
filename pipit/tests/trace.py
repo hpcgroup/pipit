@@ -116,7 +116,6 @@ def test_filter(data_dir, ping_pong_otf2_trace):
         trace.filter("Process", "==", 0).events,
         trace.filter(Filter("Process", "==", 0)).events,
         trace.filter(Filter(expr="`Process` == 0")).events,
-        trace.filter(Filter(func=lambda x: x["Process"] == 0)).events,
         trace.events[trace.events["Process"] == 0],
     )
 
@@ -124,7 +123,6 @@ def test_filter(data_dir, ping_pong_otf2_trace):
         trace.filter("Process", "!=", 0).events,
         trace.filter(Filter("Process", "!=", 0)).events,
         trace.filter(Filter(expr="`Process` != 0")).events,
-        trace.filter(Filter(func=lambda x: x["Process"] != 0)).events,
         trace.events[trace.events["Process"] != 0],
     )
 
@@ -132,7 +130,6 @@ def test_filter(data_dir, ping_pong_otf2_trace):
         trace.filter("Timestamp (ns)", ">", 1.3052e08).events,
         trace.filter(Filter("Timestamp (ns)", ">", 1.3052e08)).events,
         trace.filter(Filter(expr="`Timestamp (ns)` > 1.3052e+08")).events,
-        trace.filter(Filter(func=lambda x: x["Timestamp (ns)"] > 1.3052e08)).events,
         trace.events[trace.events["Timestamp (ns)"] > 1.3052e08],
     )
 
@@ -140,7 +137,6 @@ def test_filter(data_dir, ping_pong_otf2_trace):
         trace.filter("Timestamp (ns)", "<", 1.3567e08).events,
         trace.filter(Filter("Timestamp (ns)", "<", 1.3567e08)).events,
         trace.filter(Filter(expr="`Timestamp (ns)` < 1.3567e+08")).events,
-        trace.filter(Filter(func=lambda x: x["Timestamp (ns)"] < 1.3567e08)).events,
         trace.events[trace.events["Timestamp (ns)"] < 1.3567e08],
     )
 
@@ -148,9 +144,6 @@ def test_filter(data_dir, ping_pong_otf2_trace):
         trace.filter("Name", "in", ["MPI_Send", "MPI_Recv"]).events,
         trace.filter(Filter("Name", "in", ["MPI_Send", "MPI_Recv"])).events,
         trace.filter(Filter(expr='`Name`.isin(["MPI_Send", "MPI_Recv"])')).events,
-        trace.filter(
-            Filter(func=lambda x: x["Name"] in ["MPI_Send", "MPI_Recv"])
-        ).events,
         trace.events[trace.events["Name"].isin(["MPI_Send", "MPI_Recv"])],
     )
 
@@ -158,9 +151,6 @@ def test_filter(data_dir, ping_pong_otf2_trace):
         trace.filter("Name", "not-in", ["MPI_Send", "MPI_Recv"]).events,
         trace.filter(Filter("Name", "not-in", ["MPI_Send", "MPI_Recv"])).events,
         trace.filter(Filter(expr='~`Name`.isin(["MPI_Send", "MPI_Recv"])')).events,
-        trace.filter(
-            Filter(func=lambda x: x["Name"] not in ["MPI_Send", "MPI_Recv"])
-        ).events,
         trace.events[~trace.events["Name"].isin(["MPI_Send", "MPI_Recv"])],
     )
 
@@ -172,12 +162,6 @@ def test_filter(data_dir, ping_pong_otf2_trace):
         trace.filter(
             Filter(
                 expr="(`Timestamp (ns)` > 1.3052e+08) & (`Timestamp (ns)` < 1.3567e+08)"
-            )
-        ).events,
-        trace.filter(
-            Filter(
-                func=lambda x: (x["Timestamp (ns)"] > 1.3052e08)
-                & (x["Timestamp (ns)"] < 1.3567e08)
             )
         ).events,
         trace.events[
@@ -195,7 +179,6 @@ def test_filter(data_dir, ping_pong_otf2_trace):
     assert all_equal(
         trace.filter(~f3).events,
         trace.filter(Filter(expr="~(`Process` == 0)")).events,
-        trace.filter(Filter(func=lambda x: not (x["Process"] == 0))).events,
         trace.events[~(trace.events["Process"] == 0)],
     )
 

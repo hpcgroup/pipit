@@ -8,19 +8,19 @@ class Filter:
     convenient operators like "in", "not-in", and "between".
 
     Filter instances can be shared and reused across multiple Traces. They can also
-    be combined with logical AND or OR, and negated with a logical NOT (as long as
-    they do not use the func argument). When a Filter is applied to a Trace, a new Trace
-    instance is created containing a view of the events DataFrame of the original Trace.
-    All of Pipit's analysis and plotting functions can be applied to the filtered Trace.
+    be combined with logical AND or OR, and negated with a logical NOT. When a Filter
+    is applied to a Trace, a new Trace instance is created containing a view of the
+    events DataFrame of the original Trace. All of Pipit's analysis and plotting
+    functions can be applied to the filtered Trace.
     """
 
+    # TODO: Add "func" arg so user can provide a lambda function to filter with
     def __init__(
         self,
         field=None,
         operator=None,
         value=None,
         expr=None,
-        func=None,
         keep_invalid=False,
     ):
         """
@@ -41,13 +41,6 @@ class Filter:
                 you may provide a Pandas query expression to filter with.
                 See https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.query.html. # noqa: E501
 
-            func (callable[row], optional): Instead of providing any of the previous
-                arguments, you may provide a function that returns True or False
-                for each row of the DataFrame. This uses DataFrame.apply, which is
-                not a vectorized operation, and may result in a significantly
-                slower runtime than using the previous arguments. Note that &, |, and
-                ~ will NOT work for Filter instances with the func argument.
-
             keep_invalid (bool, optional): Whether to keep Enter/Leave events whose
                 matching event did not make the filter. If this is set to True,
                 the filter may produce an invalid Trace object. Defaults to False.
@@ -56,7 +49,6 @@ class Filter:
         self.operator = operator
         self.value = value
         self.expr = expr
-        self.func = func
         self.keep_invalid = keep_invalid
 
     def _get_pandas_expr(self):
@@ -94,9 +86,6 @@ class Filter:
         if self.expr is not None:
             return f"Filter {self.expr.__repr__()}"
 
-        elif self.func is not None:
-            return f"Filter {self.func.__repr__()}"
-
         else:
             return (
                 f"Filter {self.field.__repr__()} "
@@ -113,10 +102,7 @@ class Filter:
             pipit.Trace: new Trace instance containing filtered events DataFrame
         """
         # Filter events using either DataFrame.query or DataFrame.apply
-        if self.func is None:
-            events = trace.events.query(self._get_pandas_expr())
-        else:
-            events = trace.events[trace.events.apply(self.func, axis=1)]
+        events = trace.events.query(self._get_pandas_expr())
 
         # Remove events whose matching events did not make filter
         # Ensures that returned Trace is valid
@@ -133,7 +119,7 @@ class Filter:
 
 class And(Filter):
     """Combines multiple Filter objects with a logical AND, such that all of the
-    filters must be met. Does NOT work for Filter instances with func argument."""
+    filters must be met."""
 
     def __init__(self, *args):
         super().__init__()
@@ -149,7 +135,7 @@ class And(Filter):
 
 class Or(Filter):
     """Combines multiple Filter objects with a logical OR, such that any of the
-    filters must be met. Does NOT work for Filter instances with func argument."""
+    filters must be met."""
 
     def __init__(self, *args):
         super().__init__()
@@ -165,7 +151,7 @@ class Or(Filter):
 
 class Not(Filter):
     """Inverts Filter object with a logical NOT, such that the filter must not be
-    met. Does NOT work for Filter instances with func argument."""
+    met."""
 
     def __init__(self, filter):
         super().__init__()

@@ -365,8 +365,11 @@ class Trace:
     def filter(self, *args, **kwargs):
         """Filters the trace by field
 
-        Accepts either arguments used to create a Filter object, or a list of
-        Filter objects.
+        If one or more Filter instances are provided as arguments, then
+        applies the filter(s).
+
+        Otherwise, creates a new Filter instance with given arguments and
+        then applies it.
 
         Returns:
             pipit.Trace: New Trace instance containing the filtered events
