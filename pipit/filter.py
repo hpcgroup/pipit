@@ -1,5 +1,5 @@
 import pipit
-from .util import parse_time_value
+from .util import parse_time
 
 
 class Filter:
@@ -65,8 +65,8 @@ class Filter:
         value = self.value
 
         # Parse value if timestamp
-        if "timestamp" in field.lower():
-            value = parse_time_value(value)
+        if field and "time" in field.lower():
+            value = parse_time(value)
 
         # Convert to expr
         if operator in ["==", "<", "<=", ">", ">=", "!="]:

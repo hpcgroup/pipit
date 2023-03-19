@@ -34,6 +34,12 @@ def format_time(n: float) -> str:
 
 def parse_time(time: str) -> float:
     """Converts human-readable time to ns"""
+    if type(time) == float:
+        return time
+
+    if type(time) == list:
+        return [parse_time(t) for t in time]
+
     n = 0
 
     d = re.search(r"(\d+\.?\d*)\s?d\b", time)
@@ -60,15 +66,3 @@ def parse_time(time: str) -> float:
         n += float(ns.group(1))
 
     return n
-
-
-def parse_time_value(value):
-    """Parses time if needed"""
-    if type(value) == float:
-        return value
-
-    if type(value) == str:
-        return parse_time(value)
-
-    if type(value) == list:
-        return [parse_time_value(x) for x in value]
