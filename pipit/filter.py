@@ -1,4 +1,5 @@
 import pipit
+from .util import parse_time_value
 
 
 class Filter:
@@ -64,17 +65,8 @@ class Filter:
         value = self.value
 
         # Parse value if timestamp
-        if "timestamp" in field.lower() and type(value) == str:
-            value = value.replace(" ", "")
-
-            if "ns" in value:
-                value = float(value.replace("ns", ""))
-            elif "us" in value:
-                value = float(value.replace("us", "")) * 1e3
-            elif "ms" in value:
-                value = float(value.replace("ms", "")) * 1e6
-            elif "s" in value:
-                value = float(value.replace("s", "")) * 1e9
+        if "timestamp" in field.lower():
+            value = parse_time_value(value)
 
         # Convert to expr
         if operator in ["==", "<", "<=", ">", ">=", "!="]:
