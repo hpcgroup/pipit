@@ -59,16 +59,34 @@ class Filter:
         """
         expr = self.expr
 
-        if self.operator in ["==", "<", "<=", ">", ">=", "!="]:
-            expr = f"`{self.field}` {self.operator} {self.value.__repr__()}"
-        elif self.operator == "in":
-            expr = f"`{self.field}`.isin({self.value.__repr__()})"
-        elif self.operator == "not-in":
-            expr = f"-`{self.field}`.isin({self.value.__repr__()})"
-        elif self.operator == "between":
+        field = self.field
+        operator = self.operator
+        value = self.value
+
+        # Parse value if timestamp
+        if "timestamp" in field.lower() and type(value) == str:
+            value = value.replace(" ", "")
+
+            if "ns" in value:
+                value = float(value.replace("ns", ""))
+            elif "us" in value:
+                value = float(value.replace("us", "")) * 1e3
+            elif "ms" in value:
+                value = float(value.replace("ms", "")) * 1e6
+            elif "s" in value:
+                value = float(value.replace("s", "")) * 1e9
+
+        # Convert to expr
+        if operator in ["==", "<", "<=", ">", ">=", "!="]:
+            expr = f"`{field}` {operator} {value.__repr__()}"
+        elif operator == "in":
+            expr = f"`{field}`.isin({value.__repr__()})"
+        elif operator == "not-in":
+            expr = f"-`{field}`.isin({value.__repr__()})"
+        elif operator == "between":
             expr = (
-                f"(`{self.field}` >= {self.value[0].__repr__()})"
-                f"& (`{self.field}` <= {self.value[1].__repr__()})"
+                f"(`{field}` >= {value[0].__repr__()})"
+                f"& (`{field}` <= {value[1].__repr__()})"
             )
 
         return expr
