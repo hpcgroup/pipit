@@ -329,12 +329,15 @@ class Trace:
 
         return np.histogram(sizes, bins=bins, **kwargs)
 
-    def time_profile(self, num_bins=16):
+    def time_profile(self, num_bins=16, normalized=False):
         """Computes time contributed by each function per time interval.
 
         Args:
             num_bins (int, optional): Number of evenly-sized time intervals to compute
-            time profile for. Defaults to 16.
+                time profile for. Defaults to 16.
+
+            normalized (bool, optional): Whether to return time contribution as
+                percentage of time interval. Defaults to False.
 
         Returns:
             pd.DataFrame
@@ -418,6 +421,10 @@ class Trace:
             functions.append(agg.to_dict())
 
         profile = pd.DataFrame(functions, columns=names)
+
+        if normalized:
+            profile /= edges[1] - edges[0]
+
         profile.insert(0, "start", [b[0] for b in bins])
         profile.insert(1, "end", [b[1] for b in bins])
 
