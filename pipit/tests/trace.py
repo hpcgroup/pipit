@@ -99,3 +99,67 @@ def test_match_caller_callee(data_dir, ping_pong_otf2_trace):
 
     # all events of the ping pong trace are roots with no children
     assert len(df.loc[(df["Event Type"] == "Enter") & (df["_parent"].notnull())]) == 0
+
+
+def test_time_profile(data_dir, ping_pong_otf2_trace):
+    trace = Trace.from_otf2(str(ping_pong_otf2_trace))
+    trace.calc_exc_time()
+
+    time_profile = trace.time_profile(num_bins=61)
+
+    # check length
+    assert len(time_profile) == 61
+
+    # check bin sizes
+    exp_duration = trace.events["Timestamp (ns)"].max()
+    exp_bin_size = exp_duration / 61
+    bin_sizes = time_profile["bin_end"] - time_profile["bin_start"]
+
+    assert np.isclose(bin_sizes, exp_bin_size).all()
+
+    # check that sum of function contributions per bin equals bin duration
+    exp_bin_total_duration = exp_bin_size * 2
+    time_profile.drop(columns=["bin_start", "bin_end"], inplace=True)
+
+    assert np.isclose(time_profile.sum(axis=1), exp_bin_total_duration).all()
+
+    # check for each function that sum of exc time per bin equals total exc time
+    total_exc_times = trace.events.groupby("Name")["time.exc"].sum()
+
+    for column in time_profile:
+        if column == "idle_time":
+            continue
+
+        assert np.isclose(time_profile[column].sum(), total_exc_times[column])
+
+    # check normalization
+    norm = trace.time_profile(num_bins=61, normalized=True)
+    norm.drop(columns=["bin_start", "bin_end"], inplace=True)
+
+    assert (time_profile / exp_bin_total_duration).equals(norm)
+
+    # check against ground truth
+    assert np.isclose(norm.loc[0]["MPI_Init"], 0.90695566)
+    assert np.isclose(norm.loc[0]["MPI_Send"], 0.0)
+    assert np.isclose(norm.loc[0]["MPI_Recv"], 0.0)
+    assert np.isclose(norm.loc[0]["MPI_Finalize"], 0.0)
+
+    assert np.isclose(norm.loc[1:57]["MPI_Init"], 1.0).all()
+    assert np.isclose(norm.loc[1:57]["MPI_Send"], 0.0).all()
+    assert np.isclose(norm.loc[1:57]["MPI_Recv"], 0.0).all()
+    assert np.isclose(norm.loc[1:57]["MPI_Finalize"], 0.0).all()
+
+    assert np.isclose(norm.loc[58]["MPI_Init"], 0.67562198)
+    assert np.isclose(norm.loc[58]["MPI_Send"], 0.11226951)
+    assert np.isclose(norm.loc[58]["MPI_Recv"], 0.09453169)
+    assert np.isclose(norm.loc[58]["MPI_Finalize"], 0.0)
+
+    assert np.isclose(norm.loc[59]["MPI_Init"], 0.0)
+    assert np.isclose(norm.loc[59]["MPI_Send"], 0.30810867)
+    assert np.isclose(norm.loc[59]["MPI_Recv"], 0.20585825)
+    assert np.isclose(norm.loc[59]["MPI_Finalize"], 0.0)
+
+    assert np.isclose(norm.loc[60]["MPI_Init"], 0.0)
+    assert np.isclose(norm.loc[60]["MPI_Send"], 0.39240791)
+    assert np.isclose(norm.loc[60]["MPI_Recv"], 0.25976402)
+    assert np.isclose(norm.loc[60]["MPI_Finalize"], 0.04407401)

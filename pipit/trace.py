@@ -371,7 +371,11 @@ class Trace:
         names = all["name"].unique().tolist()
 
         # Create equal-sized bins
-        edges = np.linspace(0, all.end.max(), num_bins + 1)
+        edges = np.linspace(
+            self.events["Timestamp (ns)"].min(),
+            self.events["Timestamp (ns)"].max(),
+            num_bins + 1,
+        )
         bin_size = edges[1] - edges[0]
         total_bin_duration = bin_size * len(all["Process"].unique())
 
