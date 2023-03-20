@@ -360,6 +360,9 @@ class Trace:
 
         # Create equal-sized bins
         edges = np.linspace(0, all.end.max(), num_bins + 1)
+        bin_size = edges[1] - edges[0]
+        total_bin_duration = bin_size * len(all["Process"].unique())
+
         bins = [(edges[i], edges[i + 1]) for i in range(num_bins)]
         functions = []
 
@@ -420,12 +423,23 @@ class Trace:
             agg = func.groupby("name")["exc_time_in_bin"].sum()
             functions.append(agg.to_dict())
 
+        # Convert to DataFrame
         profile = pd.DataFrame(functions, columns=names)
 
-        if normalized:
-            profile /= edges[1] - edges[0]
+        # Add idle_time column
+        profile.insert(
+            0,
+            "idle_time",
+            total_bin_duration - profile.sum(axis=1),
+        )
 
-        profile.insert(0, "start", [b[0] for b in bins])
-        profile.insert(1, "end", [b[1] for b in bins])
+        # Normalize
+        if normalized:
+            profile /= total_bin_duration
+
+        # Add bin_start, bin_end, and threshold for zero
+        profile.insert(0, "bin_start", [b[0] for b in bins])
+        profile.insert(1, "bin_end", [b[1] for b in bins])
+        profile.mask(profile < 0.01, 0, inplace=True)
 
         return profile
