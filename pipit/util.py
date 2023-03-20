@@ -34,11 +34,17 @@ def format_time(n: float) -> str:
 
 def parse_time(time: str) -> float:
     """Converts human-readable time to ns"""
-    if type(time) == float:
+    if type(time) == float or type(time) == int:
         return time
 
     if type(time) == list:
         return [parse_time(t) for t in time]
+
+    if type(time) == slice:
+        return slice(
+            parse_time(time.start) if time.start else -float("inf"),
+            parse_time(time.stop) if time.stop else float("inf"),
+        )
 
     n = 0
 

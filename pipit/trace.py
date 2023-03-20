@@ -5,7 +5,8 @@
 
 import numpy as np
 
-import warnings
+import logging
+from .indexing import LocIndexer
 
 
 class Trace:
@@ -17,26 +18,42 @@ class Trace:
         """Create a new Trace object."""
         self.definitions = definitions
         self.events = events
-        self._validate()
+        self.loc = LocIndexer(self)
 
-    def _validate(self):
-        """Issue warning if required columns are not in the events DataFrame,
-        or if number of Enter/Leave events don't match"""
-        if (
-            not {"Timestamp (ns)", "Event Type", "Name", "Process"}.issubset(
-                self.events.columns
+        # Validate columns
+        required_cols = {"Timestamp (ns)", "Event Type", "Name", "Process"}
+        col_diff = required_cols.difference(self.events.columns)
+
+        if len(col_diff) != 0:
+            logging.warning(
+                "This Trace instance is invalid, as it is missing required columns %s. "
+                "You may continue working with it, but the Pipit API may produce "
+                "undesireable or incorrect results." % list(col_diff)
             )
-            or abs(
-                len(self.events[self.events["Event Type"] == "Enter"])
-                - len(self.events[self.events["Event Type"] == "Leave"])
+            return
+
+        # Validate rows
+        row_diff = len(self.events[self.events["Event Type"] == "Enter"]) - len(
+            self.events[self.events["Event Type"] == "Leave"]
+        )
+
+        if row_diff != 0:
+            logging.warning(
+                "This Trace instance is invalid, as it has %s more %s rows than "
+                "%s rows. You may continue working with it, but the Pipit API may "
+                "produce undesireable or incorrect results."
+                % (
+                    abs(row_diff),
+                    "Enter" if row_diff > 0 else "Leave",
+                    "Leave" if row_diff > 0 else "Enter",
+                )
             )
-            > 1
-        ):
-            warnings.warn(
-                "This Trace instance is invalid, as it is missing one or more required "
-                "rows or columns. You may continue working with it, but the Pipit API "
-                "may produce undesirable or incorrect results."
-            )
+
+    def __repr__(self):
+        return "pipit.Trace\n" + self.events.__repr__()
+
+    def _repr_html_(self):
+        return "<b>pipit.Trace</b>(...<br/>" + self.events._repr_html_()
 
     @staticmethod
     def from_otf2(dirname, num_processes=None):
