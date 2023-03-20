@@ -4,6 +4,7 @@
 # SPDX-License-Identifier: MIT
 
 import numpy as np
+import pandas as pd
 
 
 class Trace:
@@ -328,7 +329,17 @@ class Trace:
 
         return np.histogram(sizes, bins=bins, **kwargs)
 
-    def time_profile(self, num_bins=10):
+    def time_profile(self, num_bins=16):
+        """Computes time contributed by each function per time interval.
+
+        Args:
+            num_bins (int, optional): Number of evenly-sized time intervals to compute
+            time profile for. Defaults to 16.
+
+        Returns:
+            pd.DataFrame
+        """
+
         self._match_caller_callee()
         self.calc_inc_time()
 
@@ -342,6 +353,7 @@ class Trace:
             },
             inplace=True,
         )
+        names = all["name"].unique().tolist()
 
         # Create equal-sized bins
         edges = np.linspace(0, all.end.max(), num_bins + 1)
@@ -405,4 +417,8 @@ class Trace:
             agg = func.groupby("name")["exc_time_in_bin"].sum()
             functions.append(agg.to_dict())
 
-        return (bins, functions)
+        profile = pd.DataFrame(functions, columns=names)
+        profile.insert(0, "start", [b[0] for b in bins])
+        profile.insert(1, "end", [b[1] for b in bins])
+
+        return profile
