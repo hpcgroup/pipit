@@ -103,7 +103,7 @@ def test_match_caller_callee(data_dir, ping_pong_otf2_trace):
 
 def test_filter(data_dir, ping_pong_otf2_trace):
     from pipit.filter import Filter
-    import warnings
+    import pytest
 
     trace = Trace.from_otf2(str(ping_pong_otf2_trace))
 
@@ -127,6 +127,7 @@ def test_filter(data_dir, ping_pong_otf2_trace):
     )
 
     assert all_equal(
+        trace.filter("Timestamp (ns)", ">", "130.52 ms").events,
         trace.filter("Timestamp (ns)", ">", 1.3052e08).events,
         trace.filter(Filter("Timestamp (ns)", ">", 1.3052e08)).events,
         trace.filter(Filter(expr="`Timestamp (ns)` > 1.3052e+08")).events,
@@ -134,6 +135,7 @@ def test_filter(data_dir, ping_pong_otf2_trace):
     )
 
     assert all_equal(
+        trace.filter("Timestamp (ns)", "<", "135.67 ms").events,
         trace.filter("Timestamp (ns)", "<", 1.3567e08).events,
         trace.filter(Filter("Timestamp (ns)", "<", 1.3567e08)).events,
         trace.filter(Filter(expr="`Timestamp (ns)` < 1.3567e+08")).events,
@@ -155,6 +157,7 @@ def test_filter(data_dir, ping_pong_otf2_trace):
     )
 
     assert all_equal(
+        trace.filter("Timestamp (ns)", "between", ["130.52 ms", "135.67 ms"]).events,
         trace.filter("Timestamp (ns)", "between", [1.3052e08, 1.3567e08]).events,
         trace.filter(
             Filter("Timestamp (ns)", "between", [1.3052e08, 1.3567e08])
@@ -171,7 +174,7 @@ def test_filter(data_dir, ping_pong_otf2_trace):
     )
 
     # Compound filter tests
-    f1 = Filter("Timestamp (ns)", "between", [1.3052e08, 1.3567e08])
+    f1 = Filter("Timestamp (ns)", "between", ["130.52 ms", "135.67 ms"])
     f2 = Filter("Name", "in", ["MPI_Send", "MPI_Recv"])
     f3 = Filter("Process", "==", 0)
 
@@ -211,9 +214,7 @@ def test_filter(data_dir, ping_pong_otf2_trace):
     )
 
     # keep_invalid test
-    with warnings.catch_warnings(record=True) as w:
-        warnings.simplefilter("always")
-
+    with pytest.warns(UserWarning) as w:
         valid = trace.filter("Timestamp (ns)", ">", 1.33e08, keep_invalid=False).events
         invalid = trace.filter("Timestamp (ns)", ">", 1.33e08, keep_invalid=True).events
 
