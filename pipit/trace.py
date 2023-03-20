@@ -6,7 +6,6 @@
 import numpy as np
 
 import logging
-from .indexing import LocIndexer
 
 
 class Trace:
@@ -16,6 +15,8 @@ class Trace:
 
     def __init__(self, definitions, events):
         """Create a new Trace object."""
+        from .indexing import LocIndexer
+
         self.definitions = definitions
         self.events = events
         self.loc = LocIndexer(self)

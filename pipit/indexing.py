@@ -41,7 +41,15 @@ class ColIndexer:
         if type(key) == tuple:
             df = df[df[self.column].isin(key)]
         elif type(key) == slice:
-            df = df[(df[self.column] >= key.start) & (df[self.column] < key.stop)]
+            self.trace._match_events()
+
+            partial_df = df[(df[self.column] >= key.start) & (df[self.column] < key.stop)]
+
+            if (self.column == "Timestamp (ns)"):
+                matching_rows = df.loc[partial_df['_matching_event'].dropna().tolist()]
+                partial_df = pd.concat([partial_df, matching_rows]).sort_index()
+
+            df = partial_df
         else:
             df = df[df[self.column] == key]
 
