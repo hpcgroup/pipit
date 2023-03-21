@@ -93,7 +93,8 @@ class MetaReader:
     def get_information_from_context_id(self, context_id: int):
         context: dict = self.context_map[context_id]
         if "string_index" in context:
-            return {"module": None, "file": "Ummmm", "function": self.common_strings[context["string_index"]], "line": "UMMM" }
+            return {"module": None, "file": "Ummmm", "function": self.common_strings[context["string_index"]], \
+                    "relation": -1, "lexical_type": -1, "line": "UMMM" }
 
             # return self.common_strings[context["string_index"]]
         # context = {"relation": relation, "lexical_type": lexical_type, \
@@ -107,23 +108,50 @@ class MetaReader:
         source_file_index = context["source_file_index"]
         source_file_line = context["source_file_line"]
         function_index = context["function_index"]
-
+        lexical_type = context['lexical_type']
+        
+        
         source_file_string = None
         module_string = None
         function_string = None
         file_line = None
+        
+        if lexical_type == 1:
+            # loop construct
+            function_string = 'loop'
+        elif function_index != None:
+            # The function map
+            function = self.functions_list[function_index]
+            # current_function_map = {"string_index": function_name_index, \
+            #                         "source_line": source_line, "load_modules_index": load_module_index, \
+            #                         "source_file_index": source_file_index}
+            
+            # getting function name
+            function_string = self.common_strings[function["string_index"]]
+            # # Getting source file line
+            # file_line = function['source_line']
+            # # Getting source file name
+            # source_file_index = function['source_file_index']
+            # # Getting Load Module Name
+            # load_module_index = function['load_modules_index']
+        else:
+            # function is unkown
+            function_string = "<unkown function>"
+                    
+
         if load_module_index != None:
             load_module = self.load_modules_list[load_module_index]
             module_string = self.common_strings[load_module["string_index"]]
         if source_file_index != None:
             source_file = self.source_files_list[source_file_index]
             source_file_string = self.common_strings[source_file["string_index"]]
-        if function_index != None:
-            function = self.functions_list[function_index]
-            function_string = self.common_strings[function["string_index"]]
+        # if function_index != None:
+        #     function = self.functions_list[function_index]
+        #     function_string = self.common_strings[function["string_index"]]
         if source_file_line != None:
             file_line = str(source_file_line)
-        return {"module": module_string, "file": source_file_string, "function": function_string, "line": file_line }
+        return {"module": module_string, "file": source_file_string, "function": function_string, "line": file_line, \
+                "lexical_type": context["lexical_type"], "relation": context['relation']}
         
 
     def __read_common_header(self) -> None:
@@ -369,7 +397,7 @@ class MetaReader:
             
             current_function_map = {"string_index": function_name_index, \
                                     "source_line": source_line, "load_modules_index": load_module_index, \
-                                    "source_file_index": source_file_index}
+                                    "source_file_index": source_file_index, "load_modules_offset": modules_offset}
             self.functions_list.append(current_function_map)
         
     def __get_source_file_index(self, source_file_pointer: int) -> int:
@@ -477,7 +505,14 @@ class MetaReader:
         pretty_name_pointer = int.from_bytes(self.file.read(8), byteorder=self.byte_order, signed=self.signed)
         # map context for this context
         string_index = self.common_string_index_map[pretty_name_pointer] 
-        context = {"string_index": string_index}
+        context = {"relation": -1, "lexical_type": -1, \
+            "function_index": -1, \
+            "source_file_index": -1, \
+            "source_file_line": -1, \
+            "load_module_index":-1, \
+            "load_module_offset": -1, \
+            "string_index": string_index}
+        # context = {"string_index": string_index}
         self.context_map[context_id] = context
         # Create Node for this context
         node: Node = Node(context_id, None, None)
@@ -488,9 +523,9 @@ class MetaReader:
 
 
         # Reading the children contexts
-        self.__read_children_contexts(children_pointer, children_size, node)
+        self.__read_children_contexts(children_pointer, children_size, node, context_id)
 
-    def __read_children_contexts(self, context_array_pointer: int, total_size: int, parent_node: Node) -> None:
+    def __read_children_contexts(self, context_array_pointer: int, total_size: int, parent_node: Node, parent_context_id: int) -> None:
         """
         Recursive function to read all child contexts and add it to the CCT
 
@@ -575,6 +610,61 @@ class MetaReader:
                 load_module_offset = sub_flex_2
 
 
+
+
+            # Now we take a look at the relationship and type of the context
+            # if lexical_type == 1:
+            #     # loop
+            #     pass
+            if lexical_type == 2 or lexical_type == 3:
+                # source line type
+                # meaning we don't want to create a node for this
+                self.cct.add_to_map(context_id, parent_node)
+
+                next_parent_node = parent_node
+                
+            else:
+                # otherwise we do want to create a node 
+                # Creating Node for this context
+                print('created node for context', context_id)
+                node = Node(context_id, None, parent_node)
+                node.add_calling_context_id(context_id)
+
+                # Connecting this node to the parent node
+                parent_node.add_child(node)
+
+                # Adding this node to the graph
+                self.cct.add_to_map(context_id, node)
+
+                if lexical_type == 0:
+                    # function call
+                    # this means that information about the 
+                    # source file and module are with the parent
+                    parent_information = self.context_map[parent_context_id]
+                    if 'string_index' in parent_information and function_index != None:
+                        # This means that the parent is the root, and it's information is useless
+                        function = self.functions_list[function_index]
+                        # Getting source file line
+                        source_file_line = function['source_line']
+                        # Getting source file name
+                        source_file_index = function['source_file_index']
+                        # Getting Load Module Name
+                        load_module_index = function['load_modules_index']
+                        # Getting Load Module Offset
+
+                        load_module_offset = function['load_modules_offset']
+                    else:
+                        if source_file_index == None:
+                            source_file_index = parent_information['source_file_index']
+                        if source_file_line == None:
+                            source_file_line = parent_information["source_file_line"]
+                        if load_module_index == None:
+                            load_module_index = parent_information["load_module_index"]
+                            load_module_offset = parent_information["load_module_offset"] 
+                next_parent_node = node
+            
+
+            
             # creating a map for this context
             context = {"relation": relation, "lexical_type": lexical_type, \
                        "function_index": function_index, \
@@ -585,22 +675,11 @@ class MetaReader:
             
             self.context_map[context_id] = context
 
-            # Creating Node for this context
-            
-            node = Node(context_id, None, parent_node)
-            node.add_calling_context_id(context_id)
-
-            # Connecting this node to the parent node
-            parent_node.add_child(node)
-
-            # Adding this node to the graph
-            self.cct.add_to_map(context_id, node)
-
-
             # recursively call this function to add more children
             return_address = self.file.tell()
-            self.__read_children_contexts(children_pointer, children_size, node)
+            self.__read_children_contexts(children_pointer, children_size, next_parent_node, context_id)
             self.file.seek(return_address)
+
 
 
 
@@ -911,7 +990,9 @@ class TraceReader:
             "Node": [],
             "Source File Name": [],
             "Source File Line Number": [],
-            "Calling Context ID": []
+            "Calling Context ID": [],
+            "Relation": [],
+            "Lexical Type": []
         }
         print('min time', self.min_time_stamp)
         print('max time', self.max_time_stamp)
@@ -971,6 +1052,8 @@ class TraceReader:
             else:
                 # at a new non-idle context
                 current_node = self.meta_reader.cct.get_node(context_id)
+                print('current node is', current_node)
+                print('current info is', self.meta_reader.get_information_from_context_id(context_id))
             
             # First we want to close all the "enter" events from the last sample
             # that aren't still running 
@@ -983,6 +1066,10 @@ class TraceReader:
                 # closing each "enter" column until we reach the common_node
                 while last_node != common_node:
                     context_information = self.meta_reader.get_information_from_context_id(last_node.calling_context_ids[0])
+                    print('got context information from sample')
+                    lexical_type = context_information['lexical_type']
+                    relation = context_information['relation']
+                    # if lexical_type == 
                     self.data["Name"].append(str(context_information['function']))
                     self.data["Event Type"].append("Leave")
                     self.data["Timestamp (ns)"].append(timestamp)
@@ -993,6 +1080,9 @@ class TraceReader:
                     self.data["Source File Name"].append(context_information["file"])
                     self.data["Source File Line Number"].append(context_information["line"])
                     self.data["Calling Context ID"].append(last_node.calling_context_ids[0])
+                    self.data["Relation"].append(context_information['relation'])
+                    self.data["Lexical Type"].append(context_information['lexical_type'])
+                    
                     last_node = last_node.parent
             # Now we want to add all the new "enter" events after
             # the common_node event
@@ -1016,7 +1106,9 @@ class TraceReader:
                     self.data["Source File Name"].append(context_information["file"])
                     self.data["Source File Line Number"].append(context_information["line"])
                     self.data["Calling Context ID"].append(entry_node.calling_context_ids[0])
-
+                    self.data["Relation"].append(context_information['relation'])
+                    self.data["Lexical Type"].append(context_information['lexical_type'])
+                    
 
                     
 
@@ -1069,10 +1161,10 @@ class HPCToolkitReader:
         return pipit.trace.Trace(None, trace_df)
 
 def main():
-    meta_loc = '/Users/movsesyanae/Programming/Research/pipit_data/hpctoolkit-lulesh2.0-database/meta.db'
-    mr = MetaReader(meta_loc)
+    dirname = "/home/alex/Programming/Research/pipit_data/hpctoolkit-ping-pong-database-13602575"
+    mr = MetaReader(dirname + "/meta.db")
     # y = TraceReader('/Users/movsesyanae/Programming/Research/pipit_data/hpctoolkit-lulesh2.0-database/trace.db',None, None)
-    z = HPCToolkitReader('/Users/movsesyanae/Programming/Research/pipit_data/hpctoolkit-lulesh2.0-database')
+    z = HPCToolkitReader(dirname)
     trace = z.get_trace()
     t: pd.DataFrame = trace.events
     t['Name'] = t['Name'].astype('string')
