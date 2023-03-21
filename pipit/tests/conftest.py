@@ -1,5 +1,5 @@
-# Copyright 2022 Parallel Software and Systems Group, University of Maryland.
-# See the top-level LICENSE file for details.
+# Copyright 2022-2023 Parallel Software and Systems Group, University of
+# Maryland. See the top-level LICENSE file for details.
 #
 # SPDX-License-Identifier: MIT
 
@@ -25,6 +25,18 @@ def ping_pong_hpct_trace(data_dir, tmpdir):
     for f in glob(os.path.join(str(hpct_db_dir), "*.db")):
         shutil.copy(f, str(tmpdir))
     shutil.copy(os.path.join(hpct_db_dir, "experiment.xml"), str(tmpdir))
+
+    return tmpdir
+
+
+@pytest.fixture
+def ping_pong_projections_trace(data_dir, tmpdir):
+    """Builds a temporary directory containing the ping-pong traces."""
+    projections_dir = os.path.join(data_dir, "ping-pong-projections")
+
+    shutil.copy(os.path.join(projections_dir, "pingpong.prj.sts"), str(tmpdir))
+    shutil.copy(os.path.join(projections_dir, "pingpong.prj.0.log.gz"), str(tmpdir))
+    shutil.copy(os.path.join(projections_dir, "pingpong.prj.1.log.gz"), str(tmpdir))
 
     return tmpdir
 
