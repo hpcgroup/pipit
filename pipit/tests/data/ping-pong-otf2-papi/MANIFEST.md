@@ -23,3 +23,4 @@ can be found in `scorep.cfg`.
 
     SCOREP_ENABLE_PROFILING
     SCOREP_ENABLE_TRACING
+    SCOREP_METRIC_PAPI
