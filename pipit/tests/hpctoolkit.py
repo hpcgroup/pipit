@@ -12,7 +12,6 @@ import pytest
     reason="Allow this to fail until new HPCToolkit reader PR is merged."
 )
 def test_events(ping_pong_hpct_trace):
-    ping_pong_hpct_trace = 'data/ping-pong-hpctoolkit'
     events_df = Trace.from_hpctoolkit(str(ping_pong_hpct_trace)).events
 
     # 2 processes in ping pong trace

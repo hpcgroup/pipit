@@ -244,7 +244,6 @@ class MetaReader:
         if string_pointer in self.common_string_index_map:
             return self.common_strings[self.common_string_index_map[string_pointer]]
         else:
-            print("Couldn't Find String at Pointer:", string_pointer)
             return None
 
     def __read_common_string_table_section(
@@ -971,7 +970,6 @@ class ProfileReader:
         """
         # let's get to the correct spot in the file
         self.file.seek(section_pointer)
-        # print("Section Size", section_size)
 
         self.hit_map = {}
 
@@ -1190,7 +1188,6 @@ class TraceReader:
         self.max_time_stamp = int.from_bytes(
             self.file.read(8), byteorder=self.byte_order, signed=self.signed
         )
-        print('Max timestamp is ', self.max_time_stamp - self.min_time_stamp)
 
         self.data = {
             "Timestamp (ns)": [],
