@@ -50,7 +50,7 @@ def test_match_events(data_dir, ping_pong_otf2_trace):
     rank_0_timestamps = rank_0_df["Timestamp (ns)"].to_list()
     rank_0_matching_timestamps = rank_0_df["_matching_timestamp"].to_list()
 
-    # All events in ping pong trace except main are at level 0 of the call tree,
+    # All events in ping pong trace except main are leaves in the call tree,
     # so the leave row occurs immediately after the enter. The below assertions
     # test this.
     for i in range(len(rank_0_df)):
