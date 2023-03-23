@@ -71,11 +71,7 @@ class Node:
         return return_list
 
     def __str__(self) -> str:
-        return (
-            str(self.calling_context_ids)
-            + " -- level: "
-            + str(self.level)
-        )
+        return str(self.calling_context_ids) + " -- level: " + str(self.level)
 
     def _calculate_level(self):
         """private function to get depth of node"""
