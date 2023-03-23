@@ -17,7 +17,7 @@ def test_events(ping_pong_hpct_trace):
     assert set(events_df["Event Type"]) == set(["Enter", "Leave", "Loop Enter", 
                                                 "Loop Leave"])
 
-    # 89 Enter events in ping pong trace at process 0
+    # 117 Enter events in ping pong trace at process 0
     assert (
         len(
             events_df.loc[events_df["Process"] == 0].loc[
@@ -26,7 +26,7 @@ def test_events(ping_pong_hpct_trace):
         == 117
     )
 
-    # # 60 Enter events in ping pong trace at process 1
+    # 88 Enter events in ping pong trace at process 1
     assert (
         len(
             events_df.loc[events_df["Process"] == 1].loc[
