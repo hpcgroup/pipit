@@ -8,7 +8,6 @@ import numpy as np
 import pandas as pd
 import multiprocessing as mp
 import pipit.trace
-import otf2
 
 
 class OTF2Reader:
@@ -196,22 +195,41 @@ class OTF2Reader:
             # note: the below lists are for storing logical ids
             process_ids, thread_ids = [], []
 
-            # list of metric members of in the definitions
-            metric_names = set(
+            """
+            Relevant Documentation for Metrics:
+            https://scorepci.pages.jsc.fz-juelich.de/otf2-pipelines/doc.r4707/python/basics.html#metrics
+            """
+
+            # get metric class
+            metric_members = (
                 self.definitions.loc[
-                    self.definitions["Definition Type"] == "MetricMember"
+                    self.definitions["Definition Type"] == "MetricClass"
+                ]["Attributes"]
+                .map(lambda attr: attr["members"])
+                .values[0]
+            )
+
+            # ids of metrics
+            metric_ids = list(
+                map(lambda metric_member: int(metric_member[-1]), metric_members)
+            )
+
+            # names of metrics
+            metric_names = (
+                self.definitions.loc[
+                    (self.definitions["Definition Type"] == "MetricMember")
+                    & (self.definitions["ID"].isin(metric_ids))
                 ]["Attributes"]
                 .map(lambda attr: attr["name"])
-                .to_list()
+                .values
             )
 
             # maps each metric to a list of its values
             metrics_dict = {metric_name: [] for metric_name in metric_names}
 
-            # used to keep track of information about
-            # the most recent metrics that were read
+            # used to keep track of time that the
+            # most recent metrics that were read at
             prev_metric_time = -1
-            prev_metrics = set()
 
             # iterates through the events and processes them
             for loc_event in loc_events:
@@ -241,26 +259,18 @@ class OTF2Reader:
 
                         # store the metrics and their timestamp
                         prev_metric_time = event.time
-                        prev_metrics = set(metrics)
                     else:
                         # MetricClass metric events are synchronous
                         # and coupled with an enter or leave event that
-                        # has the same timestamp,
-                        if event.time == prev_metric_time:
-                            # once an enter or leave that is paired with some metrics
-                            # is encountered, add placeholders for all the metric lists
-                            # which aren't paired with this event
-                            for metric in metric_names - prev_metrics:
-                                metrics_dict[metric].append(float("nan"))
-                        else:
+                        # has the same timestamp
+                        if event.time != prev_metric_time:
                             # if the event is not paired with any metric, then
                             # add placeholders for all the metric lists
                             for metric in metric_names:
                                 metrics_dict[metric].append(float("nan"))
 
-                        # reset these as a metric event was not read
+                        # reset this as a metric event was not read
                         prev_metric_time = -1
-                        prev_metrics = set()
 
                         """
                         Below is code to read the primary information about the
