@@ -103,7 +103,6 @@ def test_match_caller_callee(data_dir, ping_pong_otf2_trace):
 
 def test_filter(data_dir, ping_pong_otf2_trace):
     from pipit.filter import Filter
-    import pytest
 
     trace = Trace.from_otf2(str(ping_pong_otf2_trace))
 
@@ -218,9 +217,7 @@ def test_filter(data_dir, ping_pong_otf2_trace):
     invalid = trace.filter("Timestamp (ns)", ">", 1.33e08, keep_invalid=True).events
 
     # invalid is same as raw dataframe selection, since it doesn't remove rows
-    assert all_equal(
-        invalid, trace.events[trace.events["Timestamp (ns)"] > 1.33e08]
-    )
+    assert all_equal(invalid, trace.events[trace.events["Timestamp (ns)"] > 1.33e08])
 
     # number of enter/leave rows should match
     assert len(valid[valid["Event Type"] == "Enter"]) == len(
