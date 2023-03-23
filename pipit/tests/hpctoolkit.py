@@ -8,7 +8,6 @@ import numpy as np
 
 
 def test_events(ping_pong_hpct_trace):
-    ping_pong_hpct_trace = 'data/ping-pong-hpctoolkit'
     events_df = Trace.from_hpctoolkit(str(ping_pong_hpct_trace)).events
 
     # 2 processes in ping pong trace
