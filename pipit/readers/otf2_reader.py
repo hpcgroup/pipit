@@ -200,7 +200,7 @@ class OTF2Reader:
             https://scorepci.pages.jsc.fz-juelich.de/otf2-pipelines/doc.r4707/python/basics.html#metrics
             """
 
-            # get metric class
+            # get members of metric class
             metric_members = (
                 self.definitions.loc[
                     self.definitions["Definition Type"] == "MetricClass"
@@ -209,7 +209,7 @@ class OTF2Reader:
                 .values[0]
             )
 
-            # ids of metrics
+            # ids of metric members
             metric_ids = list(
                 map(lambda metric_member: int(metric_member[-1]), metric_members)
             )
