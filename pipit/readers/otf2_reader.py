@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 import multiprocessing as mp
 import pipit.trace
+import otf2
 
 
 class OTF2Reader:
