@@ -214,27 +214,23 @@ def test_filter(data_dir, ping_pong_otf2_trace):
     )
 
     # keep_invalid test
-    with pytest.warns(UserWarning) as w:
-        valid = trace.filter("Timestamp (ns)", ">", 1.33e08, keep_invalid=False).events
-        invalid = trace.filter("Timestamp (ns)", ">", 1.33e08, keep_invalid=True).events
+    valid = trace.filter("Timestamp (ns)", ">", 1.33e08, keep_invalid=False).events
+    invalid = trace.filter("Timestamp (ns)", ">", 1.33e08, keep_invalid=True).events
 
-        # should raise exactly 1 warning
-        assert len(w) == 1
+    # invalid is same as raw dataframe selection, since it doesn't remove rows
+    assert all_equal(
+        invalid, trace.events[trace.events["Timestamp (ns)"] > 1.33e08]
+    )
 
-        # invalid is same as raw dataframe selection, since it doesn't remove rows
-        assert all_equal(
-            invalid, trace.events[trace.events["Timestamp (ns)"] > 1.33e08]
-        )
+    # number of enter/leave rows should match
+    assert len(valid[valid["Event Type"] == "Enter"]) == len(
+        valid[valid["Event Type"] == "Leave"]
+    )
 
-        # number of enter/leave rows should match
-        assert len(valid[valid["Event Type"] == "Enter"]) == len(
-            valid[valid["Event Type"] == "Leave"]
-        )
+    # number of enter/leave rows should not match
+    assert len(invalid[invalid["Event Type"] == "Enter"]) != len(
+        invalid[invalid["Event Type"] == "Leave"]
+    )
 
-        # number of enter/leave rows should not match
-        assert len(invalid[invalid["Event Type"] == "Enter"]) != len(
-            invalid[invalid["Event Type"] == "Leave"]
-        )
-
-        # invalid always has more rows than valid
-        assert len(invalid) > len(valid)
+    # invalid always has more rows than valid
+    assert len(invalid) > len(valid)

@@ -15,11 +15,8 @@ class Trace:
 
     def __init__(self, definitions, events):
         """Create a new Trace object."""
-        from .indexing import LocIndexer
-
         self.definitions = definitions
         self.events = events
-        self.loc = LocIndexer(self)
 
         # Validate columns
         required_cols = {"Timestamp (ns)", "Event Type", "Name", "Process"}
