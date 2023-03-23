@@ -103,9 +103,8 @@ def test_match_caller_callee(data_dir, ping_pong_otf2_trace):
 
     df = trace.events
 
-    # 40 events across both ranks that occur within main
+    # nodes with a parent = 40
     assert len(df.loc[df["_parent"].notnull()]) == 40
 
-    # 2 main functions that are also roots and only events
-    # that have children in the trace
+    # nodes with children = 2
     assert len(df.loc[df["_children"].notnull()]) == 2
