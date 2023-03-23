@@ -110,7 +110,7 @@ class MetaReader:
                 "relation": -1,
                 "lexical_type": -1,
                 "line": -1,
-                "loop_type": False
+                "loop_type": False,
             }
 
             # return self.common_strings[context["string_index"]]
@@ -169,14 +169,12 @@ class MetaReader:
             "line": file_line,
             "lexical_type": context["lexical_type"],
             "relation": context["relation"],
-            "loop_type": loop_type
+            "loop_type": loop_type,
         }
 
     def __read_common_header(self) -> None:
         """
         Reads common .db file header version 4.0
-
-        Documentation: https://gitlab.com/hpctoolkit/hpctoolkit/-/blob/develop/doc/FORMATS.md#common-file-structure
         """
 
         # read Magic identifier ("HPCPROF-tracedb_")
@@ -223,8 +221,6 @@ class MetaReader:
         self.database_title: Title of the database. May be provided by the user.
 
         self.database_description: Human-readable Markdown description of the database.
-
-        Documentation: https://gitlab.com/hpctoolkit/hpctoolkit/-/blob/develop/doc/FORMATS.md#metadb-general-properties-section
         """
 
         # go to the right spot in the file
@@ -287,8 +283,6 @@ class MetaReader:
     ) -> None:
         """
         Reads the "Load Modules" Section of meta.db.
-
-        Documentation: https://gitlab.com/hpctoolkit/hpctoolkit/-/blob/develop/doc/FORMATS.md#metadb-load-modules-section
         """
         # go to the right spot in meta.db
         self.file.seek(section_pointer)
@@ -316,9 +310,10 @@ class MetaReader:
             self.file.seek(current_index)
 
             # Flags -- Reserved for future use (u32)
-            flags = int.from_bytes(
-                self.file.read(4), byteorder=self.byte_order, signed=self.signed
-            )
+            # flags = int.from_bytes(
+            #     self.file.read(4), byteorder=self.byte_order, signed=self.signed
+            # )
+            self.file.read(4)
             # empty space that we need to skip
             self.file.read(4)
             # Full path to the associated application binary
@@ -353,8 +348,6 @@ class MetaReader:
     ) -> None:
         """
         Reads "Identifier Names" Section and Identifier Name strings in self.names_list
-
-        Documentation: https://gitlab.com/hpctoolkit/hpctoolkit/-/blob/develop/doc/FORMATS.md#metadb-hierarchical-identifier-names-section
         """
 
         # go to correct section of file
@@ -381,48 +374,7 @@ class MetaReader:
     def __read_performance_metrics_section(
         self, section_pointer: int, section_size: int
     ) -> None:
-        """
-        Documentation: https://gitlab.com/hpctoolkit/hpctoolkit/-/blob/develop/doc/FORMATS.md#metadb-performance-metrics-section
-        """
         pass
-        # go to correct spot in the file
-        self.file.seek(section_pointer)
-
-        # Descriptions of performance metrics
-        metrics_pointer = int.from_bytes(
-            self.file.read(8), byteorder=self.byte_order, signed=self.signed
-        )
-        # Number of performance metrics (u32)
-        num_metrics = int.from_bytes(
-            self.file.read(4), byteorder=self.byte_order, signed=self.signed
-        )
-        # Size of the {MD} structure, currently 32 (u8)
-        metric_size = int.from_bytes(
-            self.file.read(1), byteorder=self.byte_order, signed=self.signed
-        )
-        # Size of the {PSI} structure, currently 16 (u8)
-        PSI_size = int.from_bytes(
-            self.file.read(1), byteorder=self.byte_order, signed=self.signed
-        )
-        # Size of the {SS} structure, currently 24 (u8)
-        SS_size = int.from_bytes(
-            self.file.read(1), byteorder=self.byte_order, signed=self.signed
-        )
-        # Descriptions of propgation scopes
-        pScopes = int.from_bytes(
-            self.file.read(8), byteorder=self.byte_order, signed=self.signed
-        )
-        # Number of propgation scopes (u16)
-        nScopes = int.from_bytes(
-            self.file.read(2), byteorder=self.byte_order, signed=self.signed
-        )
-        # Size of the {PS} structure, currently 16 (u8)
-        num_PS = int.from_bytes(
-            self.file.read(1), byteorder=self.byte_order, signed=self.signed
-        )
-
-        # one byte empty
-        self.file.read(1)
 
     def __get_function_index(self, function_pointer: int) -> int:
         """
@@ -436,8 +388,6 @@ class MetaReader:
     def __read_functions_section(self, section_pointer: int, section_size: int) -> None:
         """
         Reads the "Functions" section of meta.db.
-
-        Documentation: https://gitlab.com/hpctoolkit/hpctoolkit/-/blob/develop/doc/FORMATS.md#metadb-functions-section
         """
 
         # go to correct section in file
@@ -472,9 +422,10 @@ class MetaReader:
             source_line = int.from_bytes(
                 self.file.read(4), byteorder=self.byte_order, signed=self.signed
             )
-            flags = int.from_bytes(
-                self.file.read(4), byteorder=self.byte_order, signed=self.signed
-            )
+            # flags = int.from_bytes(
+            #     self.file.read(4), byteorder=self.byte_order, signed=self.signed
+            # )
+            self.file.read(4)
             source_file_index = None
             load_module_index = None
             function_name_index = None
@@ -513,8 +464,6 @@ class MetaReader:
     ) -> None:
         """
         Reads the "Source Files" Section of meta.db.
-
-        Documentation: https://gitlab.com/hpctoolkit/hpctoolkit/-/blob/develop/doc/FORMATS.md#metadb-source-files-section
         """
 
         self.file.seek(section_pointer)
@@ -545,9 +494,10 @@ class MetaReader:
             # Reading information about each individual source file
             self.file.seek(self.source_files_pointer + (i * self.source_file_size))
 
-            flag = int.from_bytes(
-                self.file.read(4), byteorder=self.byte_order, signed=self.signed
-            )
+            # flag = int.from_bytes(
+            #     self.file.read(4), byteorder=self.byte_order, signed=self.signed
+            # )
+            self.file.read(4)
             # empty space that we need to skip
             self.file.read(4)
             # Path to the source file. Absolute, or relative to the root database
@@ -568,8 +518,6 @@ class MetaReader:
 
         Loops and calls __read_single_entry_point with the correct pointer to read
         the correct entry and add it to the CCT.
-
-        Documentation: https://gitlab.com/hpctoolkit/hpctoolkit/-/blob/develop/doc/FORMATS.md#metadb-context-tree-section
         """
 
         self.cct = Graph()
@@ -602,8 +550,6 @@ class MetaReader:
         Reads single (root) context entry.
 
         Reads the correct entry and adds it to the CCT.
-
-        Documentation: https://gitlab.com/hpctoolkit/hpctoolkit/-/blob/develop/doc/FORMATS.md#metadb-context-tree-section
         """
 
         self.file.seek(entry_point_pointer)
@@ -624,9 +570,10 @@ class MetaReader:
             self.file.read(4), byteorder=self.byte_order, signed=self.signed
         )
         # Type of entry point used here (u16)
-        entry_point_type = int.from_bytes(
-            self.file.read(2), byteorder=self.byte_order, signed=self.signed
-        )
+        # entry_point_type = int.from_bytes(
+        #     self.file.read(2), byteorder=self.byte_order, signed=self.signed
+        # )
+        self.file.read(2)
         # next 2 bytes are blank
         self.file.read(2)
         # Human-readable name for the entry point
@@ -666,8 +613,6 @@ class MetaReader:
     ) -> None:
         """
         Recursive function to read all child contexts and add it to the CCT
-
-        Documentation: https://gitlab.com/hpctoolkit/hpctoolkit/-/blob/develop/doc/FORMATS.md#metadb-context-tree-section
         """
 
         if total_size <= 0 or context_array_pointer <= 0:
@@ -716,9 +661,10 @@ class MetaReader:
             )
             index += 1
             # Bitmask for defining propagation scopes (u16)
-            propogation = int.from_bytes(
-                self.file.read(2), byteorder=self.byte_order, signed=self.signed
-            )
+            # propogation = int.from_bytes(
+            #     self.file.read(2), byteorder=self.byte_order, signed=self.signed
+            # )
+            self.file.read(2)
             index += 2
             # Empty space
             self.file.read(6)
@@ -798,7 +744,10 @@ class MetaReader:
                     # this means that information about the
                     # source file and module are with the parent
                     parent_information = self.context_map[parent_context_id]
-                    if "string_index" in parent_information and function_index is not None:
+                    if (
+                        "string_index" in parent_information
+                        and function_index is not None
+                    ):
                         # This means that the parent is the root, and it's
                         # information is useless
                         function = self.functions_list[function_index]
@@ -812,11 +761,11 @@ class MetaReader:
 
                         load_module_offset = function["load_modules_offset"]
                     else:
-                        if source_file_index == None:
+                        if source_file_index is None:
                             source_file_index = parent_information["source_file_index"]
-                        if source_file_line == None:
+                        if source_file_line is None:
                             source_file_line = parent_information["source_file_line"]
-                        if load_module_index == None:
+                        if load_module_index is None:
                             load_module_index = parent_information["load_module_index"]
                             load_module_offset = parent_information[
                                 "load_module_offset"
@@ -912,8 +861,6 @@ class ProfileReader:
     ) -> None:
         """
         Reads Profile Information section.
-
-        Documentation: https://gitlab.com/hpctoolkit/hpctoolkit/-/blob/develop/doc/FORMATS.md#profiledb-profile-info-section
         """
 
         self.file.seek(section_pointer)
@@ -965,8 +912,6 @@ class ProfileReader:
     def __read_hit_section(self, section_pointer: int, section_size: int) -> None:
         """
         Reads Hierarchical Identifier Tuples section of profile.db
-
-        Documentation: https://gitlab.com/hpctoolkit/hpctoolkit/-/blob/develop/doc/FORMATS.md#profiledb-hierarchical-identifier-tuple-section
         """
         # let's get to the correct spot in the file
         self.file.seek(section_pointer)
@@ -997,13 +942,15 @@ class ProfileReader:
                 # empty space
                 self.file.read(1)
                 # flag
-                flags = int.from_bytes(
-                    self.file.read(2), byteorder=self.byte_order, signed=self.signed
-                )
+                # flags = int.from_bytes(
+                #     self.file.read(2), byteorder=self.byte_order, signed=self.signed
+                # )
+                self.file.read(2)
                 # Logical identifier value, may be arbitrary but dense towards 0. (u32)
-                logical_id = int.from_bytes(
-                    self.file.read(4), byteorder=self.byte_order, signed=self.signed
-                )
+                # logical_id = int.from_bytes(
+                #     self.file.read(4), byteorder=self.byte_order, signed=self.signed
+                # )
+                self.file.read(4)
                 # Physical identifier value, eg. hostid or PCI bus index. (u64)
                 physical_id = int.from_bytes(
                     self.file.read(8), byteorder=self.byte_order, signed=self.signed
@@ -1015,8 +962,6 @@ class ProfileReader:
     def __read_common_header(self) -> None:
         """
         Reads common .db file header version 4.0
-
-        Documentation: https://gitlab.com/hpctoolkit/hpctoolkit/-/blob/develop/doc/FORMATS.md#common-file-structure
         """
 
         # read Magic identifier ("HPCPROF-tracedb_")
@@ -1113,8 +1058,6 @@ class TraceReader:
     def __read_common_header(self) -> None:
         """
         Reads common .db file header version 4.0
-
-        Documentation: https://gitlab.com/hpctoolkit/hpctoolkit/-/blob/develop/doc/FORMATS.md#common-file-structure
         """
 
         # read Magic identifier ("HPCPROF-tracedb_")
@@ -1157,8 +1100,6 @@ class TraceReader:
     ) -> None:
         """
         Reader Context Trace Headers section of trace.db
-
-        Documentation: https://gitlab.com/hpctoolkit/hpctoolkit/-/blob/develop/doc/FORMATS.md#tracedb-context-trace-headers-section
         """
 
         # get to the right place in the file
@@ -1199,7 +1140,7 @@ class TraceReader:
             "Node": [],
             "Source File Name": [],
             "Source File Line Number": [],
-            "Calling Context ID": []
+            "Calling Context ID": [],
         }
 
         for i in range(num_trace_headers):
@@ -1272,7 +1213,7 @@ class TraceReader:
             # First we want to close all the "enter" events from the last sample
             # that aren't still running
             if last_node is not None:
-                if current_node == None:
+                if current_node is None:
                     common_node: Node = None
                 else:
                     common_node: Node = current_node.get_intersection(last_node)
@@ -1286,7 +1227,7 @@ class TraceReader:
                     )
 
                     self.data["Name"].append(str(context_information["function"]))
-                    if context_information['loop_type']:
+                    if context_information["loop_type"]:
                         self.data["Event Type"].append("Loop Leave")
                     else:
                         self.data["Event Type"].append("Leave")
@@ -1307,7 +1248,7 @@ class TraceReader:
             # Now we want to add all the new "enter" events after
             # the common_node event
             if current_node is not None:
-                if common_node == None:
+                if common_node is None:
                     intersect_level = -1
                 else:
                     intersect_level = common_node.get_level()
@@ -1321,7 +1262,7 @@ class TraceReader:
                     )
 
                     self.data["Name"].append(str(context_information["function"]))
-                    if context_information['loop_type']:
+                    if context_information["loop_type"]:
                         self.data["Event Type"].append("Loop Enter")
                     else:
                         self.data["Event Type"].append("Enter")
@@ -1340,26 +1281,24 @@ class TraceReader:
 
             last_node = current_node
             last_id = context_id
-        
+
         # Now we want to close all the "enter" events from the last sample
         current_node = None
         timestamp = self.max_time_stamp - self.min_time_stamp
         if last_node is not None:
-            if current_node == None:
+            if current_node is None:
                 common_node: Node = None
             else:
                 common_node: Node = current_node.get_intersection(last_node)
 
             # closing each "enter" column until we reach the common_node
             while last_node != common_node:
-                context_information = (
-                    self.meta_reader.get_information_from_context_id(
-                        last_node.calling_context_ids[0]
-                    )
+                context_information = self.meta_reader.get_information_from_context_id(
+                    last_node.calling_context_ids[0]
                 )
 
                 self.data["Name"].append(str(context_information["function"]))
-                if context_information['loop_type']:
+                if context_information["loop_type"]:
                     self.data["Event Type"].append("Loop Leave")
                 else:
                     self.data["Event Type"].append("Leave")
@@ -1369,16 +1308,9 @@ class TraceReader:
                 self.data["Host"].append(hit[0][1])
                 self.data["Node"].append(last_node)
                 self.data["Source File Name"].append(context_information["file"])
-                self.data["Source File Line Number"].append(
-                    context_information["line"]
-                )
-                self.data["Calling Context ID"].append(
-                    last_node.calling_context_ids[0]
-                )
+                self.data["Source File Line Number"].append(context_information["line"])
+                self.data["Calling Context ID"].append(last_node.calling_context_ids[0])
                 last_node = last_node.parent
-
-
-        
 
 
 class HPCToolkitReader:
