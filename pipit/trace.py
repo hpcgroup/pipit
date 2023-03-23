@@ -134,7 +134,9 @@ class Trace:
 
         if "_children" not in self.events.columns:
             children = [None] * len(self.events)
-            depth, parent = [float("nan")] * len(self.events), [float("nan")] * len(self.events)
+            depth, parent = [float("nan")] * len(self.events), [float("nan")] * len(
+                self.events
+            )
 
             # only use enter and leave rows
             # to determine calling relationships
@@ -212,7 +214,9 @@ class Trace:
 
             self.events = self.events.astype({"_depth": "Int32", "_parent": "Int32"})
 
-            self.events = self.events.astype({"_depth": "category", "_parent": "category"})
+            self.events = self.events.astype(
+                {"_depth": "category", "_parent": "category"}
+            )
 
     def calc_inc_time(self):
         # Adds "time.inc" column
