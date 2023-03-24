@@ -222,9 +222,7 @@ class Trace:
         # calculate inclusive metric for each column specified
         for col in columns:
             # name of column for this inclusive metric
-            metric_col_name = (
-                "time" if col == "Timestamp (ns)" else col.lower()
-            ) + ".inc"
+            metric_col_name = ("time" if col == "Timestamp (ns)" else col) + ".inc"
 
             if metric_col_name not in self.events.columns:
                 # calculate the inclusive metric by subtracting
@@ -256,14 +254,12 @@ class Trace:
 
         for col in columns:
             # get the corresponding inclusive column name for this metric
-            inc_col_name = ("time" if col == "Timestamp (ns)" else col.lower()) + ".inc"
+            inc_col_name = ("time" if col == "Timestamp (ns)" else col) + ".inc"
             if inc_col_name not in self.events.columns:
                 self.calc_inc_metrics([col])
 
             # name of column for this exclusive metric
-            metric_col_name = (
-                "time" if col == "Timestamp (ns)" else col.lower()
-            ) + ".exc"
+            metric_col_name = ("time" if col == "Timestamp (ns)" else col) + ".exc"
 
             if metric_col_name not in self.events.columns:
                 # exc metric starts out as a copy of the inc metric values
