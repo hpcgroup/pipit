@@ -392,11 +392,8 @@ class Trace:
         # import this lazily to avoid circular dependencies
         from .filter import Filter
 
-        # Match events, in case a Filter has keep_invalid=False
-        self._match_events()
-
         # If arguments are all Filter instances, then apply each one
-        if all(isinstance(arg, Filter) for arg in args):
+        if not len(kwargs) and all(isinstance(arg, Filter) for arg in args):
             trace = self
 
             for filter in args:

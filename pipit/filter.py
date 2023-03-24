@@ -1,5 +1,6 @@
 import pipit
 from .util import parse_time
+import pandas as pd
 
 
 class Filter:
@@ -22,7 +23,7 @@ class Filter:
         operator=None,
         value=None,
         expr=None,
-        keep_invalid=False,
+        validate="keep",
     ):
         """
         Args:
@@ -42,15 +43,13 @@ class Filter:
                 you may provide a Pandas query expression to filter with.
                 See https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.query.html. # noqa: E501
 
-            keep_invalid (bool, optional): Whether to keep Enter/Leave events whose
-                matching event did not make the filter. If this is set to True,
-                the filter may produce an invalid Trace object. Defaults to False.
+            validate (optional): How to validate the Trace. Can be "keep", "remove", or False.
         """
         self.field = field
         self.operator = operator
         self.value = value
         self.expr = expr
-        self.keep_invalid = keep_invalid
+        self.validate = validate
 
     def _get_pandas_expr(self):
         """
@@ -76,9 +75,15 @@ class Filter:
         elif operator == "not-in":
             expr = f"-`{field}`.isin({value.__repr__()})"
         elif operator == "between":
+            field1 = field
+            field2 = field
+
+            if field == "Timestamp (ns)":
+                field2 = "_matching_timestamp"
+
             expr = (
-                f"(`{field}` >= {value[0].__repr__()})"
-                f"& (`{field}` <= {value[1].__repr__()})"
+                f"(`{field2}` >= {value[0].__repr__()}) "
+                f"& (`{field1}` <= {value[1].__repr__()})"
             )
 
         return expr
@@ -111,12 +116,22 @@ class Filter:
         Returns:
             pipit.Trace: new Trace instance containing filtered events DataFrame
         """
+        trace._match_events()
+
         # Filter events using either DataFrame.query or DataFrame.apply
         events = trace.events.query(self._get_pandas_expr())
 
+        # Ensure returned trace is valid
+        # Ensure that matches of filtered events are always included
+        if self.validate == "keep":
+            matching_rows = trace.events.loc[
+                events["_matching_event"].dropna().tolist()
+            ]
+            events = pd.concat([events, matching_rows]).sort_index()
+            events = events[~events.index.duplicated(keep="first")]
+
         # Remove events whose matching events did not make filter
-        # Ensures that returned Trace is valid
-        if not self.keep_invalid:
+        if self.validate == "remove":
             events = events[
                 (~(events["Event Type"].isin(["Enter", "Leave"])))
                 | (events["_matching_event"].isin(events.index))
@@ -134,6 +149,7 @@ class And(Filter):
     def __init__(self, *args):
         super().__init__()
         self.filters = args
+        self.validate = args[len(args) - 1].validate
 
     def _get_pandas_expr(self):
         # pandas query expression that combines filters with AND
@@ -150,6 +166,7 @@ class Or(Filter):
     def __init__(self, *args):
         super().__init__()
         self.filters = args
+        self.validate = args[len(args) - 1].validate
 
     def _get_pandas_expr(self):
         # pandas query expression that combines filters with OR
@@ -166,6 +183,7 @@ class Not(Filter):
     def __init__(self, filter):
         super().__init__()
         self.filter = filter
+        self.validate = filter.validate
 
     def _get_pandas_expr(self):
         # pandas query expression that negates filters
