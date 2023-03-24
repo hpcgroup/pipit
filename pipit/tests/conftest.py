@@ -53,6 +53,7 @@ def ping_pong_otf2_trace(data_dir, tmpdir):
 
     return tmpdir
 
+
 @pytest.fixture
 def ping_pong_otf2_papi_trace(data_dir, tmpdir):
     """Builds a temporary directory containing the ping-pong traces."""
