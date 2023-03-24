@@ -206,8 +206,9 @@ class OTF2Reader:
                     self.definitions["Definition Type"] == "MetricClass"
                 ]["Attributes"]
                 .map(lambda attr: attr["members"])
-                .values[0]
+                .values
             )
+            metric_members = [] if len(metric_members) == 0 else metric_members[0]
 
             # ids of metric members
             metric_ids = list(
