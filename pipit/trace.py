@@ -386,22 +386,33 @@ class Trace:
         Returns:
             pipit.Trace: new Trace instance containing a view of the events DataFrame
         """
-        from .filter import LocIndexer
+        from .selection import LocIndexer
 
         return LocIndexer(self)
 
-    def eval(self, boolExpr):
+    def eval(self, *args, **kwargs):
         """Evaluates a boolean expression for each event in this Trace.
 
-        Args:
-            boolExpr (pipit.BooleanExpr): Boolean expression to evaluate (as a
-            BooleanExpr instance)
+        Allowed inputs:
+        - Arguments used to create a BooleanExpr instance
+        - One or more BooleanExpr instances
 
         Returns:
             pd.Series: Boolean vector containing evaluated result for each event.
         """
+        # import this lazily to avoid circular dependencies
+        from .selection import BooleanExpr
 
-        return boolExpr._eval(self)
+        # If args are BooleanExpr instances, then evaluate them
+        if not len(kwargs) and all(isinstance(arg, BooleanExpr) for arg in args):
+            results = args[0]._eval(self)
+
+            for i in range(1, len(args)):
+                results = results & args[i]._eval(self)
+
+            return results
+        else:
+            return self.eval(BooleanExpr(*args, **kwargs))
 
     def query(self, *args, **kwargs):
         """Query events with a boolean expression.
@@ -413,18 +424,5 @@ class Trace:
         Returns:
             pipit.Trace: new Trace instance containing a view of the events DataFrame
         """
-        # import this lazily to avoid circular dependencies
-        from .filter import BooleanExpr
-
-        # If args are BooleanExpr instances, then evaluate and apply them
-        if not len(kwargs) and all(isinstance(arg, BooleanExpr) for arg in args):
-            trace = self
-
-            for boolExpr in args:
-                results = trace.eval(boolExpr)
-                trace = trace.loc[results]
-
-            return trace
-        else:
-            # Create a BooleanExpr instance from arguments, and query this Trace with it
-            return self.query(BooleanExpr(*args, **kwargs))
+        results = self.eval(*args, **kwargs)
+        return self.loc[results]

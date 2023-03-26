@@ -108,9 +108,10 @@ class BooleanExpr:
         DataFrame should be included in the selection. This result can be supplied
         to `Trace.loc` to get a subset of the Trace.
         """
+        value = self.value
 
         # Parse value into float
-        if self.field.lower().contains("time"):
+        if "time" in self.field.lower():
             value = parse_time(self.value)
 
         # Get boolean vector using pd.DataFrame.eval
