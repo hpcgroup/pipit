@@ -384,36 +384,47 @@ class Trace:
         Calls pandas.DataFrame.loc for the underlying events DataFrame.
 
         Returns:
-            Trace: new Trace instance containing a view of the events DataFrame
+            pipit.Trace: new Trace instance containing a view of the events DataFrame
         """
         from .filter import LocIndexer
 
         return LocIndexer(self)
 
-    def filter(self, *args, **kwargs):
-        """Filters the trace by field
+    def eval(self, boolExpr):
+        """Evaluates a boolean expression for each event in this Trace.
 
-        If one or more Filter instances are provided as arguments, then
-        applies the filter(s).
-
-        Otherwise, creates a new Filter instance with given arguments and
-        then applies it.
+        Args:
+            boolExpr (pipit.BooleanExpr): Boolean expression to evaluate (as a
+            BooleanExpr instance)
 
         Returns:
-            pipit.Trace: New Trace instance containing the filtered events
+            pd.Series: Boolean vector containing evaluated result for each event.
+        """
+
+        return boolExpr._eval(self)
+
+    def query(self, *args, **kwargs):
+        """Query events with a boolean expression.
+
+        Allowed inputs:
+        - Arguments used to create a BooleanExpr instance
+        - One or more BooleanExpr instances
+
+        Returns:
+            pipit.Trace: new Trace instance containing a view of the events DataFrame
         """
         # import this lazily to avoid circular dependencies
-        from .filter import Filter
+        from .filter import BooleanExpr
 
-        # If arguments are all Filter instances, then apply each one
-        if not len(kwargs) and all(isinstance(arg, Filter) for arg in args):
+        # If args are BooleanExpr instances, then evaluate and apply them
+        if not len(kwargs) and all(isinstance(arg, BooleanExpr) for arg in args):
             trace = self
 
-            for filter in args:
-                res = filter._eval(self)
-                trace = trace.loc[res]
+            for boolExpr in args:
+                results = trace.eval(boolExpr)
+                trace = trace.loc[results]
 
             return trace
         else:
-            # Create a new Filter instance from arguments, and apply it
-            return self.filter(Filter(*args, **kwargs))
+            # Create a BooleanExpr instance from arguments, and query this Trace with it
+            return self.query(BooleanExpr(*args, **kwargs))

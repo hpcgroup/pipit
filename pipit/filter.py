@@ -1,4 +1,3 @@
-import pipit
 from .util import parse_time
 import pandas as pd
 import numpy as np
@@ -20,6 +19,7 @@ class LocIndexer:
         item = self.trace.events.loc[key]
 
         if type(item) == pd.DataFrame:
+            # Wrap in new Trace instance
             return Trace(self.trace.definitions, item)
 
         return item
@@ -28,20 +28,25 @@ class LocIndexer:
         self.trace.events.loc[key] = value
 
 
-class Filter:
-    """Represents a conditional filter along a field, like "Name" or "Process".
-    Can operate on any field that currently exists in the events DataFrame. Supports
-    basic operators, like "<", "<=", "==", ">=", ">", "!=", as well as other
-    convenient operators like "in", "not-in", and "between".
+class BooleanExpr:
+    """Represents a boolean expression that can be evaluated for each event in a
+    Trace instance.
 
-    Filter instances can be shared and reused across multiple Traces. They can also
-    be combined with logical AND or OR, and negated with a logical NOT. When a Filter
-    is applied to a Trace, a new Trace instance is created containing a view of the
-    events DataFrame of the original Trace. All of Pipit's analysis and plotting
-    functions can be applied to the filtered Trace.
+    For example:    ("Name", "==", "MPI_Init")
+                    ("Process", ">", 5)
+
+    The expression can refer to any field that currently exists in the events
+    DataFrame. It supports convenient operations, like comparison and array
+    membership.
+
+    BooleanExpr instances can be shared and reused across multiple Traces. Logical
+    operators like AND, OR, and NOT can be also be applied to BooleanExpr instances.
+
+    When a Trace is queried with a BooleanExpr, a new Trace instance is created
+    containing a view of the events DataFrame of the original Trace. All of Pipit's
+    analysis and plotting functions can be applied to the new Trace.
     """
 
-    # TODO: Add "func" arg so user can provide a lambda function to filter with
     def __init__(
         self,
         field=None,
@@ -52,10 +57,10 @@ class Filter:
     ):
         """
         Args:
-            field (str, optional): The DataFrame field/column name to filter along.
+            field (str, optional): DataFrame field/column name to operate on.
 
-            operator (str, optional): The comparison operator used to evaluate
-                the filter condition. Allowed operators:
+            operator (str, optional): The operator used to evaluate this expression.
+                Allowed operators:
                 "<", "<=", "==", ">=", ">", "!=", "in", "not-in", "between"
 
             value (optional): The value to compare to. For "in" and "not-in"
@@ -65,10 +70,11 @@ class Filter:
                 or 1.5e+5.
 
             expr (str, optional): Instead of providing the field, operator, and value,
-                you may provide a Pandas query expression to filter with.
-                See https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.query.html. # noqa: E501
+                you may provide a Pandas query expression, which will be supplied to
+                pandas.DataFrame.eval.
+                See https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.eval.html. # noqa: E501
 
-            validate (optional): How to validate the Trace. Can be "keep", "remove", or False.
+            validate (optional): Whether or not to validate the Trace. Can be "keep" or False.
         """
         self.field = field
         self.operator = operator
@@ -87,11 +93,11 @@ class Filter:
 
     def __repr__(self):
         if self.expr is not None:
-            return f"Filter {self.expr.__repr__()}"
+            return f"BooleanExpr {self.expr.__repr__()}"
 
         else:
             return (
-                f"Filter {self.field.__repr__()} "
+                f"BooleanExpr {self.field.__repr__()} "
                 + f"{self.operator} {self.value.__repr__()}"
             )
 
@@ -103,32 +109,38 @@ class Filter:
         to `Trace.loc` to get a subset of the Trace.
         """
 
+        # Parse value into float
+        if self.field.lower().contains("time"):
+            value = parse_time(self.value)
+
+        # Get boolean vector using pd.DataFrame.eval
         if self.expr:
             result = trace.events.eval(self.expr)
 
+        # Get boolean vector using pd.Series comparison
         elif self.operator == "==":
-            result = trace.events[self.field] == self.value
+            result = trace.events[self.field] == value
 
         elif self.operator == "!=":
-            result = trace.events[self.field] != self.value
+            result = trace.events[self.field] != value
 
         elif self.operator == "<":
-            result = trace.events[self.field] < self.value
+            result = trace.events[self.field] < value
 
         elif self.operator == "<=":
-            result = trace.events[self.field] <= self.value
+            result = trace.events[self.field] <= value
 
         elif self.operator == ">":
-            result = trace.events[self.field] > self.value
+            result = trace.events[self.field] > value
 
         elif self.operator == ">=":
-            result = trace.events[self.field] >= self.value
+            result = trace.events[self.field] >= value
 
         elif self.operator == "in":
-            result = trace.events[self.field].isin(self.value)
+            result = trace.events[self.field].isin(value)
 
         elif self.operator == "not-in":
-            result = ~trace.events[self.field].isin(self.value)
+            result = ~trace.events[self.field].isin(value)
 
         elif self.operator == "between":
             field1 = self.field
@@ -138,13 +150,15 @@ class Filter:
                 trace._match_events()
                 field2 = "_matching_timestamp"
 
-            result = (trace.events[field2] >= self.value[0]) & (
-                trace.events[field1] <= self.value[1]
+            result = (trace.events[field2] >= value[0]) & (
+                trace.events[field1] <= value[1]
             )
 
         else:
             raise Exception("Invalid filter instance")
 
+        # Ensure that if an Enter/Leave row evaluates to True, then so does its
+        # matching row
         if self.validate == "keep":
             trace._match_events()
             matching = trace.events[result]["_matching_event"].dropna().tolist()
@@ -153,8 +167,8 @@ class Filter:
         return result
 
 
-class And(Filter):
-    """Combines multiple Filter objects with a logical AND, such that all of the
+class And(BooleanExpr):
+    """Combines multiple BooleanExpr objects with a logical AND, such that all of the
     filters must be met."""
 
     def __init__(self, *args):
@@ -170,8 +184,8 @@ class And(Filter):
         return " And ".join(f"({x.__repr__()})" for x in self.filters)
 
 
-class Or(Filter):
-    """Combines multiple Filter objects with a logical OR, such that any of the
+class Or(BooleanExpr):
+    """Combines multiple BooleanExpr objects with a logical OR, such that any of the
     filters must be met."""
 
     def __init__(self, *args):
@@ -187,8 +201,8 @@ class Or(Filter):
         return " Or ".join(f"({x.__repr__()})" for x in self.filters)
 
 
-class Not(Filter):
-    """Inverts Filter object with a logical NOT, such that the filter must not be
+class Not(BooleanExpr):
+    """Inverts BooleanExpr object with a logical NOT, such that the filter must not be
     met."""
 
     def __init__(self, filter):

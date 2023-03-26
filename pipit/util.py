@@ -32,7 +32,7 @@ def format_time(n: float) -> str:
     return "%.2f ns" % n
 
 
-def parse_time(time: str) -> float:
+def parse_time(time) -> float:
     """Converts human-readable time to ns"""
     if type(time) == float or type(time) == int:
         return time
