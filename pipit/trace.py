@@ -379,7 +379,7 @@ class Trace:
 
     @property
     def loc(self):
-        """Select events by index, list of indices, slice, or boolean vector.
+        """Select events by index, slice, or boolean vector.
 
         Calls pandas.DataFrame.loc for the underlying events DataFrame.
 

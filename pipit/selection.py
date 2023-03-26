@@ -1,6 +1,5 @@
 from .util import parse_time
 import pandas as pd
-import numpy as np
 from pipit import Trace
 
 
