@@ -6,10 +6,17 @@ from pipit import Trace
 
 
 class LocIndexer:
+    """Allows for indexing a Trace instance using .loc[]
+
+    Calls pandas.DataFrame.loc for underlying events DataFrame, and wraps result
+    in new Trace instance.
+    """
+
     def __init__(self, trace):
         self.trace = trace
 
     def __getitem__(self, key):
+        # Pass argument to events.loc
         item = self.trace.events.loc[key]
 
         if type(item) == pd.DataFrame:

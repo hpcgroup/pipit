@@ -379,6 +379,13 @@ class Trace:
 
     @property
     def loc(self):
+        """Select events by index, list of indices, slice, or boolean vector.
+
+        Calls pandas.DataFrame.loc for the underlying events DataFrame.
+
+        Returns:
+            Trace: new Trace instance containing a view of the events DataFrame
+        """
         from .filter import LocIndexer
 
         return LocIndexer(self)
