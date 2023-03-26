@@ -1,6 +1,24 @@
 import pipit
 from .util import parse_time
 import pandas as pd
+import numpy as np
+from pipit import Trace
+
+
+class LocIndexer:
+    def __init__(self, trace):
+        self.trace = trace
+
+    def __getitem__(self, key):
+        item = self.trace.events.loc[key]
+
+        if type(item) == pd.DataFrame:
+            return Trace(self.trace.definitions, item)
+
+        return item
+
+    def __setitem__(self, key, value):
+        self.trace.events.loc[key] = value
 
 
 class Filter:
@@ -51,43 +69,6 @@ class Filter:
         self.expr = expr
         self.validate = validate
 
-    def _get_pandas_expr(self):
-        """
-        Converts the filter into a Pandas expression that can be fed into
-        DataFrame.query for vectorized evaluation.
-        See https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.query.html.
-        """
-        expr = self.expr
-
-        field = self.field
-        operator = self.operator
-        value = self.value
-
-        # Parse value if timestamp
-        if field and "time" in field.lower():
-            value = parse_time(value)
-
-        # Convert to expr
-        if operator in ["==", "<", "<=", ">", ">=", "!="]:
-            expr = f"`{field}` {operator} {value.__repr__()}"
-        elif operator == "in":
-            expr = f"`{field}`.isin({value.__repr__()})"
-        elif operator == "not-in":
-            expr = f"-`{field}`.isin({value.__repr__()})"
-        elif operator == "between":
-            field1 = field
-            field2 = field
-
-            if field == "Timestamp (ns)":
-                field2 = "_matching_timestamp"
-
-            expr = (
-                f"(`{field2}` >= {value[0].__repr__()}) "
-                f"& (`{field1}` <= {value[1].__repr__()})"
-            )
-
-        return expr
-
     def __and__(self, other):
         return And(self, other)
 
@@ -107,39 +88,62 @@ class Filter:
                 + f"{self.operator} {self.value.__repr__()}"
             )
 
-    def _apply(self, trace):
-        """Apply this Filter to a Trace.
+    def _eval(self, trace):
+        """Evaluate this filter on a Trace
 
-        Args:
-            trace (pipit.Trace): Trace instance being filtered
-
-        Returns:
-            pipit.Trace: new Trace instance containing filtered events DataFrame
+        Returns a boolean vector that determines whether each row of the events
+        DataFrame should be included in the selection. This result can be supplied
+        to `Trace.loc` to get a subset of the Trace.
         """
-        trace._match_events()
 
-        # Filter events using either DataFrame.query or DataFrame.apply
-        events = trace.events.query(self._get_pandas_expr())
+        if self.expr:
+            result = trace.events.eval(self.expr)
 
-        # Ensure returned trace is valid
-        # Ensure that matches of filtered events are always included
+        elif self.operator == "==":
+            result = trace.events[self.field] == self.value
+
+        elif self.operator == "!=":
+            result = trace.events[self.field] != self.value
+
+        elif self.operator == "<":
+            result = trace.events[self.field] < self.value
+
+        elif self.operator == "<=":
+            result = trace.events[self.field] <= self.value
+
+        elif self.operator == ">":
+            result = trace.events[self.field] > self.value
+
+        elif self.operator == ">=":
+            result = trace.events[self.field] >= self.value
+
+        elif self.operator == "in":
+            result = trace.events[self.field].isin(self.value)
+
+        elif self.operator == "not-in":
+            result = ~trace.events[self.field].isin(self.value)
+
+        elif self.operator == "between":
+            field1 = self.field
+            field2 = self.field
+
+            if self.field == "Timestamp (ns)":
+                trace._match_events()
+                field2 = "_matching_timestamp"
+
+            result = (trace.events[field2] >= self.value[0]) & (
+                trace.events[field1] <= self.value[1]
+            )
+
+        else:
+            raise Exception("Invalid filter instance")
+
         if self.validate == "keep":
-            matching_rows = trace.events.loc[
-                events["_matching_event"].dropna().tolist()
-            ]
-            events = pd.concat([events, matching_rows]).sort_index()
-            events = events[~events.index.duplicated(keep="first")]
+            trace._match_events()
+            matching = trace.events[result]["_matching_event"].dropna().tolist()
+            result[matching] = True
 
-        # Remove events whose matching events did not make filter
-        if self.validate == "remove":
-            events = events[
-                (~(events["Event Type"].isin(["Enter", "Leave"])))
-                | (events["_matching_event"].isin(events.index))
-            ]
-
-        # TODO: filter CCT?
-
-        return pipit.Trace(trace.definitions, events)
+        return result
 
 
 class And(Filter):
@@ -149,11 +153,11 @@ class And(Filter):
     def __init__(self, *args):
         super().__init__()
         self.filters = args
-        self.validate = args[len(args) - 1].validate
 
-    def _get_pandas_expr(self):
-        # pandas query expression that combines filters with AND
-        return " & ".join(f"({filter._get_pandas_expr()})" for filter in self.filters)
+    def _eval(self, trace):
+        results = [f._eval(trace) for f in self.filters]
+
+        return np.logical_and.reduce(results)
 
     def __repr__(self):
         return " And ".join(f"({x.__repr__()})" for x in self.filters)
@@ -166,11 +170,11 @@ class Or(Filter):
     def __init__(self, *args):
         super().__init__()
         self.filters = args
-        self.validate = args[len(args) - 1].validate
 
-    def _get_pandas_expr(self):
-        # pandas query expression that combines filters with OR
-        return " | ".join(f"({filter._get_pandas_expr()})" for filter in self.filters)
+    def _eval(self, trace):
+        results = [f._eval(trace) for f in self.filters]
+
+        return np.logical_or.reduce(results)
 
     def __repr__(self):
         return " Or ".join(f"({x.__repr__()})" for x in self.filters)
@@ -183,11 +187,9 @@ class Not(Filter):
     def __init__(self, filter):
         super().__init__()
         self.filter = filter
-        self.validate = filter.validate
 
-    def _get_pandas_expr(self):
-        # pandas query expression that negates filters
-        return f"~({self.filter._get_pandas_expr()})"
+    def _get_pandas_expr(self, trace):
+        return ~self.filter._eval(trace)
 
     def __repr__(self):
         return f"Not ({self.filter.__repr__()})"

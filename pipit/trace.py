@@ -377,6 +377,12 @@ class Trace:
 
         return np.histogram(sizes, bins=bins, **kwargs)
 
+    @property
+    def loc(self):
+        from .filter import LocIndexer
+
+        return LocIndexer(self)
+
     def filter(self, *args, **kwargs):
         """Filters the trace by field
 
@@ -397,7 +403,8 @@ class Trace:
             trace = self
 
             for filter in args:
-                trace = filter._apply(trace)
+                res = filter._eval(self)
+                trace = trace.loc[res]
 
             return trace
         else:
