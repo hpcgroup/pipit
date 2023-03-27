@@ -29,34 +29,46 @@ def test_eval(data_dir, ping_pong_otf2_trace):
     trace = Trace.from_otf2(str(ping_pong_otf2_trace))
 
     # Test each operator
-    assert all_equal(trace.eval("Process", "==", 0), trace.events["Process"] == 0)
     assert all_equal(
-        trace.eval("Name", "!=", "MPI_Init"), trace.events["Name"] != "MPI_Init"
+        trace.eval("Process", "==", 0),
+        trace.eval(expr="`Process` == 0"),
+        trace.events["Process"] == 0,
+    )
+    assert all_equal(
+        trace.eval("Name", "!=", "MPI_Init"),
+        trace.eval(expr="`Name` != 'MPI_Init'"),
+        trace.events["Name"] != "MPI_Init",
     )
     assert all_equal(
         trace.eval("Timestamp (ns)", "<", "130.52 ms"),
         trace.eval("Timestamp (ns)", "<", 1.3052e8),
+        trace.eval(expr="`Timestamp (ns)` < 1.3052e8"),
         trace.events["Timestamp (ns)"] < 1.3052e8,
     )
     assert all_equal(
         trace.eval("Timestamp (ns)", "<=", 130504301.50129148),
+        trace.eval(expr="`Timestamp (ns)` <= 130504301.50129148"),
         trace.events["Timestamp (ns)"] <= 130504301.50129148,
     )
     assert all_equal(
         trace.eval("Timestamp (ns)", ">", "130.52 ms"),
         trace.eval("Timestamp (ns)", ">", 1.3052e8),
+        trace.eval(expr="`Timestamp (ns)` > 1.3052e8"),
         trace.events["Timestamp (ns)"] > 1.3052e8,
     )
     assert all_equal(
         trace.eval("Timestamp (ns)", ">=", 130532982.41000055),
+        trace.eval(expr="`Timestamp (ns)` >= 130532982.41000055"),
         trace.events["Timestamp (ns)"] >= 130532982.41000055,
     )
     assert all_equal(
         trace.eval("Name", "in", ["MPI_Send", "MPI_Recv"]),
+        trace.eval(expr="`Name`.isin(['MPI_Send', 'MPI_Recv'])"),
         trace.events["Name"].isin(["MPI_Send", "MPI_Recv"]),
     )
     assert all_equal(
         trace.eval("Name", "not-in", ["MPI_Send", "MPI_Recv"]),
+        trace.eval(expr="~(`Name`.isin(['MPI_Send', 'MPI_Recv']))"),
         ~trace.events["Name"].isin(["MPI_Send", "MPI_Recv"]),
     )
     assert all_equal(

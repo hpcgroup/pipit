@@ -110,7 +110,7 @@ class BooleanExpr:
         value = self.value
 
         # Parse value into float
-        if "time" in self.field.lower():
+        if self.field and "time" in self.field.lower():
             value = parse_time(self.value)
 
         # Get boolean vector using pd.DataFrame.eval
