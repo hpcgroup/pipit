@@ -27,6 +27,35 @@ class Trace:
         self.inc_metrics = []
         self.exc_metrics = []
 
+        # Validate columns
+        required_cols = {"Timestamp (ns)", "Event Type", "Name", "Process"}
+        col_diff = required_cols.difference(self.events.columns)
+
+        if len(col_diff) != 0:
+            logging.warning(
+                "This Trace instance is invalid, as it is missing required columns %s. "
+                "You may continue working with it, but the Pipit API may produce "
+                "undesireable or incorrect results." % list(col_diff)
+            )
+            return
+
+        # Validate rows
+        row_diff = len(self.events[self.events["Event Type"] == "Enter"]) - len(
+            self.events[self.events["Event Type"] == "Leave"]
+        )
+
+        if row_diff != 0:
+            logging.warning(
+                "This Trace instance is invalid, as it has %s more %s rows than "
+                "%s rows. You may continue working with it, but the Pipit API may "
+                "produce undesireable or incorrect results."
+                % (
+                    abs(row_diff),
+                    "Enter" if row_diff > 0 else "Leave",
+                    "Leave" if row_diff > 0 else "Enter",
+                )
+            )
+
     @staticmethod
     def from_otf2(dirname, num_processes=None):
         """Read an OTF2 trace into a new Trace object."""
