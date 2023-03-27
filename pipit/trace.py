@@ -390,7 +390,7 @@ class Trace:
 
         return LocIndexer(self)
 
-    def eval(self, *args, **kwargs):
+    def _eval(self, *args, **kwargs):
         """Evaluates a boolean expression for each event in this Trace.
 
         Allowed inputs:
@@ -412,7 +412,7 @@ class Trace:
 
             return results
         else:
-            return self.eval(BooleanExpr(*args, **kwargs))
+            return self._eval(BooleanExpr(*args, **kwargs))
 
     def query(self, *args, **kwargs):
         """Query events with a boolean expression.
@@ -424,5 +424,5 @@ class Trace:
         Returns:
             pipit.Trace: new Trace instance containing a view of the events DataFrame
         """
-        results = self.eval(*args, **kwargs)
+        results = self._eval(*args, **kwargs)
         return self.loc[results]
