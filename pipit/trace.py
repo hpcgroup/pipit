@@ -455,8 +455,8 @@ class Trace:
         """Evaluates a boolean expression for each event in this Trace.
 
         Allowed inputs:
+        - BooleanExpr instance
         - Arguments used to create a BooleanExpr instance
-        - One or more BooleanExpr instances
 
         Returns:
             pd.Series: Boolean vector containing evaluated result for each event.
@@ -464,14 +464,9 @@ class Trace:
         # import this lazily to avoid circular dependencies
         from .selection import BooleanExpr
 
-        # If args are BooleanExpr instances, then evaluate them
-        if not len(kwargs) and all(isinstance(arg, BooleanExpr) for arg in args):
-            results = args[0]._eval(self)
-
-            for i in range(1, len(args)):
-                results = results & args[i]._eval(self)
-
-            return results
+        # If argument is a BooleanExpr instance, then evaluate it
+        if isinstance(args[0], BooleanExpr):
+            return args[0]._eval(self)
         else:
             return self._eval(BooleanExpr(*args, **kwargs))
 
@@ -479,8 +474,8 @@ class Trace:
         """Query events with a boolean expression.
 
         Allowed inputs:
+        - BooleanExpr instance
         - Arguments used to create a BooleanExpr instance
-        - One or more BooleanExpr instances
 
         Returns:
             pipit.Trace: new Trace instance containing a view of the events DataFrame
