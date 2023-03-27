@@ -4,10 +4,10 @@ from pipit import Trace
 
 
 class LocIndexer:
-    """Allows for indexing a Trace instance using .loc[]
+    """Allows for selecting a sub-region of a Trace using .loc[]
 
-    Calls pandas.DataFrame.loc for underlying events DataFrame, and wraps result
-    in new Trace instance.
+    Calls pandas.DataFrame.loc for the underlying events DataFrame, and wraps the
+    result in a new Trace instance.
     """
 
     def __init__(self, trace):
