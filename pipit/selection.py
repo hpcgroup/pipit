@@ -176,9 +176,12 @@ class And(BooleanExpr):
         self.filters = args
 
     def _eval(self, trace):
-        results = [f._eval(trace) for f in self.filters]
+        results = self.filters[0]._eval(trace)
 
-        return np.logical_and.reduce(results)
+        for i in range(1, len(self.filters)):
+            results = results & self.filters[i]._eval(trace)
+
+        return results
 
     def __repr__(self):
         return " And ".join(f"({x.__repr__()})" for x in self.filters)
@@ -193,9 +196,12 @@ class Or(BooleanExpr):
         self.filters = args
 
     def _eval(self, trace):
-        results = [f._eval(trace) for f in self.filters]
+        results = self.filters[0]._eval(trace)
 
-        return np.logical_or.reduce(results)
+        for i in range(1, len(self.filters)):
+            results = results | self.filters[i]._eval(trace)
+
+        return results
 
     def __repr__(self):
         return " Or ".join(f"({x.__repr__()})" for x in self.filters)
@@ -209,7 +215,7 @@ class Not(BooleanExpr):
         super().__init__()
         self.filter = filter
 
-    def _get_pandas_expr(self, trace):
+    def _eval(self, trace):
         return ~self.filter._eval(trace)
 
     def __repr__(self):
