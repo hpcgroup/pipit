@@ -268,7 +268,7 @@ class Trace:
             # get the corresponding inclusive column name for this metric
             inc_col_name = ("time" if col == "Timestamp (ns)" else col) + ".inc"
             if inc_col_name not in self.events.columns:
-                self.calc_inc_metrics(col)
+                self.calc_inc_metrics([col])
 
             # name of column for this exclusive metric
             metric_col_name = ("time" if col == "Timestamp (ns)" else col) + ".exc"
