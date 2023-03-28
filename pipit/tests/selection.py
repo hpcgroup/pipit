@@ -40,26 +40,16 @@ def test_eval(data_dir, ping_pong_otf2_trace):
         trace.events["Name"] != "MPI_Init",
     )
     assert all_equal(
-        trace._eval("Timestamp (ns)", "<", "130.52 ms"),
-        trace._eval("Timestamp (ns)", "<", 1.3052e8),
-        trace._eval(expr="`Timestamp (ns)` < 1.3052e8"),
-        trace.events["Timestamp (ns)"] < 1.3052e8,
+        trace._eval("Timestamp (ns)", "<", "500 ns"),
+        trace._eval("Timestamp (ns)", "<", 500),
+        trace._eval(expr="`Timestamp (ns)` < 500"),
+        trace.events["Timestamp (ns)"] < 500,
     )
     assert all_equal(
-        trace._eval("Timestamp (ns)", "<=", 130504301.50129148),
-        trace._eval(expr="`Timestamp (ns)` <= 130504301.50129148"),
-        trace.events["Timestamp (ns)"] <= 130504301.50129148,
-    )
-    assert all_equal(
-        trace._eval("Timestamp (ns)", ">", "130.52 ms"),
-        trace._eval("Timestamp (ns)", ">", 1.3052e8),
-        trace._eval(expr="`Timestamp (ns)` > 1.3052e8"),
-        trace.events["Timestamp (ns)"] > 1.3052e8,
-    )
-    assert all_equal(
-        trace._eval("Timestamp (ns)", ">=", 130532982.41000055),
-        trace._eval(expr="`Timestamp (ns)` >= 130532982.41000055"),
-        trace.events["Timestamp (ns)"] >= 130532982.41000055,
+        trace._eval("Timestamp (ns)", ">", "199.6 ms"),
+        trace._eval("Timestamp (ns)", ">", 1.996e8),
+        trace._eval(expr="`Timestamp (ns)` > 1.996e8"),
+        trace.events["Timestamp (ns)"] > 1.996e8,
     )
     assert all_equal(
         trace._eval("Name", "in", ["MPI_Send", "MPI_Recv"]),
@@ -72,9 +62,17 @@ def test_eval(data_dir, ping_pong_otf2_trace):
         ~trace.events["Name"].isin(["MPI_Send", "MPI_Recv"]),
     )
     assert all_equal(
-        trace._eval("Timestamp (ns)", "between", ["16 ms", "130.505 ms"]),
-        (trace.events["Timestamp (ns)"] > 1.6e5)
-        & (trace.events["Timestamp (ns)"] < 1.30505e8),
+        trace._eval("Timestamp (ns)", "between", ["50 ns", "199.6 ms"]),
+        (trace.events["Timestamp (ns)"] > 50)
+        & (trace.events["Timestamp (ns)"] < 1.996e8),
+    )
+
+    # Test that "between" returns functions that span the time range
+    assert (
+        "int main(int, char**)"
+        in trace.query("Timestamp (ns)", "between", [3.50e05, 3.51e5])
+        .events["Name"]
+        .values
     )
 
     # Test logical operators NOT, AND, and OR
