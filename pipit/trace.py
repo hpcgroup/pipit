@@ -465,7 +465,7 @@ class Trace:
         from .selection import BooleanExpr
 
         # If argument is a BooleanExpr instance, then evaluate it
-        if isinstance(args[0], BooleanExpr):
+        if len(args) and isinstance(args[0], BooleanExpr):
             return args[0]._eval(self)
         else:
             return self._eval(BooleanExpr(*args, **kwargs))

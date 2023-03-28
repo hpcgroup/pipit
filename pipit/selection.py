@@ -150,8 +150,14 @@ class BooleanExpr:
                 trace._match_events()
                 field2 = "_matching_timestamp"
 
-            result = (trace.events[field2] >= value[0]) & (
-                trace.events[field1] <= value[1]
+            result = (
+                (trace.events["Event Type"] == "Instant")
+                & (trace.events[field1] >= value[0])
+                & (trace.events[field1] <= value[1])
+            ) | (
+                (trace.events["Event Type"] == "Enter")
+                & (trace.events[field2] >= value[0])
+                & (trace.events[field1] <= value[1])
             )
 
         else:
