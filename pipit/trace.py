@@ -406,3 +406,18 @@ class Trace:
             .groupby(groupby_column)
             .mean()
         )
+
+    def calculate_idle_time_for_process(self, process, idle_functions=None):
+        
+        # pair enter and leave rows
+        if "time.inc" not in self.events.columns:
+            self.calc_inc_metrics()
+
+        if idle_functions is None:
+            idle_functions = ['MPI_Wait', 'MPI_Send', 'MPI_Recv']
+        
+        df = self.events
+        event_start_df = df.loc[df['Event Type'] == 'Enter']
+        filtered_df = event_start_df.loc[event_start_df['Process'] == process].loc[event_start_df['Name'].isin(idle_functions)]
+        idle_time = filtered_df['time.inc'].sum()
+        return idle_time
