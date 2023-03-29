@@ -3,6 +3,8 @@
 #
 # SPDX-License-Identifier: MIT
 
+import otf2
+import numpy as np
 import pandas as pd
 import multiprocessing as mp
 import pipit.trace
@@ -151,7 +153,7 @@ class OTF2Reader:
         to a dataframe
         """
 
-        with otf2.reader.open(self.file_name) as trace:  # noqa: F821
+        with otf2.reader.open(self.file_name) as trace:
             # extracts the rank and size
             # and gets all the locations
             # of the trace
@@ -190,10 +192,45 @@ class OTF2Reader:
             # columns of the DataFrame
             timestamps, event_types, event_attributes, names = [], [], [], []
 
-            # Note:
-            # 1. The below lists are for storing logical ids.
-            # 2. Support for GPU events has to be added and unified across readers.
+            # note: the below lists are for storing logical ids
             process_ids, thread_ids = [], []
+
+            """
+            Relevant Documentation for Metrics:
+            https://scorepci.pages.jsc.fz-juelich.de/otf2-pipelines/doc.r4707/python/basics.html#metrics
+            """
+
+            # get members of metric class
+            metric_members = (
+                self.definitions.loc[
+                    self.definitions["Definition Type"] == "MetricClass"
+                ]["Attributes"]
+                .map(lambda attr: attr["members"])
+                .values
+            )
+            metric_members = [] if len(metric_members) == 0 else metric_members[0]
+
+            # ids of metric members
+            metric_ids = list(
+                map(lambda metric_member: int(metric_member[-1]), metric_members)
+            )
+
+            # names of metrics
+            metric_names = (
+                self.definitions.loc[
+                    (self.definitions["Definition Type"] == "MetricMember")
+                    & (self.definitions["ID"].isin(metric_ids))
+                ]["Attributes"]
+                .map(lambda attr: attr["name"])
+                .values
+            )
+
+            # maps each metric to a list of its values
+            metrics_dict = {metric_name: [] for metric_name in metric_names}
+
+            # used to keep track of time that the
+            # most recent metrics that were read at
+            prev_metric_time = -1
 
             # iterates through the events and processes them
             for loc_event in loc_events:
@@ -201,59 +238,96 @@ class OTF2Reader:
                 # location could be thread, process, etc
                 loc, event = loc_event[0], loc_event[1]
 
-                # information about the location that the event occurred on
-
-                # TO DO:
-                # need to add support for accelerator and metric locations
+                # To Do:
+                # Support for GPU events has to be
+                # added and unified across readers.
                 if str(loc.type)[13:] == "CPU_THREAD":
-                    process_id = loc.group._ref
-                    process_ids.append(process_id)
+                    # don't add metric events as a separate row,
+                    # and add their values into columns instead
+                    if type(event) == otf2.events.Metric:
+                        # Since the location is a cpu thread, we know
+                        # that the metric event is of type MetricClass,
+                        # which has a list of MetricMembers.
+                        metrics = list(
+                            map(lambda metric: metric.name, event.metric.members)
+                        )
+                        metric_values = event.values
 
-                    # subtract the minimum location number of a process
-                    # from the location number to get threads numbered
-                    # 0 to (num_threads per process - 1) for each process.
-                    thread_ids.append(loc._ref - self.process_threads_map[process_id])
+                        # append the values for the metrics
+                        # to their appropriate lists
+                        for i in range(len(metrics)):
+                            metrics_dict[metrics[i]].append(metric_values[i])
 
-                    # type of event - enter, leave, or other types
-                    event_type = str(type(event))[20:-2]
-                    if event_type == "Enter" or event_type == "Leave":
-                        event_types.append(event_type)
+                        # store the metrics and their timestamp
+                        prev_metric_time = event.time
                     else:
-                        event_types.append("Instant")
+                        # MetricClass metric events are synchronous
+                        # and coupled with an enter or leave event that
+                        # has the same timestamp
+                        if event.time != prev_metric_time:
+                            # if the event is not paired with any metric, then
+                            # add placeholders for all the metric lists
+                            for metric in metric_names:
+                                metrics_dict[metric].append(float("nan"))
 
-                    if event_type in ["Enter", "Leave"]:
-                        names.append(event.region.name)
-                    else:
-                        names.append(event_type)
+                        # reset this as a metric event was not read
+                        prev_metric_time = -1
 
-                    timestamps.append(event.time)
+                        """
+                        Below is code to read the primary information about the
+                        non-metric event, such as location, attributes, etc.
+                        """
 
-                    # only add attributes for non-leave rows so that
-                    # there aren't duplicate attributes for a single event
-                    if event_type != "Leave":
-                        attributes_dict = {}
+                        process_id = loc.group._ref
+                        process_ids.append(process_id)
 
-                        # iterates through the event's attributes
-                        # (ex: region, bytes sent, etc)
-                        for key, value in vars(event).items():
-                            # only adds non-empty attributes
-                            # and ignores time so there isn't a duplicate time
-                            if value is not None and key != "time":
-                                # uses field_to_val to convert all data types
-                                # and ensure that there are no pickling errors
-                                attributes_dict[
-                                    self.field_to_val(key)
-                                ] = self.handle_data(value)
-                        event_attributes.append(attributes_dict)
-                    else:
-                        # nan attributes for leave rows
-                        # attributes column is of object dtype
-                        event_attributes.append(None)
+                        # subtract the minimum location number of a process
+                        # from the location number to get threads numbered
+                        # 0 to (num_threads per process - 1) for each process.
+                        thread_ids.append(
+                            loc._ref - self.process_threads_map[process_id]
+                        )
+
+                        # type of event - enter, leave, or other types
+                        event_type = str(type(event))[20:-2]
+                        if event_type == "Enter" or event_type == "Leave":
+                            event_types.append(event_type)
+                        else:
+                            event_types.append("Instant")
+
+                        if event_type in ["Enter", "Leave"]:
+                            names.append(event.region.name)
+                        else:
+                            names.append(event_type)
+
+                        timestamps.append(event.time)
+
+                        # only add attributes for non-leave rows so that
+                        # there aren't duplicate attributes for a single event
+                        if event_type != "Leave":
+                            attributes_dict = {}
+
+                            # iterates through the event's attributes
+                            # (ex: region, bytes sent, etc)
+                            for key, value in vars(event).items():
+                                # only adds non-empty attributes
+                                # and ignores time so there isn't a duplicate time
+                                if value is not None and key != "time":
+                                    # uses field_to_val to convert all data types
+                                    # and ensure that there are no pickling errors
+                                    attributes_dict[
+                                        self.field_to_val(key)
+                                    ] = self.handle_data(value)
+                            event_attributes.append(attributes_dict)
+                        else:
+                            # nan attributes for leave rows
+                            # attributes column is of object dtype
+                            event_attributes.append(None)
 
             trace.close()  # close event files
 
         # returns dataframe with all events and their fields
-        return pd.DataFrame(
+        trace_df = pd.DataFrame(
             {
                 "Timestamp (ns)": timestamps,
                 "Event Type": event_types,
@@ -263,6 +337,15 @@ class OTF2Reader:
                 "Attributes": event_attributes,
             }
         )
+
+        for metric, metric_values in metrics_dict.items():
+            # only add columns of metrics which are populated with
+            # some values (sometimes a metric could be defined but not
+            # appear in the trace itself)
+            if not np.isnan(metric_values).all():
+                trace_df[metric] = metric_values
+
+        return trace_df
 
     def read_definitions(self, trace):
         """
