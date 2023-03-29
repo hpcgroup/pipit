@@ -407,14 +407,14 @@ class Trace:
             .mean()
         )
 
-    def calculate_idle_time_for_process(self, process, idle_functions=None):
+    def calculate_idle_time_for_process(self, process, idle_functions=['Idle'], MPI_enabled=False):
         
         # pair enter and leave rows
         if "time.inc" not in self.events.columns:
             self.calc_inc_metrics()
 
-        if idle_functions is None:
-            idle_functions = ['MPI_Wait', 'MPI_Send', 'MPI_Recv']
+        if MPI_enabled:
+            idle_functions += ['MPI_Wait', 'MPI_Send', 'MPI_Recv']
         
         df = self.events
         event_start_df = df.loc[df['Event Type'] == 'Enter']
