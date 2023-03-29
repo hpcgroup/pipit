@@ -408,14 +408,14 @@ class Trace:
         )
 
     def calculate_idle_time_for_process(
-        self, process, idle_functions=["Idle"], MPI_enabled=False
+        self, process, idle_functions=["Idle"], MPI_enabled=True
     ):
         # pair enter and leave rows
         if "time.inc" not in self.events.columns:
             self.calc_inc_metrics()
 
         if MPI_enabled:
-            idle_functions += ["MPI_Wait", "MPI_Send", "MPI_Recv"]
+            idle_functions += ["MPI_Wait", "MPI_Waitall", "MPI_Recv"]
         # filter the dataframe to include only 'Enter' events within the specified
         # process with the specified function names
         df = self.events
