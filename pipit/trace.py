@@ -407,17 +407,22 @@ class Trace:
             .mean()
         )
 
-    def calculate_idle_time_for_process(self, process, idle_functions=['Idle'], MPI_enabled=False):
-        
+    def calculate_idle_time_for_process(
+        self, process, idle_functions=["Idle"], MPI_enabled=False
+    ):
         # pair enter and leave rows
         if "time.inc" not in self.events.columns:
             self.calc_inc_metrics()
 
         if MPI_enabled:
-            idle_functions += ['MPI_Wait', 'MPI_Send', 'MPI_Recv']
-        
+            idle_functions += ["MPI_Wait", "MPI_Send", "MPI_Recv"]
+        # filter the dataframe to include only 'Enter' events within the specified
+        # process with the specified function names
         df = self.events
-        event_start_df = df.loc[df['Event Type'] == 'Enter']
-        filtered_df = event_start_df.loc[event_start_df['Process'] == process].loc[event_start_df['Name'].isin(idle_functions)]
-        idle_time = filtered_df['time.inc'].sum()
-        return idle_time
+        filtered_df = (
+            df.loc[df["Event Type"] == "Enter"]
+            .loc[df["Process"] == process]
+            .loc[df["Name"].isin(idle_functions)]
+        )
+        # get the sum of the inclusive times of these events
+        return filtered_df["time.inc"].sum()
