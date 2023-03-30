@@ -76,7 +76,6 @@ class BooleanExpr:
         self.operator = operator
         self.value = value
         self.expr = expr
-        self.validate = validate
 
     def __and__(self, other):
         return And(self, other)
