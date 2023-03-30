@@ -100,25 +100,41 @@ class Trace:
                 # observed improvement in performance when using lists.
 
                 event_types = list(filtered_df["Event Type"])
-                df_indices, timestamps = list(filtered_df.index), list(
-                    filtered_df["Timestamp (ns)"]
+                df_indices, timestamps, names = (
+                    list(filtered_df.index),
+                    list(filtered_df["Timestamp (ns)"]),
+                    list(filtered_df.Name),
                 )
 
                 # Iterate through all events of filtered DataFrame
                 for i in range(len(filtered_df)):
-                    curr_df_index, curr_timestamp, evt_type = (
+                    curr_df_index, curr_timestamp, evt_type, curr_name = (
                         df_indices[i],
                         timestamps[i],
                         event_types[i],
+                        names[i],
                     )
 
                     if evt_type == "Enter":
                         # Add current dataframe index and timestamp to stack
-                        stack.append((curr_df_index, curr_timestamp))
+                        stack.append((curr_df_index, curr_timestamp, curr_name))
                     else:
-                        # Pop corresponding enter event's dataframe index
-                        # and timestamp
-                        enter_df_index, enter_timestamp = stack.pop()
+                        # We want to pop from the stack until we find the corresponding
+                        # "Enter" Event
+                        enter_name = None
+                        event_found = True
+                        while enter_name != curr_name:
+                            # if we've gone through the entire stack and haven't found
+                            # the matching event, then the event wasn't in the stack
+                            if len(stack) == 0:
+                                event_found = False
+                            # Pop corresponding enter event's dataframe index
+                            # and timestamp
+                            enter_df_index, enter_timestamp, enter_name = stack.pop()
+
+                        # If we didn't find the corresponding event then it's unmatched
+                        if not event_found:
+                            continue
 
                         # Fill in the lists with the matching values
                         matching_events[enter_df_index] = curr_df_index
