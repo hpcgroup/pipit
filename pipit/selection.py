@@ -52,7 +52,6 @@ class BooleanExpr:
         operator=None,
         value=None,
         expr=None,
-        validate="keep",
     ):
         """
         Args:
@@ -72,8 +71,6 @@ class BooleanExpr:
                 you may provide a Pandas query expression, which will be supplied to
                 pandas.DataFrame.eval.
                 See https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.eval.html. # noqa: E501
-
-            validate (optional): Whether or not to validate the Trace. Can be "keep" or False.
         """
         self.field = field
         self.operator = operator
@@ -143,32 +140,34 @@ class BooleanExpr:
             result = ~trace.events[self.field].isin(value)
 
         elif self.operator == "between":
-            field1 = self.field
-            field2 = self.field
+            start = self.value[0]
+            end = self.value[1]
 
-            if self.field == "Timestamp (ns)":
-                trace._match_events()
-                field2 = "_matching_timestamp"
-
-            result = (
-                (trace.events["Event Type"] == "Instant")
-                & (trace.events[field1] >= value[0])
-                & (trace.events[field1] <= value[1])
-            ) | (
-                (trace.events["Event Type"] == "Enter")
-                & (trace.events[field2] >= value[0])
-                & (trace.events[field1] <= value[1])
-            )
+            if self.field != "Timestamp (ns)":
+                result = (trace.events[self.field] >= start) & (
+                    trace.events[self.field] <= end
+                )
+            else:
+                result = (
+                    (
+                        (trace.events["Event Type"] == "Instant")
+                        & (trace.events["Timestamp (ns)"] >= start)
+                        & (trace.events["Timestamp (ns)"] <= end)
+                    )
+                    | (
+                        (trace.events["Event Type"] == "Enter")
+                        & (trace.events["_matching_timestamp"] >= start)
+                        & (trace.events["Timestamp (ns)"] <= end)
+                    )
+                    | (
+                        (trace.events["Event Type"] == "Leave")
+                        & (trace.events["Timestamp (ns)"] >= start)
+                        & (trace.events["_matching_timestamp"] <= end)
+                    )
+                )
 
         else:
             raise Exception("Invalid filter instance")
-
-        # Ensure that if an Enter/Leave row evaluates to True, then so does its
-        # matching row
-        if self.validate == "keep":
-            trace._match_events()
-            matching = trace.events[result]["_matching_event"].dropna().tolist()
-            result[matching] = True
 
         return result
 
