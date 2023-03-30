@@ -119,29 +119,22 @@ class Trace:
                         # Add current dataframe index and timestamp to stack
                         stack.append((curr_df_index, curr_timestamp, curr_name))
                     else:
-                        # We want to pop from the stack until we find the corresponding
-                        # "Enter" Event
-                        enter_name = None
-                        event_found = True
-                        while enter_name != curr_name:
-                            # if we've gone through the entire stack and haven't found
-                            # the matching event, then the event wasn't in the stack
-                            if len(stack) == 0:
-                                event_found = False
-                            # Pop corresponding enter event's dataframe index
-                            # and timestamp
-                            enter_df_index, enter_timestamp, enter_name = stack.pop()
+                        # We want to pop from the stack until
+                        # we find the corresponding "Enter" Event
+                        enter_name, i = None, 0
+                        while enter_name != curr_name and i < len(stack):
+                            enter_df_index, enter_timestamp, enter_name = stack[i]
+                            i += 1
 
-                        # If we didn't find the corresponding event then it's unmatched
-                        if not event_found:
+                        if enter_name == curr_name:
+                            # Fill in the lists with the matching values
+                            matching_events[enter_df_index] = curr_df_index
+                            matching_events[curr_df_index] = enter_df_index
+
+                            matching_times[enter_df_index] = curr_timestamp
+                            matching_times[curr_df_index] = enter_timestamp
+                        else:
                             continue
-
-                        # Fill in the lists with the matching values
-                        matching_events[enter_df_index] = curr_df_index
-                        matching_events[curr_df_index] = enter_df_index
-
-                        matching_times[enter_df_index] = curr_timestamp
-                        matching_times[curr_df_index] = enter_timestamp
 
             self.events["_matching_event"] = matching_events
             self.events["_matching_timestamp"] = matching_times
