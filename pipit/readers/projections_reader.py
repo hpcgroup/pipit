@@ -295,6 +295,7 @@ class ProjectionsReader:
             self.executable_location + "." + str(pe_num) + ".log.gz", "rt"
         )
 
+
         # Basing read on projections log reader and log entry viewer
         # Iterated through every line in the file and adds to dict
         for line in log_file:
@@ -780,6 +781,15 @@ class ProjectionsReader:
                 data["Process"].append(pe_num)
                 data["Details"].append(details)
 
+        # Making sure that the log file ends with END_COMPUTATION
+        if len(data["Name"]) > 0 and data["Name"][-1] != "Computation":
+            time = data["Timestamp (ns)"][-1]
+            data["Name"].append("Computation")
+            data["Event Type"].append("Leave")
+            data["Timestamp (ns)"].append(time)
+            data["Process"].append(pe_num)
+            data["Details"].append(None)
+            
         log_file.close()
         df = pandas.DataFrame(data)
         return df
