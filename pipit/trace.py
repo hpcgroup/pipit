@@ -127,6 +127,9 @@ class Trace:
                             i += 1
 
                         if enter_name == curr_name:
+                            # remove matched event from the stack
+                            del stack[i - 1]
+
                             # Fill in the lists with the matching values if event found
                             matching_events[enter_df_index] = curr_df_index
                             matching_events[curr_df_index] = enter_df_index
