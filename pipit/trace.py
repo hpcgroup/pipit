@@ -13,7 +13,7 @@ class Trace:
     or more dataframes.
     """
 
-    def __init__(self, definitions, events):
+    def __init__(self, definitions, events, start=None, end=None):
         """Create a new Trace object."""
         self.definitions = definitions
         self.events = events
@@ -26,6 +26,9 @@ class Trace:
         # will store columns names for inc/exc metrics
         self.inc_metrics = []
         self.exc_metrics = []
+
+        self.start = start or self.events["Timestamp (ns)"].min()
+        self.end = end or self.events["Timestamp (ns)"].max()
 
         # Validate columns
         required_cols = {"Timestamp (ns)", "Event Type", "Name", "Process"}
@@ -482,3 +485,16 @@ class Trace:
         """
         results = self._eval(*args, **kwargs)
         return self.loc[results]
+
+    def trim(self, start=None, end=None):
+        start = start or self.start
+        end = end or self.end
+
+        events = self.query("Timestamp (ns)", "between", [start, end]).events.copy(
+            deep=False
+        )
+
+        for col in ["Timestamp (ns)", "_matching_timestamp"]:
+            events[col] = events[col].clip(start, end)
+
+        return Trace(self.definitions, events, start=start, end=end)

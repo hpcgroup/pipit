@@ -19,7 +19,7 @@ class LocIndexer:
 
         if type(item) == pd.DataFrame:
             # Wrap in new Trace instance
-            return Trace(self.trace.definitions, item)
+            return Trace(self.trace.definitions, item, self.start, self.end)
 
         return item
 
@@ -139,6 +139,8 @@ class BooleanExpr:
             result = ~trace.events[self.field].isin(value)
 
         elif self.operator == "between":
+            trace._match_events()
+
             start = self.value[0]
             end = self.value[1]
 
@@ -147,6 +149,8 @@ class BooleanExpr:
                     trace.events[self.field] <= end
                 )
             else:
+                trace.start = start
+                trace.end = end
                 result = (
                     (
                         (trace.events["Event Type"] == "Instant")

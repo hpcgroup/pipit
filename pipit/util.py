@@ -1,4 +1,5 @@
 import re
+import numbers
 
 
 def format_time(n: float) -> str:
@@ -34,7 +35,7 @@ def format_time(n: float) -> str:
 
 def parse_time(time) -> float:
     """Converts human-readable time to ns"""
-    if type(time) == float or type(time) == int:
+    if isinstance(time, numbers.Number):
         return time
 
     if type(time) == list:
