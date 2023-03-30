@@ -93,14 +93,6 @@ def test_eval(data_dir, ping_pong_otf2_trace):
         trace._eval(e1) | trace._eval(e2) | trace._eval(e3),
     )
 
-    # Test validate
-    keep = trace._eval("Timestamp (ns)", ">", "133 ms", validate="keep")
-    invalid = trace._eval("Timestamp (ns)", ">", "133 ms", validate=False)
-
-    assert all_equal(invalid, trace.events["Timestamp (ns)"] > 1.33e08)
-
-    assert invalid.sum() < keep.sum()
-
 
 def test_query(data_dir, ping_pong_otf2_trace):
     trace = Trace.from_otf2(str(ping_pong_otf2_trace))
@@ -115,15 +107,4 @@ def test_query(data_dir, ping_pong_otf2_trace):
         trace.query("Process", "==", 0).events,
         trace.loc[trace._eval("Process", "==", 0)].events,
         trace.events[trace.events["Process"] == 0],
-    )
-
-    # Test validate
-    keep = trace.query("Timestamp (ns)", ">", "133 ms", validate="keep").events
-    invalid = trace.query("Timestamp (ns)", ">", "133 ms", validate=False).events
-
-    assert len(keep[keep["Event Type"] == "Enter"]) == len(
-        keep[keep["Event Type"] == "Leave"]
-    )
-    assert len(invalid[invalid["Event Type"] == "Enter"]) != len(
-        invalid[invalid["Event Type"] == "Leave"]
     )

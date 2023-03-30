@@ -487,14 +487,25 @@ class Trace:
         return self.loc[results]
 
     def trim(self, start=None, end=None):
+        """Filters to events that occur within a time range, and trims functions so that
+        their Enter/Leave timestamps are bounded by [start, end].
+
+        Args:
+            start (float, optional): Start of time range. Defaults to self.start.
+            end (float, optional): End of time range. Defaults to self.end.
+
+        Returns:
+            pipit.Trace: new Trace instance containing a view of the events DataFrame
+        """
         start = start or self.start
         end = end or self.end
 
-        events = self.query("Timestamp (ns)", "between", [start, end]).events.copy(
-            deep=False
-        )
+        # Filter to time range
+        events = self.query("Timestamp (ns)", "between", [start, end]).events
 
+        # Clip values to be in [start, end]
         for col in ["Timestamp (ns)", "_matching_timestamp"]:
             events[col] = events[col].clip(start, end)
 
+        # Return new Trace instance containing modified events
         return Trace(self.definitions, events, start=start, end=end)

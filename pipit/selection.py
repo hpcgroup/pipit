@@ -15,13 +15,15 @@ class LocIndexer:
 
     def __getitem__(self, key):
         # Pass argument to events.loc
-        item = self.trace.events.loc[key]
+        events = self.trace.events.loc[key]
 
-        if type(item) == pd.DataFrame:
+        if type(events) == pd.DataFrame:
             # Wrap in new Trace instance
-            return Trace(self.trace.definitions, item, self.start, self.end)
+            return Trace(
+                self.trace.definitions, events, self.trace.start, self.trace.end
+            )
 
-        return item
+        return events
 
     def __setitem__(self, key, value):
         self.trace.events.loc[key] = value
@@ -141,8 +143,8 @@ class BooleanExpr:
         elif self.operator == "between":
             trace._match_events()
 
-            start = self.value[0]
-            end = self.value[1]
+            start = value[0]
+            end = value[1]
 
             if self.field != "Timestamp (ns)":
                 result = (trace.events[self.field] >= start) & (
