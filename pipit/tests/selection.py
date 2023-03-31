@@ -108,3 +108,22 @@ def test_query(data_dir, ping_pong_otf2_trace):
         trace.loc[trace._eval("Process", "==", 0)].events,
         trace.events[trace.events["Process"] == 0],
     )
+
+
+def test_crop(data_dir, ping_pong_otf2_trace):
+    trace = Trace.from_otf2(str(ping_pong_otf2_trace))
+
+    # assert all_equal(trace.trim().events, trace.events)
+    # assert all_equal(
+    #     trace.trim(0, 1).events, trace.events[trace.events["Timestamp (ns)"] == 0]
+    # )
+
+    # queried = trace.query("Timestamp (ns)", "between", [1e5, 1e6]).events
+    # trimmed = trace.trim(1e5, 1e6).events
+
+    # assert all_equal(queried.index, trimmed.index)
+
+    # assert trimmed["Timestamp (ns)"].min() >= 1e5
+    # assert trimmed["_matching_timestamp"].min() >= 1e5
+    # assert trimmed["Timestamp (ns)"].max() <= 1e6
+    # assert trimmed["_matching_timestamp"].max() <= 1e6

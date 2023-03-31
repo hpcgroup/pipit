@@ -29,7 +29,7 @@ class LocIndexer:
         self.trace.events.loc[key] = value
 
 
-class BooleanExpr:
+class Filter:
     """Represents a boolean expression that can be evaluated for each event in a
     Trace instance.
 
@@ -40,10 +40,10 @@ class BooleanExpr:
     DataFrame. It supports convenient operations, like comparison and array
     membership.
 
-    BooleanExpr instances can be shared and reused across multiple Traces. Logical
-    operators like AND, OR, and NOT can be also be applied to BooleanExpr instances.
+    Filter instances can be shared and reused across multiple Traces. Logical
+    operators like AND, OR, and NOT can be also be applied to Filter instances.
 
-    When a Trace is queried with a BooleanExpr, a new Trace instance is created
+    When a Trace is queried with a Filter, a new Trace instance is created
     containing a view of the events DataFrame of the original Trace. All of Pipit's
     analysis and plotting functions can be applied to the new Trace.
     """
@@ -54,6 +54,7 @@ class BooleanExpr:
         operator=None,
         value=None,
         expr=None,
+        trim=True,
     ):
         """
         Args:
@@ -73,11 +74,15 @@ class BooleanExpr:
                 you may provide a Pandas query expression, which will be supplied to
                 pandas.DataFrame.eval.
                 See https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.eval.html. # noqa: E501
+
+            trim (bool, optional): When filtering by timestamp, whether to trim functions
+                so that Enter/Leave timestamps are within the value. Defaults to True.
         """
         self.field = field
         self.operator = operator
         self.value = value
         self.expr = expr
+        self.trim = trim
 
     def __and__(self, other):
         return And(self, other)
@@ -90,15 +95,15 @@ class BooleanExpr:
 
     def __repr__(self):
         if self.expr is not None:
-            return f"BooleanExpr {self.expr.__repr__()}"
+            return f"Filter {self.expr.__repr__()}"
 
         else:
             return (
-                f"BooleanExpr {self.field.__repr__()} "
+                f"Filter {self.field.__repr__()} "
                 + f"{self.operator} {self.value.__repr__()}"
             )
 
-    def _eval(self, trace):
+    def _apply(self, trace):
         """Evaluate this filter on a Trace
 
         Returns a boolean vector that determines whether each row of the events
@@ -106,6 +111,8 @@ class BooleanExpr:
         to `Trace.loc` to get a subset of the Trace.
         """
         value = self.value
+        start = trace.start
+        end = trace.end
 
         # Parse value into float
         if self.field and "time" in self.field.lower():
@@ -151,8 +158,6 @@ class BooleanExpr:
                     trace.events[self.field] <= end
                 )
             else:
-                trace.start = start
-                trace.end = end
                 result = (
                     (
                         (trace.events["Event Type"] == "Instant")
@@ -171,14 +176,17 @@ class BooleanExpr:
                     )
                 )
 
-        else:
-            raise Exception("Invalid filter instance")
+        events = trace.events.loc[result].copy(deep=False)
 
-        return result
+        if self.trim:
+            for col in ["Timestamp (ns)", "_matching_timestamp"]:
+                events[col] = events[col].clip(start, end)
+
+        return Trace(trace.definitions, events)
 
 
-class And(BooleanExpr):
-    """Combines multiple BooleanExpr objects with a logical AND, such that all of the
+class And(Filter):
+    """Combines multiple Filter objects with a logical AND, such that all of the
     filters must be met."""
 
     def __init__(self, *args):
@@ -197,8 +205,8 @@ class And(BooleanExpr):
         return " And ".join(f"({x.__repr__()})" for x in self.filters)
 
 
-class Or(BooleanExpr):
-    """Combines multiple BooleanExpr objects with a logical OR, such that any of the
+class Or(Filter):
+    """Combines multiple Filter objects with a logical OR, such that any of the
     filters must be met."""
 
     def __init__(self, *args):
@@ -217,8 +225,8 @@ class Or(BooleanExpr):
         return " Or ".join(f"({x.__repr__()})" for x in self.filters)
 
 
-class Not(BooleanExpr):
-    """Inverts BooleanExpr object with a logical NOT, such that the filter must not be
+class Not(Filter):
+    """Inverts Filter object with a logical NOT, such that the filter must not be
     met."""
 
     def __init__(self, filter):

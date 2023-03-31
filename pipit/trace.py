@@ -13,7 +13,7 @@ class Trace:
     or more dataframes.
     """
 
-    def __init__(self, definitions, events, start=None, end=None):
+    def __init__(self, definitions, events):
         """Create a new Trace object."""
         self.definitions = definitions
         self.events = events
@@ -26,9 +26,6 @@ class Trace:
         # will store columns names for inc/exc metrics
         self.inc_metrics = []
         self.exc_metrics = []
-
-        self.start = start or self.events["Timestamp (ns)"].min()
-        self.end = end or self.events["Timestamp (ns)"].max()
 
         # Validate columns
         required_cols = {"Timestamp (ns)", "Event Type", "Name", "Process"}
@@ -454,58 +451,27 @@ class Trace:
 
         return LocIndexer(self)
 
-    def _eval(self, *args, **kwargs):
-        """Evaluates a boolean expression for each event in this Trace.
+    def filter(self, *args, **kwargs):
+        from .selection import Filter
 
-        Allowed inputs:
-        - BooleanExpr instance
-        - Arguments used to create a BooleanExpr instance
+        return Filter(*args, **kwargs)._apply(self)
 
-        Returns:
-            pd.Series: Boolean vector containing evaluated result for each event.
-        """
-        # import this lazily to avoid circular dependencies
-        from .selection import BooleanExpr
+    # def trim(self):
+    #     """Trims functions so that their Enter and Leave timestamps are bounded within
+    #     [self.start, self.end].
 
-        # If argument is a BooleanExpr instance, then evaluate it
-        if len(args) and isinstance(args[0], BooleanExpr):
-            return args[0]._eval(self)
-        else:
-            return self._eval(BooleanExpr(*args, **kwargs))
+    #     Args:
+    #     start (float, optional): Start of the time range.
+    #     end (float, optional): End of the time range.
 
-    def query(self, *args, **kwargs):
-        """Query events with a boolean expression.
+    #     Returns:
+    #         pipit.Trace: new Trace instance containing a view of the events DataFrame
+    #     """
+    #     events = self.events.copy(deep=False)
 
-        Allowed inputs:
-        - BooleanExpr instance
-        - Arguments used to create a BooleanExpr instance
+    #     # Clip values to be in [start, end]
+    #     for col in ["Timestamp (ns)", "_matching_timestamp"]:
+    #         events[col] = events[col].clip(self.start, self.end)
 
-        Returns:
-            pipit.Trace: new Trace instance containing a view of the events DataFrame
-        """
-        results = self._eval(*args, **kwargs)
-        return self.loc[results]
-
-    def trim(self, start=None, end=None):
-        """Filters to events that occur within a time range, and trims functions so that
-        their Enter/Leave timestamps are bounded by [start, end].
-
-        Args:
-            start (float, optional): Start of time range. Defaults to self.start.
-            end (float, optional): End of time range. Defaults to self.end.
-
-        Returns:
-            pipit.Trace: new Trace instance containing a view of the events DataFrame
-        """
-        start = start or self.start
-        end = end or self.end
-
-        # Filter to time range
-        events = self.query("Timestamp (ns)", "between", [start, end]).events
-
-        # Clip values to be in [start, end]
-        for col in ["Timestamp (ns)", "_matching_timestamp"]:
-            events[col] = events[col].clip(start, end)
-
-        # Return new Trace instance containing modified events
-        return Trace(self.definitions, events, start=start, end=end)
+    #     # Return new Trace instance containing modified events
+    #     return Trace(self.definitions, events, start=self.start, end=self.end)
