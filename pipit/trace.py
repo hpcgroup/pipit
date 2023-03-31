@@ -383,11 +383,16 @@ class Trace:
         functions = []
 
         def calc_exc_time_in_bin(func):
-            # start out with exc times being a copy of inc times
-            exc_times = func["inc_time_in_bin"].copy(deep=False)
+            # check if the numpy equivalent of the below code is faster
 
-            # Filter to events that have children
+            dfx_to_idx = {dfx: idx for (dfx, idx) in zip(func.index, [i for i in range(len(func))])}
+
+            # start out with exc times being a copy of inc times
+            exc_times = list(func["inc_time_in_bin"].copy(deep=False))
+
+            # filter to events that have children
             filtered_df = func.loc[func["_children"].notnull()]
+
             parent_df_indices, children = (
                 list(filtered_df.index),
                 filtered_df["_children"].to_list(),
@@ -395,13 +400,12 @@ class Trace:
 
             # Iterate through the events that are parents
             for i in range(len(filtered_df)):
-                curr_parent_idx, curr_children = parent_df_indices[i], children[i]
+                curr_parent_idx, curr_children = dfx_to_idx[parent_df_indices[i]], children[i]
 
                 # Only consider inc times of children in current bin
-                children_in_bin = list(set(curr_children).intersection(set(func.index)))
-                exc_times[curr_parent_idx] -= func["inc_time_in_bin"][
-                    children_in_bin
-                ].sum()
+                for child_df_idx in curr_children:
+                    if child_df_idx in dfx_to_idx:
+                        exc_times[curr_parent_idx] -= exc_times[dfx_to_idx[child_df_idx]]
 
             func["exc_time_in_bin"] = exc_times
 
