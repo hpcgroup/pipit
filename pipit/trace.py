@@ -408,6 +408,12 @@ class Trace:
             .mean()
         )
 
+    def calc_inc_time(self):
+        return self.calc_inc_metrics(["Timestamp (ns)"])
+
+    def calc_exc_time(self):
+        return self.calc_exc_metrics(["Timestamp (ns)"])
+
     def time_profile(self, num_bins=16, normalized=False):
         """Computes time contributed by each function per time interval.
 
@@ -452,7 +458,10 @@ class Trace:
         def calc_exc_time_in_bin(func):
             # check if the numpy equivalent of the below code is faster
 
-            dfx_to_idx = {dfx: idx for (dfx, idx) in zip(func.index, [i for i in range(len(func))])}
+            dfx_to_idx = {
+                dfx: idx
+                for (dfx, idx) in zip(func.index, [i for i in range(len(func))])
+            }
 
             # start out with exc times being a copy of inc times
             exc_times = list(func["inc_time_in_bin"].copy(deep=False))
@@ -467,12 +476,17 @@ class Trace:
 
             # Iterate through the events that are parents
             for i in range(len(filtered_df)):
-                curr_parent_idx, curr_children = dfx_to_idx[parent_df_indices[i]], children[i]
+                curr_parent_idx, curr_children = (
+                    dfx_to_idx[parent_df_indices[i]],
+                    children[i],
+                )
 
                 # Only consider inc times of children in current bin
                 for child_df_idx in curr_children:
                     if child_df_idx in dfx_to_idx:
-                        exc_times[curr_parent_idx] -= exc_times[dfx_to_idx[child_df_idx]]
+                        exc_times[curr_parent_idx] -= exc_times[
+                            dfx_to_idx[child_df_idx]
+                        ]
 
             func["exc_time_in_bin"] = exc_times
 
@@ -520,13 +534,15 @@ class Trace:
             total_bin_duration - profile.sum(axis=1),
         )
 
+        # Threshold for zero
+        profile.mask(profile < 0.01, 0, inplace=True)
+
         # Normalize
         if normalized:
             profile /= total_bin_duration
 
-        # Add bin_start, bin_end, and threshold for zero
+        # Add bin_start and bin_end
         profile.insert(0, "bin_start", [b[0] for b in bins])
         profile.insert(1, "bin_end", [b[1] for b in bins])
-        profile.mask(profile < 0.01, 0, inplace=True)
 
         return profile
