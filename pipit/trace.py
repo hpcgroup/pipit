@@ -452,3 +452,36 @@ class Trace:
         imbalance_df.sort_values(by=(imb_metric), axis=0, inplace=True, ascending=False)
 
         return imbalance_df
+
+    def idle_time(self, idle_functions=["Idle"], MPI_enabled=False):
+        idle_times = {"Process": [], "Idle Time": []}
+        for process in set(self.events["Process"]):
+            idle_times["Process"].append(process)
+            idle_times["Idle Time"].append(
+                self._calculate_idle_time_for_process(
+                    process, idle_functions, MPI_enabled
+                )
+            )
+        return pd.DataFrame(idle_times)
+
+    def _calculate_idle_time_for_process(
+        self, process, idle_functions=["Idle"], MPI_enabled=False
+    ):
+        # pair enter and leave rows
+        if "time.inc" not in self.events.columns:
+            self.calc_inc_metrics()
+
+        if MPI_enabled:
+            idle_functions += ["MPI_Wait", "MPI_Waitall", "MPI_Recv"]
+        # filter the dataframe to include only 'Enter' events within the specified
+        # process with the specified function names
+        df = self.events
+        filtered_df = (
+            df.loc[df["Event Type"] == "Enter"]
+            .loc[df["Process"] == process]
+            .loc[df["Name"].isin(idle_functions)]
+        )
+        print(idle_functions)
+        print(filtered_df)
+        # get the sum of the inclusive times of these events
+        return filtered_df["time.inc"].sum()
