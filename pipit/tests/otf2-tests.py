@@ -11,8 +11,8 @@ def test_events(data_dir, ping_pong_otf2_trace):
     trace = Trace.from_otf2(str(ping_pong_otf2_trace))
     events_df = trace.events
 
-    # 108 total events in ping pong trace
-    assert len(events_df) == 108
+    # 120 total events in ping pong trace
+    assert len(events_df) == 120
 
     # event types for trace (instant events are program begin/end and mpi send/recv)
     assert set(events_df["Event Type"]) == set(["Enter", "Instant", "Leave"])
@@ -28,6 +28,9 @@ def test_events(data_dir, ping_pong_otf2_trace):
             "MpiRecv",
             "MPI_Init",
             "MPI_Finalize",
+            "MPI_Comm_rank",
+            "MPI_Comm_size",
+            "int main(int, char**)",
         ]
     )
 
@@ -38,11 +41,11 @@ def test_events(data_dir, ping_pong_otf2_trace):
 
     assert len(set(events_df["Thread"])) == 1  # 1 thread per rank
 
-    assert len(events_df.loc[events_df["Process"] == 0]) == 54  # 54 events per rank
+    assert len(events_df.loc[events_df["Process"] == 0]) == 60  # 60 events per rank
 
     assert (
-        len(events_df.loc[events_df["Thread"] == 0]) == 108
-    )  # all 108 events associated with the main thread
+        len(events_df.loc[events_df["Thread"] == 0]) == 120
+    )  # all 120 events associated with the main thread
 
     # timestamps should be sorted in increasing order
     assert (np.diff(events_df["Timestamp (ns)"]) > 0).all()
@@ -52,7 +55,7 @@ def test_definitions(data_dir, ping_pong_otf2_trace):
     trace = Trace.from_otf2(str(ping_pong_otf2_trace))
     definitions_df = trace.definitions
 
-    assert len(definitions_df) == 229
+    assert len(definitions_df) == 533
 
     # 17 unique definition types in trace
     assert len(set(definitions_df["Definition Type"])) == 17
