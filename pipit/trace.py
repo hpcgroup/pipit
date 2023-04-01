@@ -57,7 +57,7 @@ class Trace:
 
         return NsightReader(filename).read()
 
-    def to_perfetto(self, filename):
+    def to_perfetto(self, filename=None):
         """Export as Chrome Tracing JSON, which can be opened
         in Perfetto."""
         from .writers.perfetto_writer import PerfettoWriter
