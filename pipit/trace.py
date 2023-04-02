@@ -453,25 +453,27 @@ class Trace:
 
         return imbalance_df
 
-    def idle_time(self, idle_functions=["Idle"], MPI_enabled=False):
+    def idle_time(self, idle_functions=["Idle"], MPI_events=False):
+        # dict for creating a new dataframe
         idle_times = {"Process": [], "Idle Time": []}
+
         for process in set(self.events["Process"]):
             idle_times["Process"].append(process)
             idle_times["Idle Time"].append(
                 self._calculate_idle_time_for_process(
-                    process, idle_functions, MPI_enabled
+                    process, idle_functions, MPI_events
                 )
             )
         return pd.DataFrame(idle_times)
 
     def _calculate_idle_time_for_process(
-        self, process, idle_functions=["Idle"], MPI_enabled=False
+        self, process, idle_functions=["Idle"], MPI_events=False
     ):
-        # pair enter and leave rows
+        # calculate inclusive metrics
         if "time.inc" not in self.events.columns:
             self.calc_inc_metrics()
 
-        if MPI_enabled:
+        if MPI_events:
             idle_functions += ["MPI_Wait", "MPI_Waitall", "MPI_Recv"]
         # filter the dataframe to include only 'Enter' events within the specified
         # process with the specified function names
