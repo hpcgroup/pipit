@@ -421,7 +421,8 @@ class Trace:
         Returns:
         A Pandas DataFrame indexed by function name that will have two columns:
         one containing the imabalance which (max / mean) time for all ranks
-        and the other containing a list of num_processes ranks with the highest imbalances
+        and the other containing a list of num_processes ranks with the highest
+        imbalances
         """
 
         num_ranks = len(set(self.events["Process"]))
