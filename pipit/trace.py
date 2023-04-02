@@ -481,7 +481,5 @@ class Trace:
             .loc[df["Process"] == process]
             .loc[df["Name"].isin(idle_functions)]
         )
-        print(idle_functions)
-        print(filtered_df)
         # get the sum of the inclusive times of these events
         return filtered_df["time.inc"].sum()
