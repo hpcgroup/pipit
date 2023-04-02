@@ -443,15 +443,11 @@ class Trace:
 
             top_n = curr_series.sort_values(ascending=False).iloc[0:num_display]
 
-            imbalance_dict[imb_metric].append(
-                top_n.values[0] / curr_series.mean()
-            )
+            imbalance_dict[imb_metric].append(top_n.values[0] / curr_series.mean())
             imbalance_dict[imb_ranks].append(list(top_n.index))
 
         imbalance_df = pd.DataFrame(imbalance_dict)
         imbalance_df.index = functions
-        imbalance_df.sort_values(
-            by=(imb_metric), axis=0, inplace=True, ascending=False
-        )
+        imbalance_df.sort_values(by=(imb_metric), axis=0, inplace=True, ascending=False)
 
         return imbalance_df
