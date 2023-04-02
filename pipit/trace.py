@@ -408,13 +408,7 @@ class Trace:
             .mean()
         )
 
-    def calc_inc_time(self):
-        return self.calc_inc_metrics(["Timestamp (ns)"])
-
-    def calc_exc_time(self):
-        return self.calc_exc_metrics(["Timestamp (ns)"])
-
-    def time_profile(self, num_bins=16, normalized=False):
+    def time_profile(self, num_bins=50, normalized=False):
         """Computes time contributed by each function per time interval.
 
         Args:
@@ -428,20 +422,15 @@ class Trace:
             pd.DataFrame
         """
 
-        self._match_caller_callee()
-        self.calc_inc_time()
+        # match caller and callee rows
+        if "_children" not in self.events.columns:
+            self._match_caller_callee()
+        if "time.inc" not in self.events.columns:
+            self.calc_inc_metrics(["Timestamp (ns)"])
 
         # Filter by functions
         all = self.events[self.events["Event Type"] == "Enter"].copy(deep=False)
-        all.rename(
-            columns={
-                "Name": "name",
-                "Timestamp (ns)": "start",
-                "_matching_timestamp": "end",
-            },
-            inplace=True,
-        )
-        names = all["name"].unique().tolist()
+        names = all["Name"].unique().tolist()
 
         # Create equal-sized bins
         edges = np.linspace(
@@ -521,7 +510,7 @@ class Trace:
             calc_exc_time_in_bin(func)
 
             # Sum across processes
-            agg = func.groupby("name")["exc_time_in_bin"].sum()
+            agg = func.groupby("Name")["exc_time_in_bin"].sum()
             functions.append(agg.to_dict())
 
         # Convert to DataFrame
