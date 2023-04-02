@@ -413,7 +413,7 @@ class Trace:
 
         Args:
             num_bins (int, optional): Number of evenly-sized time intervals to compute
-                time profile for. Defaults to 16.
+                time profile for. Defaults to 50.
 
             normalized (bool, optional): Whether to return time contribution as
                 percentage of time interval. Defaults to False.
@@ -421,7 +421,6 @@ class Trace:
         Returns:
             pd.DataFrame
         """
-
         # match caller and callee rows
         if "_children" not in self.events.columns:
             self._match_caller_callee()
@@ -442,21 +441,20 @@ class Trace:
         total_bin_duration = bin_size * len(all["Process"].unique())
 
         bins = [(edges[i], edges[i + 1]) for i in range(num_bins)]
-        functions = []
+        all_events = []
 
-        def calc_exc_time_in_bin(func):
-            # check if the numpy equivalent of the below code is faster
-
+        def calc_exc_time_in_bin(event):
+            # TODO: check if the numpy equivalent of the below code is faster
             dfx_to_idx = {
                 dfx: idx
-                for (dfx, idx) in zip(func.index, [i for i in range(len(func))])
+                for (dfx, idx) in zip(event.index, [i for i in range(len(event))])
             }
 
             # start out with exc times being a copy of inc times
-            exc_times = list(func["inc_time_in_bin"].copy(deep=False))
+            exc_times = list(event["inc_time_in_bin"].copy(deep=False))
 
             # filter to events that have children
-            filtered_df = func.loc[func["_children"].notnull()]
+            filtered_df = event.loc[event["_children"].notnull()]
 
             parent_df_indices, children = (
                 list(filtered_df.index),
@@ -477,44 +475,44 @@ class Trace:
                             dfx_to_idx[child_df_idx]
                         ]
 
-            func["exc_time_in_bin"] = exc_times
+            event["exc_time_in_bin"] = exc_times
 
         for start, end in bins:
-            # Find all functions that belong in this bin
-            func = all[~((all.start > end) | (all.end < start))].copy(deep=False)
+            # Find all events that belong in this bin
+            event = all[~((all.start > end) | (all.end < start))].copy(deep=False)
 
             # Calculate inc_time_in_bin for each function
             # Case 1 - Function starts in bin
-            func.loc[func.start >= start, "inc_time_in_bin"] = end - func.start
+            event.loc[event.start >= start, "inc_time_in_bin"] = end - event.start
 
             # Case 2 - Function ends in bin
-            func.loc[func.end <= end, "inc_time_in_bin"] = func.end - start
+            event.loc[event.end <= end, "inc_time_in_bin"] = event.end - start
 
             # Case 3 - Function spans bin
-            func.loc[
-                (func.start < start) & (func.end > end),
+            event.loc[
+                (event.start < start) & (event.end > end),
                 "inc_time_in_bin",
             ] = (
                 end - start
             )
 
             # Case 4 - Function contained in bin
-            func.loc[
-                (func.start >= start) & (func.end <= end),
+            event.loc[
+                (event.start >= start) & (event.end <= end),
                 "inc_time_in_bin",
             ] = (
-                func.end - func.start
+                event.end - event.start
             )
 
             # Calculate exc_time_in_bin by subtracting inc_time_in_bin for all children
-            calc_exc_time_in_bin(func)
+            calc_exc_time_in_bin(event)
 
             # Sum across processes
-            agg = func.groupby("Name")["exc_time_in_bin"].sum()
-            functions.append(agg.to_dict())
+            agg = event.groupby("Name")["exc_time_in_bin"].sum()
+            all_events.append(agg.to_dict())
 
         # Convert to DataFrame
-        profile = pd.DataFrame(functions, columns=names)
+        profile = pd.DataFrame(all_events, columns=names)
 
         # Add idle_time column
         profile.insert(
