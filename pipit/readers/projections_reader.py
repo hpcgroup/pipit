@@ -99,9 +99,14 @@ class STSReader:
     # to get name of entry print <name of chare + :: + name of entry>>
     def get_entry_name(self, entry_id):
         # self.entries[entry_id][1] is the chare_id (index for self.chares)
-        return (
-            self.chares[self.entries[entry_id][1]][0] + "::" + self.entries[entry_id][0]
-        )
+        if entry_id not in self.entries:
+            return ""
+        entry_name, chare_id = self.entries[entry_id]
+        ret_val = entry_name
+        if chare_id in self.chares:
+            return self.chares[chare_id][0] + "::" + ret_val
+        else:
+            return ret_val
 
     # To get the dimension of an entry
     def get_dimension(self, entry_id):
@@ -544,8 +549,8 @@ class ProjectionsReader:
                 cpu_end_time = int(line_arr[7])
                 num_perf_counts = sts_reader.get_num_perf_counts()
                 perf_counts = []
-                for i in range(8 + dimensions, 8 + dimensions + num_perf_counts):
-                    perf_counts.append(int(line_arr[i]))
+                for i in range(num_perf_counts):
+                    perf_counts.append(int(line_arr[8 + i]))
 
                 details = {
                     "From PE": pe,
