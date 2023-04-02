@@ -380,7 +380,7 @@ class Trace:
 
         return np.histogram(sizes, bins=bins, **kwargs)
 
-    def flat_profile(self, metrics=None, groupby_column="Name"):
+    def flat_profile(self, metrics=None, groupby_column="Name", per_rank=False):
         """
         Arguments:
         metrics - a string or list of strings containing the metrics to be aggregated
@@ -396,11 +396,20 @@ class Trace:
         # This first groups by both the process and the specified groupby
         # column (like name). It then sums up the metrics for each combination
         # of the process and the groupby column.
-        return (
-            self.events.loc[self.events["Event Type"] == "Enter"]
-            .groupby([groupby_column, "Process"], observed=True)[metrics]
-            .sum()
-        )
+        if (per_rank):
+            return (
+                self.events.loc[self.events["Event Type"] == "Enter"]
+                .groupby([groupby_column, "Process"], observed=True)[metrics]
+                .sum()
+            )
+        else
+            return (
+                self.events.loc[self.events["Event Type"] == "Enter"]
+                .groupby([groupby_column, "Process"], observed=True)[metrics]
+                .sum()
+                .groupby(groupby_column)
+                .mean()
+            )
 
     def load_imbalance(self, metric="time.exc", num_max=1):
         """
@@ -418,7 +427,7 @@ class Trace:
         num_ranks = len(set(self.events["Process"]))
         num_max = num_ranks if num_max > num_ranks else num_max
 
-        flat_profile = self.flat_profile(metrics=metric)
+        flat_profile = self.flat_profile(metrics=metric, per_rank=True)
 
         imbalance_dict = dict()
 
