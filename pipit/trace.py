@@ -380,7 +380,7 @@ class Trace:
 
         return np.histogram(sizes, bins=bins, **kwargs)
 
-    def flat_profile(self, metrics=None, groupby_column="Name", per_rank=False):
+    def flat_profile(self, metrics=None, groupby_column="Name", per_process=False):
         """
         Arguments:
         metrics - a string or list of strings containing the metrics to be aggregated
@@ -396,13 +396,13 @@ class Trace:
         # This first groups by both the process and the specified groupby
         # column (like name). It then sums up the metrics for each combination
         # of the process and the groupby column.
-        if (per_rank):
+        if (per_process):
             return (
                 self.events.loc[self.events["Event Type"] == "Enter"]
                 .groupby([groupby_column, "Process"], observed=True)[metrics]
                 .sum()
             )
-        else
+        else:
             return (
                 self.events.loc[self.events["Event Type"] == "Enter"]
                 .groupby([groupby_column, "Process"], observed=True)[metrics]
@@ -411,44 +411,47 @@ class Trace:
                 .mean()
             )
 
-    def load_imbalance(self, metric="time.exc", num_max=1):
+    def load_imbalance(self, metric="time.exc", num_processes=1):
         """
         Arguments:
         metric - a string denoting the metric to calculate load imbalance for
-        num_max - the number of ranks to display for each function that have the
+        num_processes - the number of ranks to display for each function that have the
         highest load imbalances
 
         Returns:
         A Pandas DataFrame indexed by function name that will have two columns:
         one containing the imabalance which (max / mean) time for all ranks
-        and the other containing a list of num_max ranks with the highest imbalances
+        and the other containing a list of num_processes ranks with the highest imbalances
         """
 
         num_ranks = len(set(self.events["Process"]))
-        num_max = num_ranks if num_max > num_ranks else num_max
+        num_display = num_ranks if num_processes > num_ranks else num_processes
 
-        flat_profile = self.flat_profile(metrics=metric, per_rank=True)
+        flat_profile = self.flat_profile(metrics=metric, per_process=True)
 
         imbalance_dict = dict()
 
-        imbalance_dict[metric + " Imbalance"] = []
-        imbalance_dict[metric + " Max Ranks"] = []
+        imb_metric = metric + ".imbalance"
+        imb_ranks = "Top processes"
+
+        imbalance_dict[imb_metric] = []
+        imbalance_dict[imb_ranks] = []
 
         functions = set(self.events.loc[self.events["Event Type"] == "Enter"]["Name"])
         for function in functions:
             curr_series = flat_profile.loc[function]
 
-            top_n = curr_series.sort_values(ascending=False).iloc[0:num_max]
+            top_n = curr_series.sort_values(ascending=False).iloc[0:num_display]
 
-            imbalance_dict[metric + " Imbalance"].append(
+            imbalance_dict[imb_metric].append(
                 top_n.values[0] / curr_series.mean()
             )
-            imbalance_dict[metric + " Max Ranks"].append(list(top_n.index))
+            imbalance_dict[imb_ranks].append(list(top_n.index))
 
         imbalance_df = pd.DataFrame(imbalance_dict)
         imbalance_df.index = functions
         imbalance_df.sort_values(
-            by=(metric + " Imbalance"), axis=0, inplace=True, ascending=False
+            by=(imb_metric), axis=0, inplace=True, ascending=False
         )
 
         return imbalance_df
