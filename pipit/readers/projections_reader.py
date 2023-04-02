@@ -460,13 +460,13 @@ class ProjectionsReader:
                 details = {
                     "From PE": pe,
                     "MType": mtype,
-                    "Entry Name": sts_reader.get_entry_name(entry),
+                    "Entry Type": "Create",
                     "Message Length": msglen,
                     "Event ID": event,
                     "Send Time": send_time,
                 }
 
-                data["Name"].append("Create")
+                data["Name"].append("Create <" + sts_reader.get_entry_name(entry) + ">")
                 data["Event Type"].append("Instant")
                 data["Timestamp (ns)"].append(time)
                 data["Process"].append(pe_num)
@@ -488,14 +488,14 @@ class ProjectionsReader:
                 details = {
                     "From PE": pe,
                     "Message Type": mtype,
-                    "Entry Name": sts_reader.get_entry_name(entry),
+                    "Entry Type": "Multicast",
                     "Message Length": msglen,
                     "Event ID": event,
                     "Send Time": send_time,
                     "Destinatopn PEs": destPEs,
                 }
 
-                data["Name"].append("Multicast")
+                data["Name"].append(sts_reader.get_entry_name(entry))
                 data["Event Type"].append("Instant")
                 data["Timestamp (ns)"].append(time)
                 data["Process"].append(pe_num)
@@ -524,7 +524,7 @@ class ProjectionsReader:
                 details = {
                     "From PE": pe,
                     "Message Type": mtype,
-                    "Entry Name": sts_reader.get_entry_name(entry),
+                    "Entry Type": "Processing",
                     "Event ID": event,
                     "Message Length": msglen,
                     "Recieve Time": recv_time,
@@ -533,7 +533,7 @@ class ProjectionsReader:
                     "perf counts list": perf_counts,
                 }
 
-                data["Name"].append("Processing")
+                data["Name"].append(sts_reader.get_entry_name(entry))
                 data["Event Type"].append("Enter")
                 data["Timestamp (ns)"].append(time)
                 data["Process"].append(pe_num)
@@ -555,18 +555,18 @@ class ProjectionsReader:
                 details = {
                     "From PE": pe,
                     "Message Type": mtype,
-                    "Entry Name": sts_reader.get_entry_name(entry),
+                    "Entry Name": "Processing",
                     "Event ID": event,
                     "Message Length": msglen,
                     "CPU End Time": cpu_end_time,
                     "perf counts list": perf_counts,
                 }
 
-                data["Name"].append("Processing")
+                data["Name"].append(sts_reader.get_entry_name(entry))
                 data["Event Type"].append("Leave")
                 data["Timestamp (ns)"].append(time)
                 data["Process"].append(pe_num)
-                data["Details"].append(sts_reader.get_entry_name(entry))
+                data["Details"].append(details)
 
             # For selective tracing - when trace is called inside code
             elif int(line_arr[0]) == ProjectionsConstants.BEGIN_TRACE:
