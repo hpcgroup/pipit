@@ -396,13 +396,13 @@ class Trace:
         # This first groups by both the process and the specified groupby
         # column (like name). It then sums up the metrics for each combination
         # of the process and the groupby column.
-        if (per_rank):
+        if per_rank:
             return (
                 self.events.loc[self.events["Event Type"] == "Enter"]
                 .groupby([groupby_column, "Process"], observed=True)[metrics]
                 .sum()
             )
-        else
+        else:
             return (
                 self.events.loc[self.events["Event Type"] == "Enter"]
                 .groupby([groupby_column, "Process"], observed=True)[metrics]
