@@ -243,7 +243,10 @@ class Trace:
             self._match_events()
 
         # only filter to enters that have a matching event
-        enter_df = self.events.loc[self.events["_matching_event"].notnull()]
+        enter_df = self.events.loc[
+            (self.events["Event Type"] == "Enter")
+            & (self.events["_matching_event"].notnull())
+        ]
 
         # calculate inclusive metric for each column specified
         for col in columns:
@@ -255,7 +258,9 @@ class Trace:
                 # the values at the enter rows from the values
                 # at the corresponding leave rows
                 self.events.loc[
-                    self.events["_matching_event"].notnull(), metric_col_name
+                    (self.events["_matching_event"].notnull())
+                    & (self.events["Event Type"] == "Enter"),
+                    metric_col_name,
                 ] = (
                     self.events[col][enter_df["_matching_event"]].values
                     - enter_df[col].values
