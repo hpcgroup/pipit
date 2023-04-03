@@ -101,32 +101,44 @@ class Trace:
                 # observed improvement in performance when using lists.
 
                 event_types = list(filtered_df["Event Type"])
-                df_indices, timestamps = list(filtered_df.index), list(
-                    filtered_df["Timestamp (ns)"]
+                df_indices, timestamps, names = (
+                    list(filtered_df.index),
+                    list(filtered_df["Timestamp (ns)"]),
+                    list(filtered_df.Name),
                 )
 
                 # Iterate through all events of filtered DataFrame
                 for i in range(len(filtered_df)):
-                    curr_df_index, curr_timestamp, evt_type = (
+                    curr_df_index, curr_timestamp, evt_type, curr_name = (
                         df_indices[i],
                         timestamps[i],
                         event_types[i],
+                        names[i],
                     )
 
                     if evt_type == "Enter":
                         # Add current dataframe index and timestamp to stack
-                        stack.append((curr_df_index, curr_timestamp))
+                        stack.append((curr_df_index, curr_timestamp, curr_name))
                     else:
-                        # Pop corresponding enter event's dataframe index
-                        # and timestamp
-                        enter_df_index, enter_timestamp = stack.pop()
+                        # We want to pop from the stack until
+                        # we find the corresponding "Enter" Event
+                        enter_name, i = None, 0
+                        while enter_name != curr_name and i < len(stack):
+                            enter_df_index, enter_timestamp, enter_name = stack[i]
+                            i += 1
 
-                        # Fill in the lists with the matching values
-                        matching_events[enter_df_index] = curr_df_index
-                        matching_events[curr_df_index] = enter_df_index
+                        if enter_name == curr_name:
+                            # remove matched event from the stack
+                            del stack[i - 1]
 
-                        matching_times[enter_df_index] = curr_timestamp
-                        matching_times[curr_df_index] = enter_timestamp
+                            # Fill in the lists with the matching values if event found
+                            matching_events[enter_df_index] = curr_df_index
+                            matching_events[curr_df_index] = enter_df_index
+
+                            matching_times[enter_df_index] = curr_timestamp
+                            matching_times[curr_df_index] = enter_timestamp
+                        else:
+                            continue
 
             self.events["_matching_event"] = matching_events
             self.events["_matching_timestamp"] = matching_times
