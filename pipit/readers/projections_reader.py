@@ -99,9 +99,14 @@ class STSReader:
     # to get name of entry print <name of chare + :: + name of entry>>
     def get_entry_name(self, entry_id):
         # self.entries[entry_id][1] is the chare_id (index for self.chares)
-        return (
-            self.chares[self.entries[entry_id][1]][0] + "::" + self.entries[entry_id][0]
-        )
+        if entry_id not in self.entries:
+            return ""
+        entry_name, chare_id = self.entries[entry_id]
+        ret_val = entry_name
+        if chare_id in self.chares:
+            return self.chares[chare_id][0] + "::" + ret_val
+        else:
+            return ret_val
 
     # To get the dimension of an entry
     def get_dimension(self, entry_id):
@@ -266,7 +271,7 @@ class ProjectionsReader:
             "Event Type": [],
             "Timestamp (ns)": [],
             "Process": [],
-            "Details": [],
+            "Attributes": [],
         }
 
     def read(self):
@@ -313,7 +318,7 @@ class ProjectionsReader:
                 data["Event Type"].append("Enter")
                 data["Timestamp (ns)"].append(time)
                 data["Process"].append(pe_num)
-                data["Details"].append(details)
+                data["Attributes"].append(details)
 
             elif int(line_arr[0]) == ProjectionsConstants.END_IDLE:
                 time = int(line_arr[1])
@@ -325,7 +330,7 @@ class ProjectionsReader:
                 data["Event Type"].append("Leave")
                 data["Timestamp (ns)"].append(time)
                 data["Process"].append(pe_num)
-                data["Details"].append(details)
+                data["Attributes"].append(details)
 
             # Pack message to be sent
             elif int(line_arr[0]) == ProjectionsConstants.BEGIN_PACK:
@@ -338,7 +343,7 @@ class ProjectionsReader:
                 data["Event Type"].append("Enter")
                 data["Timestamp (ns)"].append(time)
                 data["Process"].append(pe_num)
-                data["Details"].append(details)
+                data["Attributes"].append(details)
 
             elif int(line_arr[0]) == ProjectionsConstants.END_PACK:
                 time = int(line_arr[1])
@@ -350,7 +355,7 @@ class ProjectionsReader:
                 data["Event Type"].append("Leave")
                 data["Timestamp (ns)"].append(time)
                 data["Process"].append(pe_num)
-                data["Details"].append(details)
+                data["Attributes"].append(details)
 
             # Unpacking a received message
             elif int(line_arr[0]) == ProjectionsConstants.BEGIN_UNPACK:
@@ -363,7 +368,7 @@ class ProjectionsReader:
                 data["Event Type"].append("Enter")
                 data["Timestamp (ns)"].append(time)
                 data["Process"].append(pe_num)
-                data["Details"].append(details)
+                data["Attributes"].append(details)
 
             elif int(line_arr[0]) == ProjectionsConstants.END_UNPACK:
                 time = int(line_arr[1])
@@ -375,7 +380,7 @@ class ProjectionsReader:
                 data["Event Type"].append("Leave")
                 data["Timestamp (ns)"].append(time)
                 data["Process"].append(pe_num)
-                data["Details"].append(details)
+                data["Attributes"].append(details)
 
             elif int(line_arr[0]) == ProjectionsConstants.USER_SUPPLIED:
                 user_supplied = line_arr[1]
@@ -385,7 +390,7 @@ class ProjectionsReader:
                 data["Event Type"].append("Instant")
                 data["Timestamp (ns)"].append(-1)
                 data["Process"].append(pe_num)
-                data["Details"].append(details)
+                data["Attributes"].append(details)
 
             elif int(line_arr[0]) == ProjectionsConstants.USER_SUPPLIED_NOTE:
                 time = line_arr[1]
@@ -399,7 +404,7 @@ class ProjectionsReader:
                 data["Event Type"].append("Instant")
                 data["Timestamp (ns)"].append(time)
                 data["Process"].append(pe_num)
-                data["Details"].append(details)
+                data["Attributes"].append(details)
 
             # Not sure if this should be instant or enter/leave
             elif int(line_arr[0]) == ProjectionsConstants.USER_SUPPLIED_BRACKETED_NOTE:
@@ -421,13 +426,13 @@ class ProjectionsReader:
                 data["Event Type"].append("Enter")
                 data["Timestamp (ns)"].append(time)
                 data["Process"].append(pe_num)
-                data["Details"].append(details)
+                data["Attributes"].append(details)
 
                 data["Name"].append("User Supplied Bracketed Note")
                 data["Event Type"].append("Leave")
                 data["Timestamp (ns)"].append(end_time)
                 data["Process"].append(pe_num)
-                data["Details"].append(details)
+                data["Attributes"].append(details)
 
             # Memory Usage at timestamp
             elif int(line_arr[0]) == ProjectionsConstants.MEMORY_USAGE:
@@ -440,7 +445,7 @@ class ProjectionsReader:
                 data["Event Type"].append("Instant")
                 data["Timestamp (ns)"].append(time)
                 data["Process"].append(pe_num)
-                data["Details"].append(details)
+                data["Attributes"].append(details)
 
             # New chare create message being sent
             elif int(line_arr[0]) == ProjectionsConstants.CREATION:
@@ -455,17 +460,17 @@ class ProjectionsReader:
                 details = {
                     "From PE": pe,
                     "MType": mtype,
-                    "Entry Name": sts_reader.get_entry_name(entry),
+                    "Entry Type": "Create",
                     "Message Length": msglen,
                     "Event ID": event,
                     "Send Time": send_time,
                 }
 
-                data["Name"].append("Create")
+                data["Name"].append(sts_reader.get_entry_name(entry))
                 data["Event Type"].append("Instant")
                 data["Timestamp (ns)"].append(time)
                 data["Process"].append(pe_num)
-                data["Details"].append(details)
+                data["Attributes"].append(details)
 
             elif int(line_arr[0]) == ProjectionsConstants.CREATION_MULTICAST:
                 mtype = int(line_arr[1])
@@ -483,18 +488,18 @@ class ProjectionsReader:
                 details = {
                     "From PE": pe,
                     "Message Type": mtype,
-                    "Entry Name": sts_reader.get_entry_name(entry),
+                    "Entry Type": "Multicast",
                     "Message Length": msglen,
                     "Event ID": event,
                     "Send Time": send_time,
                     "Destinatopn PEs": destPEs,
                 }
 
-                data["Name"].append("Multicast")
+                data["Name"].append(sts_reader.get_entry_name(entry))
                 data["Event Type"].append("Instant")
                 data["Timestamp (ns)"].append(time)
                 data["Process"].append(pe_num)
-                data["Details"].append("To " + str(numPEs) + "processors")
+                data["Attributes"].append("To " + str(numPEs) + "processors")
 
             # Processing of chare (i.e. execution) ?
             elif int(line_arr[0]) == ProjectionsConstants.BEGIN_PROCESSING:
@@ -519,7 +524,7 @@ class ProjectionsReader:
                 details = {
                     "From PE": pe,
                     "Message Type": mtype,
-                    "Entry Name": sts_reader.get_entry_name(entry),
+                    "Entry Type": "Processing",
                     "Event ID": event,
                     "Message Length": msglen,
                     "Recieve Time": recv_time,
@@ -528,11 +533,11 @@ class ProjectionsReader:
                     "perf counts list": perf_counts,
                 }
 
-                data["Name"].append("Processing")
+                data["Name"].append(sts_reader.get_entry_name(entry))
                 data["Event Type"].append("Enter")
                 data["Timestamp (ns)"].append(time)
                 data["Process"].append(pe_num)
-                data["Details"].append(details)
+                data["Attributes"].append(details)
 
             elif int(line_arr[0]) == ProjectionsConstants.END_PROCESSING:
                 mtype = int(line_arr[1])
@@ -544,24 +549,24 @@ class ProjectionsReader:
                 cpu_end_time = int(line_arr[7])
                 num_perf_counts = sts_reader.get_num_perf_counts()
                 perf_counts = []
-                for i in range(8 + dimensions, 8 + dimensions + num_perf_counts):
-                    perf_counts.append(int(line_arr[i]))
+                for i in range(num_perf_counts):
+                    perf_counts.append(int(line_arr[8 + i]))
 
                 details = {
                     "From PE": pe,
                     "Message Type": mtype,
-                    "Entry Name": sts_reader.get_entry_name(entry),
+                    "Entry Name": "Processing",
                     "Event ID": event,
                     "Message Length": msglen,
                     "CPU End Time": cpu_end_time,
                     "perf counts list": perf_counts,
                 }
 
-                data["Name"].append("Processing")
+                data["Name"].append(sts_reader.get_entry_name(entry))
                 data["Event Type"].append("Leave")
                 data["Timestamp (ns)"].append(time)
                 data["Process"].append(pe_num)
-                data["Details"].append(sts_reader.get_entry_name(entry))
+                data["Attributes"].append(None)
 
             # For selective tracing - when trace is called inside code
             elif int(line_arr[0]) == ProjectionsConstants.BEGIN_TRACE:
@@ -571,7 +576,7 @@ class ProjectionsReader:
                 data["Event Type"].append("Enter")
                 data["Timestamp (ns)"].append(time)
                 data["Process"].append(pe_num)
-                data["Details"].append(None)
+                data["Attributes"].append(None)
 
             elif int(line_arr[0]) == ProjectionsConstants.END_TRACE:
                 time = int(line_arr[1])
@@ -580,7 +585,7 @@ class ProjectionsReader:
                 data["Event Type"].append("Leave")
                 data["Timestamp (ns)"].append(time)
                 data["Process"].append(pe_num)
-                data["Details"].append(None)
+                data["Attributes"].append(None)
 
             # Message Receive ?
             elif int(line_arr[0]) == ProjectionsConstants.MESSAGE_RECV:
@@ -601,7 +606,7 @@ class ProjectionsReader:
                 data["Event Type"].append("Instant")
                 data["Timestamp (ns)"].append(time)
                 data["Process"].append(pe_num)
-                data["Details"].append(details)
+                data["Attributes"].append(details)
 
             # queueing creation ?
             elif int(line_arr[0]) == ProjectionsConstants.ENQUEUE:
@@ -616,7 +621,7 @@ class ProjectionsReader:
                 data["Event Type"].append("Instant")
                 data["Timestamp (ns)"].append(time)
                 data["Process"].append(pe_num)
-                data["Details"].append(details)
+                data["Attributes"].append(details)
 
             elif int(line_arr[0]) == ProjectionsConstants.DEQUEUE:
                 mtype = int(line_arr[1])
@@ -630,7 +635,7 @@ class ProjectionsReader:
                 data["Event Type"].append("Instant")
                 data["Timestamp (ns)"].append(time)
                 data["Process"].append(pe_num)
-                data["Details"].append(details)
+                data["Attributes"].append(details)
 
             # Interrupt from different chare ?
             elif int(line_arr[0]) == ProjectionsConstants.BEGIN_INTERRUPT:
@@ -644,7 +649,7 @@ class ProjectionsReader:
                 data["Event Type"].append("Enter")
                 data["Timestamp (ns)"].append(time)
                 data["Process"].append(pe_num)
-                data["Details"].append(details)
+                data["Attributes"].append(details)
 
             elif int(line_arr[0]) == ProjectionsConstants.END_INTERRUPT:
                 time = int(line_arr[1])
@@ -657,7 +662,7 @@ class ProjectionsReader:
                 data["Event Type"].append("Leave")
                 data["Timestamp (ns)"].append(time)
                 data["Process"].append(pe_num)
-                data["Details"].append(details)
+                data["Attributes"].append(details)
 
             # Very start of the program - encapsulates every other event
             elif int(line_arr[0]) == ProjectionsConstants.BEGIN_COMPUTATION:
@@ -667,7 +672,7 @@ class ProjectionsReader:
                 data["Event Type"].append("Enter")
                 data["Timestamp (ns)"].append(time)
                 data["Process"].append(pe_num)
-                data["Details"].append(None)
+                data["Attributes"].append(None)
 
             elif int(line_arr[0]) == ProjectionsConstants.END_COMPUTATION:
                 time = int(line_arr[1])
@@ -676,7 +681,7 @@ class ProjectionsReader:
                 data["Event Type"].append("Leave")
                 data["Timestamp (ns)"].append(time)
                 data["Process"].append(pe_num)
-                data["Details"].append(None)
+                data["Attributes"].append(None)
 
             # User event (in code)
             elif int(line_arr[0]) == ProjectionsConstants.USER_EVENT:
@@ -693,7 +698,7 @@ class ProjectionsReader:
                 data["Event Type"].append("Instant")
                 data["Timestamp (ns)"].append(time)
                 data["Process"].append(pe_num)
-                data["Details"].append(details)
+                data["Attributes"].append(details)
 
             elif int(line_arr[0]) == ProjectionsConstants.USER_EVENT_PAIR:
                 user_event_id = int(line_arr[1])
@@ -715,7 +720,7 @@ class ProjectionsReader:
                 data["Event Type"].append("Instant")
                 data["Timestamp (ns)"].append(time)
                 data["Process"].append(pe_num)
-                data["Details"].append(details)
+                data["Attributes"].append(details)
 
             elif int(line_arr[0]) == ProjectionsConstants.BEGIN_USER_EVENT_PAIR:
                 user_event_id = int(line_arr[1])
@@ -735,7 +740,7 @@ class ProjectionsReader:
                 data["Event Type"].append("Enter")
                 data["Timestamp (ns)"].append(time)
                 data["Process"].append(pe_num)
-                data["Details"].append(details)
+                data["Attributes"].append(details)
 
             elif int(line_arr[0]) == ProjectionsConstants.END_USER_EVENT_PAIR:
                 user_event_id = int(line_arr[1])
@@ -755,7 +760,7 @@ class ProjectionsReader:
                 data["Event Type"].append("Leave")
                 data["Timestamp (ns)"].append(time)
                 data["Process"].append(pe_num)
-                data["Details"].append(details)
+                data["Attributes"].append(details)
 
             # User stat (in code)
             elif int(line_arr[0]) == ProjectionsConstants.USER_STAT:
@@ -778,7 +783,16 @@ class ProjectionsReader:
                 data["Event Type"].append("Instant")
                 data["Timestamp (ns)"].append(time)
                 data["Process"].append(pe_num)
-                data["Details"].append(details)
+                data["Attributes"].append(details)
+
+        # Making sure that the log file ends with END_COMPUTATION
+        if len(data["Name"]) > 0 and data["Name"][-1] != "Computation":
+            time = data["Timestamp (ns)"][-1]
+            data["Name"].append("Computation")
+            data["Event Type"].append("Leave")
+            data["Timestamp (ns)"].append(time)
+            data["Process"].append(pe_num)
+            data["Attributes"].append(None)
 
         log_file.close()
         df = pandas.DataFrame(data)
