@@ -213,7 +213,6 @@ class Trace:
             )
 
             self.events = self.events.astype({"_depth": "Int32", "_parent": "Int32"})
-
             self.events = self.events.astype(
                 {"_depth": "category", "_parent": "category"}
             )
