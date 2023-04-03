@@ -485,3 +485,136 @@ class Trace:
         )
         # get the sum of the inclusive times of these events
         return filtered_df["time.inc"].sum()
+
+    def time_profile(self, num_bins=32, normalized=False):
+        """Computes time contributed by each function per time interval.
+
+        Args:
+            num_bins (int, optional): Number of evenly-sized time intervals to compute
+                time profile for. Defaults to 50.
+            normalized (bool, optional): Whether to return time contribution as
+                percentage of time interval. Defaults to False.
+
+        Returns:
+            pd.DataFrame: Time profile of each function, where each column
+                represents a function, and each row represents a time interval.
+        """
+        # Generate metrics
+        self._match_caller_callee()
+        self.calc_inc_metrics(["Timestamp (ns)"])
+
+        # Filter by Enter rows
+        events = self.events[self.events["Event Type"] == "Enter"].copy(deep=False)
+        names = events["Name"].unique().tolist()
+
+        # Create equal-sized bins
+        edges = np.linspace(
+            self.events["Timestamp (ns)"].min(),
+            self.events["Timestamp (ns)"].max(),
+            num_bins + 1,
+        )
+        bin_size = edges[1] - edges[0]
+
+        total_bin_duration = bin_size * len(events["Process"].unique())
+
+        profile = []
+
+        def calc_exc_time_in_bin(events):
+            # TODO: check if the numpy equivalent of the below code is faster
+            dfx_to_idx = {
+                dfx: idx
+                for (dfx, idx) in zip(events.index, [i for i in range(len(events))])
+            }
+
+            # start out with exc times being a copy of inc times
+            exc_times = list(events["inc_time_in_bin"].copy(deep=False))
+
+            # filter to events that have children
+            filtered_df = events.loc[events["_children"].notnull()]
+
+            parent_df_indices, children = (
+                list(filtered_df.index),
+                filtered_df["_children"].to_list(),
+            )
+
+            # Iterate through the events that are parents
+            for i in range(len(filtered_df)):
+                curr_parent_idx, curr_children = (
+                    dfx_to_idx[parent_df_indices[i]],
+                    children[i],
+                )
+
+                # Only consider inc times of children in current bin
+                for child_df_idx in curr_children:
+                    if child_df_idx in dfx_to_idx:
+                        exc_times[curr_parent_idx] -= exc_times[
+                            dfx_to_idx[child_df_idx]
+                        ]
+
+            events["exc_time_in_bin"] = exc_times
+
+        # For each bin, determine each function's time contribution
+        for i in range(num_bins):
+            start = edges[i]
+            end = edges[i + 1]
+
+            # Find functions that belong in this bin
+            in_bin = events[
+                (events["_matching_timestamp"] > start)
+                & (events["Timestamp (ns)"] < end)
+            ].copy(deep=False)
+
+            # Calculate inc_time_in_bin for each function
+            # Case 1 - Function starts in bin
+            in_bin.loc[in_bin["Timestamp (ns)"] >= start, "inc_time_in_bin"] = (
+                end - in_bin["Timestamp (ns)"]
+            )
+
+            # Case 2 - Function ends in bin
+            in_bin.loc[in_bin["_matching_timestamp"] <= end, "inc_time_in_bin"] = (
+                in_bin["_matching_timestamp"] - start
+            )
+
+            # Case 3 - Function spans bin
+            in_bin.loc[
+                (in_bin["Timestamp (ns)"] < start)
+                & (in_bin["_matching_timestamp"] > end),
+                "inc_time_in_bin",
+            ] = (
+                end - start
+            )
+
+            # Case 4 - Function contained in bin
+            in_bin.loc[
+                (in_bin["Timestamp (ns)"] >= start)
+                & (in_bin["_matching_timestamp"] <= end),
+                "inc_time_in_bin",
+            ] = (
+                in_bin["_matching_timestamp"] - in_bin["Timestamp (ns)"]
+            )
+
+            # Calculate exc_time_in_bin by subtracting inc_time_in_bin for all children
+            calc_exc_time_in_bin(in_bin)
+
+            # Sum across all processes
+            agg = in_bin.groupby("Name")["exc_time_in_bin"].sum()
+            profile.append(agg.to_dict())
+
+        # Convert to DataFrame
+        df = pd.DataFrame(profile, columns=names)
+
+        # Add idle_time column
+        df.insert(0, "idle_time", total_bin_duration - df.sum(axis=1))
+
+        # Threshold for zero
+        df.mask(df < 0.01, 0, inplace=True)
+
+        # Normalize
+        if normalized:
+            df /= total_bin_duration
+
+        # Add bin_start and bin_end
+        df.insert(0, "bin_start", edges[:-1])
+        df.insert(0, "bin_end", edges[1:])
+
+        return df
