@@ -1,30 +1,4 @@
 from .util import parse_time
-import pandas as pd
-from pipit import Trace
-
-
-class LocIndexer:
-    """Allows for selecting a sub-region of a Trace using .loc[]
-
-    Calls pandas.DataFrame.loc for the underlying events DataFrame, and wraps the
-    result in a new Trace instance.
-    """
-
-    def __init__(self, trace):
-        self.trace = trace
-
-    def __getitem__(self, key):
-        # Pass argument to events.loc
-        events = self.trace.events.loc[key].copy(deep=False)
-
-        if type(events) == pd.DataFrame:
-            # Wrap in new Trace instance
-            return Trace(self.trace.definitions, events)
-
-        return events
-
-    def __setitem__(self, key, value):
-        self.trace.events.loc[key] = value
 
 
 class Filter:
