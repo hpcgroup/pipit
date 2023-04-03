@@ -120,16 +120,16 @@ class Trace:
                         # Add current dataframe index and timestamp to stack
                         stack.append((curr_df_index, curr_timestamp, curr_name))
                     else:
-                        # We want to pop from the stack until
-                        # we find the corresponding "Enter" Event
-                        enter_name, i = None, 0
-                        while enter_name != curr_name and i < len(stack):
+                        # we want to iterate through the stack in reverse order
+                        # until we find the corresponding "Enter" Event
+                        enter_name, i = None, len(stack) - 1
+                        while enter_name != curr_name and i > -1:
                             enter_df_index, enter_timestamp, enter_name = stack[i]
-                            i += 1
+                            i -= 1
 
                         if enter_name == curr_name:
                             # remove matched event from the stack
-                            del stack[i - 1]
+                            del stack[i + 1]
 
                             # Fill in the lists with the matching values if event found
                             matching_events[enter_df_index] = curr_df_index
