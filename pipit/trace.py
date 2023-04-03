@@ -451,27 +451,58 @@ class Trace:
 
         return LocIndexer(self)
 
-    def filter(self, *args, **kwargs):
+    def _eval(self, *args, **kwargs):
+        """Evaluates a Filter for each event in this Trace.
+
+        Allowed inputs:
+        - Arguments used to create a Filter instance
+        - One or more Filter instances
+
+        Returns:
+            pd.Series: Boolean vector containing evaluated result for each event.
+        """
         from .selection import Filter
 
-        return Filter(*args, **kwargs)._apply(self)
+        if len(kwargs) == 0 and isinstance(args[0], Filter):
+            return args[0]._eval(self)
+        else:
+            return Filter(*args, **kwargs)._eval(self)
 
-    # def trim(self):
-    #     """Trims functions so that their Enter and Leave timestamps are bounded within
-    #     [self.start, self.end].
+    def filter(self, *args, **kwargs):
+        """Filter events with a boolean filter.
 
-    #     Args:
-    #     start (float, optional): Start of the time range.
-    #     end (float, optional): End of the time range.
+        Allowed inputs:
+        - Arguments used to create a BooleanExpr instance
+        - One or more BooleanExpr instances
 
-    #     Returns:
-    #         pipit.Trace: new Trace instance containing a view of the events DataFrame
-    #     """
-    #     events = self.events.copy(deep=False)
+        Returns:
+            pipit.Trace: new Trace instance containing filtered copy of the events
+            DataFrame.
+        """
+        results = self._eval(*args, **kwargs)
+        return self.loc[results]
 
-    #     # Clip values to be in [start, end]
-    #     for col in ["Timestamp (ns)", "_matching_timestamp"]:
-    #         events[col] = events[col].clip(self.start, self.end)
+    def trim(self, start=None, end=None):
+        """Trims functions so that their Enter and Leave timestamps are bounded within
+        a time range.
 
-    #     # Return new Trace instance containing modified events
-    #     return Trace(self.definitions, events, start=self.start, end=self.end)
+        Args:
+        start (float): Start of the time range.
+        end (float): End of the time range.
+
+        Returns:
+            pipit.Trace: new Trace instance containing a view of the events DataFrame
+        """
+        self._match_events()
+
+        start = start or self.events["Timestamp (ns)"].min()
+        end = end or self.events["Timestamp (ns)"].max()
+
+        events = self.filter("Timestamp (ns)", "between", [start, end]).events
+
+        # Clip values to be in [start, end]
+        for col in ["Timestamp (ns)", "_matching_timestamp"]:
+            events[col] = events[col].clip(start, end)
+
+        # Return new Trace instance containing modified events
+        return Trace(self.definitions, events)

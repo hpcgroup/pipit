@@ -15,13 +15,11 @@ class LocIndexer:
 
     def __getitem__(self, key):
         # Pass argument to events.loc
-        events = self.trace.events.loc[key]
+        events = self.trace.events.loc[key].copy(deep=False)
 
         if type(events) == pd.DataFrame:
             # Wrap in new Trace instance
-            return Trace(
-                self.trace.definitions, events, self.trace.start, self.trace.end
-            )
+            return Trace(self.trace.definitions, events)
 
         return events
 
@@ -103,7 +101,7 @@ class Filter:
                 + f"{self.operator} {self.value.__repr__()}"
             )
 
-    def _apply(self, trace):
+    def _eval(self, trace):
         """Evaluate this filter on a Trace
 
         Returns a boolean vector that determines whether each row of the events
@@ -111,8 +109,6 @@ class Filter:
         to `Trace.loc` to get a subset of the Trace.
         """
         value = self.value
-        start = trace.start
-        end = trace.end
 
         # Parse value into float
         if self.field and "time" in self.field.lower():
@@ -176,13 +172,7 @@ class Filter:
                     )
                 )
 
-        events = trace.events.loc[result].copy(deep=False)
-
-        if self.trim:
-            for col in ["Timestamp (ns)", "_matching_timestamp"]:
-                events[col] = events[col].clip(start, end)
-
-        return Trace(trace.definitions, events)
+        return result
 
 
 class And(Filter):

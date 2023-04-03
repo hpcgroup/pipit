@@ -67,63 +67,63 @@ def test_eval(data_dir, ping_pong_otf2_trace):
         & (trace.events["Timestamp (ns)"] < 1.996e8),
     )
 
-    # Test that "between" returns functions that span the time range
-    assert (
-        "int main(int, char**)"
-        in trace.query("Timestamp (ns)", "between", [3.50e05, 3.51e5])
-        .events["Name"]
-        .values
-    )
-
     # Test logical operators NOT, AND, and OR
-    from pipit.selection import BooleanExpr
+    from pipit.selection import Filter
 
-    e1 = BooleanExpr("Timestamp (ns)", "between", ["130.52 ms", "136.57 ms"])
-    e2 = BooleanExpr("Name", "in", ["MPI_Send", "MPI_Recv"])
-    e3 = BooleanExpr("Process", "==", 0)
+    f1 = Filter("Timestamp (ns)", "between", ["130.52 ms", "136.57 ms"])
+    f2 = Filter("Name", "in", ["MPI_Send", "MPI_Recv"])
+    f3 = Filter("Process", "==", 0)
 
-    assert all_equal(trace._eval(~e3), ~trace._eval(e3))
+    assert all_equal(trace._eval(~f3), ~trace._eval(f3))
 
     assert all_equal(
-        trace._eval(e1 & e2 & e3),
-        trace._eval(e1) & trace._eval(e2) & trace._eval(e3),
+        trace._eval(f1 & f2 & f3),
+        trace._eval(f1) & trace._eval(f2) & trace._eval(f3),
     )
     assert all_equal(
-        trace._eval(e1 | e2 | e3),
-        trace._eval(e1) | trace._eval(e2) | trace._eval(e3),
+        trace._eval(f1 | f2 | f3),
+        trace._eval(f1) | trace._eval(f2) | trace._eval(f3),
     )
 
 
-def test_query(data_dir, ping_pong_otf2_trace):
+def test_filter(data_dir, ping_pong_otf2_trace):
     trace = Trace.from_otf2(str(ping_pong_otf2_trace))
 
     assert all_equal(
-        trace.query("Process", "==", 0).definitions,
+        trace.filter("Process", "==", 0).definitions,
         trace.loc[trace._eval("Process", "==", 0)].definitions,
         trace.definitions,
     )
 
     assert all_equal(
-        trace.query("Process", "==", 0).events,
+        trace.filter("Process", "==", 0).events,
         trace.loc[trace._eval("Process", "==", 0)].events,
         trace.events[trace.events["Process"] == 0],
     )
 
+    # Test that "between" returns functions that span the time range
+    assert (
+        "int main(int, char**)"
+        in trace.filter("Timestamp (ns)", "between", [3.50e05, 3.51e5])
+        .events["Name"]
+        .values
+    )
 
-def test_crop(data_dir, ping_pong_otf2_trace):
+
+def test_trim(data_dir, ping_pong_otf2_trace):
     trace = Trace.from_otf2(str(ping_pong_otf2_trace))
 
-    # assert all_equal(trace.trim().events, trace.events)
-    # assert all_equal(
-    #     trace.trim(0, 1).events, trace.events[trace.events["Timestamp (ns)"] == 0]
-    # )
+    assert all_equal(trace.trim().events, trace.events)
+    assert all_equal(
+        trace.trim(0, 1).events, trace.events[trace.events["Timestamp (ns)"] == 0]
+    )
 
-    # queried = trace.query("Timestamp (ns)", "between", [1e5, 1e6]).events
-    # trimmed = trace.trim(1e5, 1e6).events
+    filtered = trace.filter("Timestamp (ns)", "between", [1e5, 1e6]).events
+    trimmed = trace.trim(1e5, 1e6).events
 
-    # assert all_equal(queried.index, trimmed.index)
+    assert all_equal(filtered.index, trimmed.index)
 
-    # assert trimmed["Timestamp (ns)"].min() >= 1e5
-    # assert trimmed["_matching_timestamp"].min() >= 1e5
-    # assert trimmed["Timestamp (ns)"].max() <= 1e6
-    # assert trimmed["_matching_timestamp"].max() <= 1e6
+    assert trimmed["Timestamp (ns)"].min() >= 1e5
+    assert trimmed["_matching_timestamp"].min() >= 1e5
+    assert trimmed["Timestamp (ns)"].max() <= 1e6
+    assert trimmed["_matching_timestamp"].max() <= 1e6
