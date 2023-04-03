@@ -660,7 +660,7 @@ class Trace:
         Returns:
             pd.Series: Boolean vector containing evaluated result for each event.
         """
-        from .selection import Filter
+        from .filter import Filter
 
         if len(kwargs) == 0 and isinstance(args[0], Filter):
             return args[0]._eval(self)

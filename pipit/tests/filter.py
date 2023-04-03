@@ -48,7 +48,7 @@ def test_eval(data_dir, ping_pong_otf2_trace):
     )
 
     # Test logical operators NOT, AND, and OR
-    from pipit.selection import Filter
+    from pipit.filter import Filter
 
     f1 = Filter("Timestamp (ns)", "between", ["130.52 ms", "136.57 ms"])
     f2 = Filter("Name", "in", ["MPI_Send", "MPI_Recv"])
