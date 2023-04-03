@@ -472,8 +472,8 @@ class Trace:
         """Filter events with a boolean filter.
 
         Allowed inputs:
-        - Arguments used to create a BooleanExpr instance
-        - One or more BooleanExpr instances
+        - Arguments used to create a Filter instance
+        - One or more Filter instances
 
         Returns:
             pipit.Trace: new Trace instance containing filtered copy of the events
