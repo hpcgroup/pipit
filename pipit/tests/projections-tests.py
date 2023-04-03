@@ -18,22 +18,46 @@ def test_events(data_dir, ping_pong_projections_trace):
 
     # all event names in the trace
     assert set(events_df["Name"]) == {
-        "Idle",
-        "Create",
-        "Processing",
         "Computation",
-        "Unpack",
+        "Idle",
         "Pack",
+        "Ping1()",
+        "Ping2()",
+        "Ping3()",
+        "PingC()",
+        "PingC(IdMsg* impl_msg)",
+        "PingF()",
+        "PingMarshall()",
+        "Unpack",
+        "dummy_thread_ep",
+        "exchange(IdMsg* impl_msg)",
+        "maindone()",
+        "recv(PingMsg* impl_msg)",
+        "recvHandle(const CkNcpyBuffer &destInfo)",
+        "recv_zerocopy(CkNcpyBuffer ncpyBuffer_msg, int size)",
+        "remoteDoneInserting()",
+        "start(const bool &reportTime)",
+        "traceProjectionsParallelShutdown(int impl_noname_8)",
+        "trecv(PingMsg* impl_msg)",
+        "updateLocation(const CkArrayIndex &idx, const CkLocEntry &e)",
     }
 
-    # PE 1 has 68 create events
+    # PE 1 has 68 create events (which are the only instant events)
     assert (
-        len(events_df.loc[events_df["Process"] == 1].loc[events_df["Name"] == "Create"])
+        len(
+            events_df.loc[events_df["Process"] == 1].loc[
+                events_df["Event Type"] == "Instant"
+            ]
+        )
         == 68
     )
-    # PE 0 has 77 create events
+    # PE 0 has 77 create events (which are the only instant events)
     assert (
-        len(events_df.loc[events_df["Process"] == 0].loc[events_df["Name"] == "Create"])
+        len(
+            events_df.loc[events_df["Process"] == 0].loc[
+                events_df["Event Type"] == "Instant"
+            ]
+        )
         == 77
     )
 
