@@ -491,7 +491,7 @@ class Trace:
 
         Args:
             num_bins (int, optional): Number of evenly-sized time intervals to compute
-                time profile for. Defaults to 50.
+                time profile for. Defaults to 32.
             normalized (bool, optional): Whether to return time contribution as
                 percentage of time interval. Defaults to False.
 
