@@ -4,6 +4,7 @@
 # SPDX-License-Identifier: MIT
 
 import numpy as np
+import pandas as pd
 
 
 class Trace:
@@ -15,6 +16,15 @@ class Trace:
         """Create a new Trace object."""
         self.definitions = definitions
         self.events = events
+
+        # list of numeric columns which we can calculate inc/exc metrics with
+        self.numeric_cols = list(
+            self.events.select_dtypes(include=[np.number]).columns.values
+        )
+
+        # will store columns names for inc/exc metrics
+        self.inc_metrics = []
+        self.exc_metrics = []
 
     @staticmethod
     def from_otf2(dirname, num_processes=None):
@@ -91,32 +101,44 @@ class Trace:
                 # observed improvement in performance when using lists.
 
                 event_types = list(filtered_df["Event Type"])
-                df_indices, timestamps = list(filtered_df.index), list(
-                    filtered_df["Timestamp (ns)"]
+                df_indices, timestamps, names = (
+                    list(filtered_df.index),
+                    list(filtered_df["Timestamp (ns)"]),
+                    list(filtered_df.Name),
                 )
 
                 # Iterate through all events of filtered DataFrame
                 for i in range(len(filtered_df)):
-                    curr_df_index, curr_timestamp, evt_type = (
+                    curr_df_index, curr_timestamp, evt_type, curr_name = (
                         df_indices[i],
                         timestamps[i],
                         event_types[i],
+                        names[i],
                     )
 
                     if evt_type == "Enter":
                         # Add current dataframe index and timestamp to stack
-                        stack.append((curr_df_index, curr_timestamp))
+                        stack.append((curr_df_index, curr_timestamp, curr_name))
                     else:
-                        # Pop corresponding enter event's dataframe index
-                        # and timestamp
-                        enter_df_index, enter_timestamp = stack.pop()
+                        # we want to iterate through the stack in reverse order
+                        # until we find the corresponding "Enter" Event
+                        enter_name, i = None, len(stack) - 1
+                        while enter_name != curr_name and i > -1:
+                            enter_df_index, enter_timestamp, enter_name = stack[i]
+                            i -= 1
 
-                        # Fill in the lists with the matching values
-                        matching_events[enter_df_index] = curr_df_index
-                        matching_events[curr_df_index] = enter_df_index
+                        if enter_name == curr_name:
+                            # remove matched event from the stack
+                            del stack[i + 1]
 
-                        matching_times[enter_df_index] = curr_timestamp
-                        matching_times[curr_df_index] = enter_timestamp
+                            # Fill in the lists with the matching values if event found
+                            matching_events[enter_df_index] = curr_df_index
+                            matching_events[curr_df_index] = enter_df_index
+
+                            matching_times[enter_df_index] = curr_timestamp
+                            matching_times[curr_df_index] = enter_timestamp
+                        else:
+                            continue
 
             self.events["_matching_event"] = matching_events
             self.events["_matching_timestamp"] = matching_times
@@ -138,10 +160,17 @@ class Trace:
                 self.events
             )
 
+            # match events so we can
+            # ignore unmatched ones
+            self._match_events()
+
             # only use enter and leave rows
             # to determine calling relationships
             enter_leave_df = self.events.loc[
-                self.events["Event Type"].isin(["Enter", "Leave"])
+                (
+                    self.events["Event Type"].isin(["Enter", "Leave"])
+                    & (self.events["_matching_event"].notnull())
+                )
             ]
 
             # list of processes and/or threads to iterate over
@@ -217,43 +246,78 @@ class Trace:
                 {"_depth": "category", "_parent": "category"}
             )
 
-    def calc_inc_time(self):
-        # Adds "time.inc" column
-        if "time.inc" not in self.events.columns:
-            if "_matching_timestamp" not in self.events.columns:
-                self._match_events()
+    def calc_inc_metrics(self, columns=None):
+        # if no columns are specified by the user, then we calculate
+        # inclusive metrics for all the numeric columns in the trace
+        columns = self.numeric_cols if columns is None else columns
 
-            # Uses matching timestamp to calculate the inclusive time
-            self.events.loc[self.events["Event Type"] == "Enter", "time.inc"] = (
-                self.events["_matching_timestamp"] - self.events["Timestamp (ns)"]
-            )
+        # pair enter and leave rows
+        if "_matching_event" not in self.events.columns:
+            self._match_events()
 
-    def calc_exc_time(self):
-        if "time.exc" not in self.events.columns:
-            if "time.inc" not in self.events.columns:
-                self.calc_inc_time()
-            if "_children" not in self.events.columns:
-                self._match_caller_callee()
+        # only filter to enters that have a matching event
+        enter_df = self.events.loc[
+            (self.events["Event Type"] == "Enter")
+            & (self.events["_matching_event"].notnull())
+        ]
 
-            # start out with exc times being a copy of inc times
-            exc_times = self.events["time.inc"].to_list()
-            inc_times = self.events["time.inc"].to_list()
+        # calculate inclusive metric for each column specified
+        for col in columns:
+            # name of column for this inclusive metric
+            metric_col_name = ("time" if col == "Timestamp (ns)" else col) + ".inc"
 
-            # Filter to events that have children
-            filtered_df = self.events.loc[self.events["_children"].notnull()]
-            parent_df_indices, children = (
-                list(filtered_df.index),
-                filtered_df["_children"].to_list(),
-            )
+            if metric_col_name not in self.events.columns:
+                # calculate the inclusive metric by subtracting
+                # the values at the enter rows from the values
+                # at the corresponding leave rows
+                self.events.loc[
+                    (self.events["_matching_event"].notnull())
+                    & (self.events["Event Type"] == "Enter"),
+                    metric_col_name,
+                ] = (
+                    self.events[col][enter_df["_matching_event"]].values
+                    - enter_df[col].values
+                )
 
-            # Iterate through the events that are parents
-            for i in range(len(filtered_df)):
-                curr_parent_idx, curr_children = parent_df_indices[i], children[i]
-                for child_idx in curr_children:
-                    # Subtract child's inclusive time to update parent's exclusive time
-                    exc_times[curr_parent_idx] -= inc_times[child_idx]
+                self.inc_metrics.append(metric_col_name)
 
-            self.events["time.exc"] = exc_times
+    def calc_exc_metrics(self, columns=None):
+        # calculate exc metrics for all numeric columns if not specified
+        columns = self.numeric_cols if columns is None else columns
+
+        # match caller and callee rows
+        self._match_caller_callee()
+
+        # exclusive metrics only change for rows that have children
+        filtered_df = self.events.loc[self.events["_children"].notnull()]
+        parent_df_indices, children = (
+            list(filtered_df.index),
+            filtered_df["_children"].to_list(),
+        )
+
+        for col in columns:
+            # get the corresponding inclusive column name for this metric
+            inc_col_name = ("time" if col == "Timestamp (ns)" else col) + ".inc"
+            if inc_col_name not in self.events.columns:
+                self.calc_inc_metrics([col])
+
+            # name of column for this exclusive metric
+            metric_col_name = ("time" if col == "Timestamp (ns)" else col) + ".exc"
+
+            if metric_col_name not in self.events.columns:
+                # exc metric starts out as a copy of the inc metric values
+                exc_values = self.events[inc_col_name].to_list()
+                inc_values = self.events[inc_col_name].to_list()
+
+                for i in range(len(filtered_df)):
+                    curr_parent_idx, curr_children = parent_df_indices[i], children[i]
+                    for child_idx in curr_children:
+                        # subtract each child's inclusive metric from the total
+                        # to calculate the exclusive metric for the parent
+                        exc_values[curr_parent_idx] -= inc_values[child_idx]
+
+                self.events[metric_col_name] = exc_values
+                self.exc_metrics.append(metric_col_name)
 
     def comm_matrix(self, output="size"):
         """
@@ -345,3 +409,242 @@ class Trace:
         sizes = messages["Attributes"].map(lambda x: x["msg_length"])
 
         return np.histogram(sizes, bins=bins, **kwargs)
+
+    def flat_profile(self, metrics=None, groupby_column="Name", per_process=False):
+        """
+        Arguments:
+        metrics - a string or list of strings containing the metrics to be aggregated
+        groupby_column - a string or list containing the columns to be grouped by
+
+        Returns:
+        A Pandas DataFrame that will have the aggregated metrics
+        for the grouped by columns.
+        """
+
+        metrics = self.inc_metrics + self.exc_metrics if metrics is None else metrics
+
+        # This first groups by both the process and the specified groupby
+        # column (like name). It then sums up the metrics for each combination
+        # of the process and the groupby column.
+        if per_process:
+            return (
+                self.events.loc[self.events["Event Type"] == "Enter"]
+                .groupby([groupby_column, "Process"], observed=True)[metrics]
+                .sum()
+            )
+        else:
+            return (
+                self.events.loc[self.events["Event Type"] == "Enter"]
+                .groupby([groupby_column, "Process"], observed=True)[metrics]
+                .sum()
+                .groupby(groupby_column)
+                .mean()
+            )
+
+    def load_imbalance(self, metric="time.exc", num_processes=1):
+        """
+        Arguments:
+        metric - a string denoting the metric to calculate load imbalance for
+        num_processes - the number of ranks to display for each function that have the
+        highest load imbalances
+
+        Returns:
+        A Pandas DataFrame indexed by function name that will have two columns:
+        one containing the imabalance which (max / mean) time for all ranks
+        and the other containing a list of num_processes ranks with the highest
+        imbalances
+        """
+
+        num_ranks = len(set(self.events["Process"]))
+        num_display = num_ranks if num_processes > num_ranks else num_processes
+
+        flat_profile = self.flat_profile(metrics=metric, per_process=True)
+
+        imbalance_dict = dict()
+
+        imb_metric = metric + ".imbalance"
+        imb_ranks = "Top processes"
+
+        imbalance_dict[imb_metric] = []
+        imbalance_dict[imb_ranks] = []
+
+        functions = set(self.events.loc[self.events["Event Type"] == "Enter"]["Name"])
+        for function in functions:
+            curr_series = flat_profile.loc[function]
+
+            top_n = curr_series.sort_values(ascending=False).iloc[0:num_display]
+
+            imbalance_dict[imb_metric].append(top_n.values[0] / curr_series.mean())
+            imbalance_dict[imb_ranks].append(list(top_n.index))
+
+        imbalance_df = pd.DataFrame(imbalance_dict)
+        imbalance_df.index = functions
+        imbalance_df.sort_values(by=(imb_metric), axis=0, inplace=True, ascending=False)
+
+        return imbalance_df
+
+    def idle_time(self, idle_functions=["Idle"], MPI_events=False):
+        # dict for creating a new dataframe
+        idle_times = {"Process": [], "Idle Time": []}
+
+        for process in set(self.events["Process"]):
+            idle_times["Process"].append(process)
+            idle_times["Idle Time"].append(
+                self._calculate_idle_time_for_process(
+                    process, idle_functions, MPI_events
+                )
+            )
+        return pd.DataFrame(idle_times)
+
+    def _calculate_idle_time_for_process(
+        self, process, idle_functions=["Idle"], MPI_events=False
+    ):
+        # calculate inclusive metrics
+        if "time.inc" not in self.events.columns:
+            self.calc_inc_metrics()
+
+        if MPI_events:
+            idle_functions += ["MPI_Wait", "MPI_Waitall", "MPI_Recv"]
+        # filter the dataframe to include only 'Enter' events within the specified
+        # process with the specified function names
+        df = self.events
+        filtered_df = (
+            df.loc[df["Event Type"] == "Enter"]
+            .loc[df["Process"] == process]
+            .loc[df["Name"].isin(idle_functions)]
+        )
+        # get the sum of the inclusive times of these events
+        return filtered_df["time.inc"].sum()
+
+    def time_profile(self, num_bins=50, normalized=False):
+        """Computes time contributed by each function per time interval.
+
+        Args:
+            num_bins (int, optional): Number of evenly-sized time intervals to compute
+                time profile for. Defaults to 50.
+            normalized (bool, optional): Whether to return time contribution as
+                percentage of time interval. Defaults to False.
+
+        Returns:
+            pd.DataFrame: Time profile of each function, where each column
+                represents a function, and each row represents a time interval.
+        """
+        # Generate metrics
+        self._match_caller_callee()
+        self.calc_inc_metrics(["Timestamp (ns)"])
+
+        # Filter by Enter rows
+        events = self.events[self.events["Event Type"] == "Enter"].copy(deep=False)
+        names = events["Name"].unique().tolist()
+
+        # Create equal-sized bins
+        edges = np.linspace(
+            self.events["Timestamp (ns)"].min(),
+            self.events["Timestamp (ns)"].max(),
+            num_bins + 1,
+        )
+        bin_size = edges[1] - edges[0]
+
+        total_bin_duration = bin_size * len(events["Process"].unique())
+
+        profile = []
+
+        def calc_exc_time_in_bin(events):
+            # TODO: check if the numpy equivalent of the below code is faster
+            dfx_to_idx = {
+                dfx: idx
+                for (dfx, idx) in zip(events.index, [i for i in range(len(events))])
+            }
+
+            # start out with exc times being a copy of inc times
+            exc_times = list(events["inc_time_in_bin"].copy(deep=False))
+
+            # filter to events that have children
+            filtered_df = events.loc[events["_children"].notnull()]
+
+            parent_df_indices, children = (
+                list(filtered_df.index),
+                filtered_df["_children"].to_list(),
+            )
+
+            # Iterate through the events that are parents
+            for i in range(len(filtered_df)):
+                curr_parent_idx, curr_children = (
+                    dfx_to_idx[parent_df_indices[i]],
+                    children[i],
+                )
+
+                # Only consider inc times of children in current bin
+                for child_df_idx in curr_children:
+                    if child_df_idx in dfx_to_idx:
+                        exc_times[curr_parent_idx] -= exc_times[
+                            dfx_to_idx[child_df_idx]
+                        ]
+
+            events["exc_time_in_bin"] = exc_times
+
+        # For each bin, determine each function's time contribution
+        for i in range(num_bins):
+            start = edges[i]
+            end = edges[i + 1]
+
+            # Find functions that belong in this bin
+            in_bin = events[
+                (events["_matching_timestamp"] > start)
+                & (events["Timestamp (ns)"] < end)
+            ].copy(deep=False)
+
+            # Calculate inc_time_in_bin for each function
+            # Case 1 - Function starts in bin
+            in_bin.loc[in_bin["Timestamp (ns)"] >= start, "inc_time_in_bin"] = (
+                end - in_bin["Timestamp (ns)"]
+            )
+
+            # Case 2 - Function ends in bin
+            in_bin.loc[in_bin["_matching_timestamp"] <= end, "inc_time_in_bin"] = (
+                in_bin["_matching_timestamp"] - start
+            )
+
+            # Case 3 - Function spans bin
+            in_bin.loc[
+                (in_bin["Timestamp (ns)"] < start)
+                & (in_bin["_matching_timestamp"] > end),
+                "inc_time_in_bin",
+            ] = (
+                end - start
+            )
+
+            # Case 4 - Function contained in bin
+            in_bin.loc[
+                (in_bin["Timestamp (ns)"] >= start)
+                & (in_bin["_matching_timestamp"] <= end),
+                "inc_time_in_bin",
+            ] = (
+                in_bin["_matching_timestamp"] - in_bin["Timestamp (ns)"]
+            )
+
+            # Calculate exc_time_in_bin by subtracting inc_time_in_bin for all children
+            calc_exc_time_in_bin(in_bin)
+
+            # Sum across all processes
+            agg = in_bin.groupby("Name")["exc_time_in_bin"].sum()
+            profile.append(agg.to_dict())
+
+        # Convert to DataFrame
+        df = pd.DataFrame(profile, columns=names)
+
+        # Add idle_time column
+        df.insert(0, "idle_time", total_bin_duration - df.sum(axis=1))
+
+        # Threshold for zero
+        df.mask(df < 0.01, 0, inplace=True)
+
+        # Normalize
+        if normalized:
+            df /= total_bin_duration
+
+        # Add bin_start and bin_end
+        df.insert(0, "bin_start", edges[:-1])
+        df.insert(0, "bin_end", edges[1:])
+
+        return df
