@@ -157,10 +157,14 @@ class Trace:
             children = [None] * len(self.events)
             parent = [float("nan")] * len(self.events)
 
+            # match events so we can
+            # ignore unmatched ones
+            self._match_events()
+
             # only use enter and leave rows
             # to determine calling relationships
             enter_leave_df = self.events.loc[
-                self.events["Event Type"].isin(["Enter", "Leave"])
+                (self.events["Event Type"].isin(["Enter", "Leave"]) & (self.events["_matching_event"].notnull()))
             ]
 
             # list of processes and/or threads to iterate over
@@ -272,8 +276,7 @@ class Trace:
         columns = self.numeric_cols if columns is None else columns
 
         # match caller and callee rows
-        if "_children" not in self.events.columns:
-            self._match_caller_callee()
+        self._match_caller_callee()
 
         # exclusive metrics only change for rows that have children
         filtered_df = self.events.loc[self.events["_children"].notnull()]
