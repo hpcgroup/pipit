@@ -164,7 +164,10 @@ class Trace:
             # only use enter and leave rows
             # to determine calling relationships
             enter_leave_df = self.events.loc[
-                (self.events["Event Type"].isin(["Enter", "Leave"]) & (self.events["_matching_event"].notnull()))
+                (
+                    self.events["Event Type"].isin(["Enter", "Leave"])
+                    & (self.events["_matching_event"].notnull())
+                )
             ]
 
             # list of processes and/or threads to iterate over
