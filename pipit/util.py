@@ -2,39 +2,16 @@ import re
 import numbers
 
 
-def format_time(n: float) -> str:
-    """Converts timestamp/timedelta from ns to human-readable time"""
-    # Adapted from https://github.com/dask/dask/blob/main/dask/utils.py
-
-    if n >= 1e9 * 24 * 60 * 60 * 2:
-        d = int(n / 1e9 / 3600 / 24)
-        h = int((n / 1e9 - d * 3600 * 24) / 3600)
-        return f"{d}d {h}hr"
-
-    if n >= 1e9 * 60 * 60 * 2:
-        h = int(n / 1e9 / 3600)
-        m = int((n / 1e9 - h * 3600) / 60)
-        return f"{h}hr {m}m"
-
-    if n >= 1e9 * 60 * 10:
-        m = int(n / 1e9 / 60)
-        s = int(n / 1e9 - m * 60)
-        return f"{m}m {s}s"
-
-    if n >= 1e9:
-        return "%.2f s" % (n / 1e9)
-
-    if n >= 1e6:
-        return "%.2f ms" % (n / 1e6)
-
-    if n >= 1e3:
-        return "%.2f us" % (n / 1e3)
-
-    return "%.2f ns" % n
-
-
 def parse_time(time) -> float:
-    """Converts human-readable time to ns"""
+    """Parses human-readable timestamp to ns.
+
+    parse_time("130 ms") -> 130000000.0
+    parse_time("1.45 s") -> 1450000000.0
+    parse_time("12345") -> 12345
+
+    Returns:
+        float: Timestamp in nanoseconds.
+    """
     if isinstance(time, numbers.Number):
         return time
 
@@ -46,6 +23,9 @@ def parse_time(time) -> float:
             parse_time(time.start) if time.start else -float("inf"),
             parse_time(time.stop) if time.stop else float("inf"),
         )
+
+    if time.isnumeric():
+        return float(time)
 
     n = 0
 

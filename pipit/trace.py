@@ -650,19 +650,6 @@ class Trace:
 
         return df
 
-    @property
-    def loc(self):
-        """Select events by index, slice, or boolean vector.
-
-        Calls pandas.DataFrame.loc for the underlying events DataFrame.
-
-        Returns:
-            pipit.Trace: new Trace instance containing a view of the events DataFrame
-        """
-        from .selection import LocIndexer
-
-        return LocIndexer(self)
-
     def _eval(self, *args, **kwargs):
         """Evaluates a Filter for each event in this Trace.
 
@@ -692,7 +679,7 @@ class Trace:
             DataFrame.
         """
         results = self._eval(*args, **kwargs)
-        return self.loc[results]
+        return Trace(self.definitions, self.events.loc[results].copy(deep=False))
 
     def trim(self, start=None, end=None):
         """Trims functions so that their Enter and Leave timestamps are bounded within

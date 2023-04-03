@@ -5,26 +5,6 @@ def all_equal(*dfs):
     return all([dfs[0].equals(df) for df in dfs])
 
 
-def test_loc(data_dir, ping_pong_otf2_trace):
-    trace = Trace.from_otf2(str(ping_pong_otf2_trace))
-
-    # index
-    assert all_equal(trace.loc[12], trace.events.loc[12])
-
-    # slice
-    assert all_equal(trace.loc[30:45].events, trace.events.loc[30:45])
-
-    # boolean array
-    arr = [False] * len(trace.events)
-    arr[5] = True
-    arr[16] = True
-    arr[23] = True
-    arr[78] = True
-    arr[107] = True
-
-    assert all_equal(trace.loc[arr].events, trace.events.loc[arr])
-
-
 def test_eval(data_dir, ping_pong_otf2_trace):
     trace = Trace.from_otf2(str(ping_pong_otf2_trace))
 
@@ -91,13 +71,11 @@ def test_filter(data_dir, ping_pong_otf2_trace):
 
     assert all_equal(
         trace.filter("Process", "==", 0).definitions,
-        trace.loc[trace._eval("Process", "==", 0)].definitions,
         trace.definitions,
     )
 
     assert all_equal(
         trace.filter("Process", "==", 0).events,
-        trace.loc[trace._eval("Process", "==", 0)].events,
         trace.events[trace.events["Process"] == 0],
     )
 
