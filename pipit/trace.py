@@ -486,12 +486,12 @@ class Trace:
         # get the sum of the inclusive times of these events
         return filtered_df["time.inc"].sum()
 
-    def time_profile(self, num_bins=32, normalized=False):
+    def time_profile(self, num_bins=50, normalized=False):
         """Computes time contributed by each function per time interval.
 
         Args:
             num_bins (int, optional): Number of evenly-sized time intervals to compute
-                time profile for. Defaults to 32.
+                time profile for. Defaults to 50.
             normalized (bool, optional): Whether to return time contribution as
                 percentage of time interval. Defaults to False.
 
