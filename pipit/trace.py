@@ -648,3 +648,212 @@ class Trace:
         df.insert(0, "bin_end", edges[1:])
 
         return df
+
+    def plot_timeline(self, **kwargs):
+        # import this lazily to avoid circular dependencies
+        from pipit import plotting as plt
+
+        return plt.timeline(self, **kwargs)
+
+    def plot_comm_matrix(self, **kwargs):
+        # import this lazily to avoid circular dependencies
+        from pipit import plotting as plt
+
+        return plt.comm_matrix(self, **kwargs)
+
+    def plot_message_histogram(self, **kwargs):
+        # import this lazily to avoid circular dependencies
+        from pipit import plotting as plt
+
+        return plt.message_histogram(self, **kwargs)
+
+    def plot_time_profile(self, **kwargs):
+        # import this lazily to avoid circular dependencies
+        from pipit import plotting as plt
+
+        return plt.time_profile(self, **kwargs)
+
+    def plot_flat_profile(self, **kwargs):
+        # import this lazily to avoid circular dependencies
+        from pipit import plotting as plt
+
+        return plt.flat_profile(self, **kwargs)
+
+    def _get_matching_complete_or_request_event(self, instant):
+        """Returns corresponding MpiIsendComplete event for an MpiIsend event (and vice
+        versa).
+        Returns corresponding MpiIRecv event fro an MpiIrecvRequest event (and vice
+        versa).
+        """
+        events = self.events
+        instant = events.loc[instant]
+
+        if instant["Name"] == "MpiIsend":
+            events = events.loc[
+                (events["Name"] == "MpiIsendComplete")
+                & (events["Timestamp (ns)"] > instant["Timestamp (ns)"])
+                & (events["Process"] == instant["Process"])
+            ]
+            events = events.loc[
+                events["Attributes"].apply(
+                    lambda x: False
+                    if x is None
+                    else x.get("request_id") == instant["Attributes"]["request_id"]
+                )
+            ]
+            return events.index[0]
+
+        elif instant["Name"] == "MpiIsendComplete":
+            events = events.loc[
+                (events["Name"] == "MpiIsend")
+                & (events["Timestamp (ns)"] < instant["Timestamp (ns)"])
+                & (events["Process"] == instant["Process"])
+            ]
+            events = events.loc[
+                events["Attributes"].apply(
+                    lambda x: False
+                    if x is None
+                    else x.get("request_id") == instant["Attributes"]["request_id"]
+                )
+            ]
+            return events.index[0]
+
+        elif instant["Name"] == "MpiIrecv":
+            events = events.loc[
+                (events["Name"] == "MpiIrecvRequest")
+                & (events["Timestamp (ns)"] < instant["Timestamp (ns)"])
+                & (events["Process"] == instant["Process"])
+            ]
+            events = events.loc[
+                events["Attributes"].apply(
+                    lambda x: False
+                    if x is None
+                    else x.get("request_id") == instant["Attributes"]["request_id"]
+                )
+            ]
+            return events.index[0]
+
+        elif instant["Name"] == "MpiIrecvRequest":
+            events = events.loc[
+                (events["Name"] == "MpiIrecv")
+                & (events["Timestamp (ns)"] > instant["Timestamp (ns)"])
+                & (events["Process"] == instant["Process"])
+            ]
+            events = events.loc[
+                events["Attributes"].apply(
+                    lambda x: False
+                    if x is None
+                    else x.get("request_id") == instant["Attributes"]["request_id"]
+                )
+            ]
+            return events.index[0]
+
+    def _get_matching_instant_event(self, enter):
+        """Returns the instant MPI event that occurs between the Enter/Leave rows
+        of an MPI function"""
+
+        events = self.events
+        enter = events.loc[enter]
+
+        return events.index[
+            (events["Name"].str.startswith("Mpi"))
+            & (events["Process"] == enter["Process"])
+            & (events["Timestamp (ns)"] >= enter["Timestamp (ns)"])
+            & (events["Timestamp (ns)"] <= enter["_matching_timestamp"])
+        ][0]
+
+    # NOTE: should this function even be used? Is it misleading, since it gets the Enter
+    # for MpiIrecvRequest instead of MpiIrecv?
+    def _get_matching_enter_event(self, instant):
+        """Returns the Enter row of an MPI function that an instant MPI event
+        occurs in"""
+
+        events = self.events
+        instant = events.loc[instant]
+
+        # MpiIsendComplete and MpiIrecv instant events happen OUTSIDE of Enter/Leave
+        # pairs. So, if "instant" is an MpiIsendComplete or MpiIrecv event, we need to
+        # find the corresponding MpiIsend or MpiIrecvRequest event, since THAT will be
+        # inside of an Enter/Leave pair
+        if instant["Name"] in ["MpiIsendComplete", "MpiIrecv"]:
+            instant = self._get_matching_complete_or_request_event(instant.name)
+            instant = events.loc[instant]
+
+        return events.index[
+            (events["Event Type"] == "Enter")
+            & (events["Name"].str.startswith("MPI_"))
+            & (events["Process"] == instant["Process"])
+            & (events["Timestamp (ns)"] <= instant["Timestamp (ns)"])
+            & (events["_matching_timestamp"] >= instant["Timestamp (ns)"])
+        ][0]
+
+    def _get_matching_p2p_event(self, instant):
+        """Gets the matching MPI event for a point-to-point MPI event.
+        Returns corresponding MpiRecv event for an MpiSend event (and vice
+        versa).
+        Returns corresponding MpiIrecv event for an MpiIsend event (and vice
+        versa).
+        """
+
+        events = self.events
+        instant = events.loc[instant]
+
+        if instant["Name"] == "MpiSend":
+            events = events.loc[
+                (events["Timestamp (ns)"] > instant["Timestamp (ns)"])
+                & (events["Name"] == "MpiRecv")
+                & (events["Process"] == instant["Attributes"]["receiver"])
+            ]
+            events = events.loc[
+                events["Attributes"].apply(
+                    lambda x: False
+                    if x is None
+                    else x.get("sender") == instant["Process"]
+                )
+            ]
+            return events["Timestamp (ns)"].idxmin()
+
+        elif instant["Name"] == "MpiIsend":
+            events = events.loc[
+                (events["Timestamp (ns)"] > instant["Timestamp (ns)"])
+                & (events["Name"] == "MpiIrecv")
+                & (events["Process"] == instant["Attributes"]["receiver"])
+            ]
+            events = events.loc[
+                events["Attributes"].apply(
+                    lambda x: False
+                    if x is None
+                    else x.get("sender") == instant["Process"]
+                )
+            ]
+            return events["Timestamp (ns)"].idxmin()
+
+        elif instant["Name"] == "MpiRecv":
+            events = events.loc[
+                (events["Timestamp (ns)"] < instant["Timestamp (ns)"])
+                & (events["Name"] == "MpiSend")
+                & (events["Process"] == instant["Attributes"]["sender"])
+            ]
+            events = events.loc[
+                events["Attributes"].apply(
+                    lambda x: False
+                    if x is None
+                    else x.get("receiver") == instant["Process"]
+                )
+            ]
+            return events["Timestamp (ns)"].idxmax()
+
+        elif instant["Name"] == "MpiIrecv":
+            events = events.loc[
+                (events["Timestamp (ns)"] < instant["Timestamp (ns)"])
+                & (events["Name"] == "MpiIsend")
+                & (events["Process"] == instant["Attributes"]["sender"])
+            ]
+            events = events.loc[
+                events["Attributes"].apply(
+                    lambda x: False
+                    if x is None
+                    else x.get("receiver") == instant["Process"]
+                )
+            ]
+            return events["Timestamp (ns)"].idxmax()
