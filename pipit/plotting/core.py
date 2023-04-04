@@ -15,6 +15,7 @@ from bokeh.models import (
     Arrow,
     OpenHead,
     CustomJS,
+    BasicTickFormatter,
 )
 from bokeh.palettes import RdYlBu11
 from bokeh.plotting import figure
@@ -381,6 +382,7 @@ def comm_matrix(trace, kind="heatmap", mapping="linear", labels=False, **kwargs)
     communcation voulme.
     """
     comm_matrix = trace.comm_matrix(**kwargs)
+    is_size = kwargs.pop("output", "size") == "size"
 
     # Transform matrix into a stacked form, required for labels and scatterplot
     stacked = (
@@ -395,11 +397,11 @@ def comm_matrix(trace, kind="heatmap", mapping="linear", labels=False, **kwargs)
     # Define color mapping
     if mapping == "linear":
         color_mapper = LinearColorMapper(
-            palette=list((RdYlBu11)), low=1, high=np.amax(comm_matrix)
+            palette=RdYlBu11, low=0, high=np.amax(comm_matrix)
         )
     elif mapping == "log":
         color_mapper = LogColorMapper(
-            palette=list((RdYlBu11)), low=1, high=np.amax(comm_matrix)
+            palette=RdYlBu11, low=0.01, high=np.amax(comm_matrix)
         )
     else:
         color_mapper = LinearColorMapper(palette="RdYlBu11", low=1, high=1)
@@ -431,7 +433,7 @@ def comm_matrix(trace, kind="heatmap", mapping="linear", labels=False, **kwargs)
 
         color_bar = ColorBar(
             color_mapper=color_mapper,
-            formatter=get_size_tick_formatter(),
+            formatter=get_size_tick_formatter() if is_size else BasicTickFormatter(),
             border_line_color=None,
         )
         p.add_layout(color_bar, "right")
@@ -497,6 +499,12 @@ def comm_matrix(trace, kind="heatmap", mapping="linear", labels=False, **kwargs)
             "Sender": "Process $x{0.}",
             "Receiver": "Process $y{0.}",
             "Bytes": "@image{custom}",
+        }
+        if is_size
+        else {
+            "Sender": "Process $x{0.}",
+            "Receiver": "Process $y{0.}",
+            "Count": "@image",
         }
     )
     hover.formatters = {"@image": get_size_hover_formatter()}
