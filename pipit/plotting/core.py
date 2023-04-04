@@ -716,12 +716,26 @@ def events_over_time(trace, **kwargs):
     p.xaxis.formatter = get_time_tick_formatter()
 
     hist, edges = np.histogram(ts, bins=100, density=True, range=(min_ts, max_ts))
-    p.quad(top=hist, bottom=0, left=edges[:-1], right=edges[1:], line_color="white", legend_label="Histogram")
+    p.quad(
+        top=hist,
+        bottom=0,
+        left=edges[:-1],
+        right=edges[1:],
+        line_color="white",
+        legend_label="Histogram",
+    )
 
     pdf = gaussian_kde(ts)
     x = np.linspace(min_ts, max_ts, 200)
     p.line(x, pdf(x), line_color="#ff8888", line_width=4, alpha=0.7, legend_label="PDF")
-    p.line(x, np.cumsum(pdf(x)), line_color="orange", line_width=2, alpha=0.7, legend_label="CDF")
+    p.line(
+        x,
+        np.cumsum(pdf(x)),
+        line_color="orange",
+        line_width=2,
+        alpha=0.7,
+        legend_label="CDF",
+    )
 
     p.add_layout(p.legend[0], "right")
 
@@ -748,7 +762,10 @@ def comm_profile(trace, **kwargs):
 
     p.yaxis.formatter = get_size_tick_formatter()
     p.xaxis.ticker = BasicTicker(
-        base=2, desired_num_ticks=min(len(trace.events["Process"].unique()), 16), min_interval=1, num_minor_ticks=0
+        base=2,
+        desired_num_ticks=min(len(trace.events["Process"].unique()), 16),
+        min_interval=1,
+        num_minor_ticks=0,
     )
 
     p.vbar(
