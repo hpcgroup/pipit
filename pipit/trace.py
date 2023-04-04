@@ -146,16 +146,19 @@ class Trace:
             self.events = self.events.astype({"_matching_event": "Int32"})
 
     def _match_caller_callee(self):
-        """Matches callers (parents) to callees (children) and adds two
+        """Matches callers (parents) to callees (children) and adds three
         columns to the dataframe:
-        _parent, and _children
+        _depth, _parent, and _children
+        _depth is the depth of the event in the call tree (starting from 0 for root)
         _parent is the dataframe index of a row's parent event.
         _children is a list of dataframe indices of a row's children events.
         """
 
         if "_children" not in self.events.columns:
             children = [None] * len(self.events)
-            parent = [float("nan")] * len(self.events)
+            depth, parent = [float("nan")] * len(self.events), [float("nan")] * len(
+                self.events
+            )
 
             # match events so we can
             # ignore unmatched ones
@@ -218,6 +221,7 @@ class Trace:
 
                             parent[curr_df_index] = parent_df_index
 
+                        depth[curr_df_index] = curr_depth
                         curr_depth += 1
 
                         # add enter dataframe index to stack
@@ -231,13 +235,16 @@ class Trace:
 
                         curr_depth -= 1
 
-            self.events["_parent"], self.events["_children"] = (
+            self.events["_depth"], self.events["_parent"], self.events["_children"] = (
+                depth,
                 parent,
                 children,
             )
 
-            self.events = self.events.astype({"_parent": "Int32"})
-            self.events = self.events.astype({"_parent": "category"})
+            self.events = self.events.astype({"_depth": "Int32", "_parent": "Int32"})
+            self.events = self.events.astype(
+                {"_depth": "category", "_parent": "category"}
+            )
 
     def calc_inc_metrics(self, columns=None):
         # if no columns are specified by the user, then we calculate
