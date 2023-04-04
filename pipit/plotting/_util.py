@@ -302,10 +302,10 @@ def plot(obj):
         display_html(
             HTML(
                 """
-            <style>
-            @import url('https://fonts.cdnfonts.com/css/gill-sans?styles=17575');
-            </style>
-        """
+                <style>
+                @import url('https://fonts.cdnfonts.com/css/gill-sans?styles=17575');
+                </style>
+                """
             )
         )
 
@@ -349,7 +349,6 @@ def get_html_tooltips(tooltips_dict):
         """
     html += """
         <style>
-            @import url('https://fonts.cdnfonts.com/css/gill-sans');
             div.bk-tooltip > div > div:not(:last-child) {
                 display:none !important;
             }

@@ -303,7 +303,7 @@ def timeline(trace, show_depth=False, instant_events=False):
         # band_fill_color="gray",
         # band_fill_alpha=0.1,
         ticker=FixedTicker(ticks=process_ticks - 0.5),
-        level="overlay" if show_depth else "glyph",
+        level="glyph",
     )
     p.add_layout(g1)
     p.add_layout(g2)
