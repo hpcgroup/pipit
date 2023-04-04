@@ -25,7 +25,7 @@ notebook_url = "http://localhost:8888"
 theme_default = """
     attrs:
         Plot:
-            height: 420
+            height: 400
             width: 800
             toolbar_location: "above"
             outline_line_width: 0
@@ -285,7 +285,7 @@ def plot(obj):
         doc.add_root(obj)
         doc.theme = Theme(
             json=yaml.load(
-                theme_paper,
+                theme_default,
                 Loader=yaml.FullLoader,
             )
         )

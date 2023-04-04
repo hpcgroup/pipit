@@ -525,7 +525,8 @@ def message_histogram(trace, **kwargs):
 
     p.xgrid.visible = False
     p.xaxis.formatter = get_size_tick_formatter()
-    # p.xaxis.ticker.desired_num_ticks = 16
+    p.xaxis.minor_tick_line_color = None
+    # p.xaxis.ticker = AdaptiveTicker()
 
     hover = p.select(HoverTool)
     hover.tooltips = get_html_tooltips(
@@ -657,3 +658,98 @@ def flat_profile(trace, x_axis_type="log", **kwargs):
     hover.formatters = {"@{time.exc}": get_time_hover_formatter()}
 
     return plot(p)
+
+
+# IGNORE THE FOLLOWING FUNCTIONS
+
+
+def messages_over_time(trace, **kwargs):
+    sends = trace.events[trace.events["Name"].isin(["MpiSend", "MpiIsend"])]
+
+    timestamps = sends["Timestamp (ns)"]
+    sizes = sends["Attributes"].apply(lambda x: x["msg_length"])
+
+    min_ts = trace.events["Timestamp (ns)"].min()
+    max_ts = trace.events["Timestamp (ns)"].max()
+
+    hist, edges = np.histogram(
+        timestamps, bins=200, weights=sizes, range=(min_ts, max_ts)
+    )
+
+    p = figure(
+        y_range=(0, np.max(hist) + np.max(hist) / 4),
+        x_axis_label="Time",
+        y_axis_label="Message size",
+        tools="hover,save",
+        sizing_mode="stretch_width",
+    )
+    p.xaxis.formatter = get_time_tick_formatter()
+    p.yaxis.formatter = get_size_tick_formatter()
+
+    p.quad(top=hist, bottom=0, left=edges[:-1], right=edges[1:], line_color="white")
+
+    return plot(p)
+
+
+def events_over_time(trace, **kwargs):
+    events = trace.events
+
+    timestamps = events["Timestamp (ns)"]
+
+    min_ts = trace.events["Timestamp (ns)"].min()
+    max_ts = trace.events["Timestamp (ns)"].max()
+
+    hist, edges = np.histogram(timestamps, bins=200, range=(min_ts, max_ts))
+
+    p = figure(
+        y_range=(0, np.max(hist) + np.max(hist) / 4),
+        x_axis_label="Time",
+        y_axis_label="Count",
+        tools="hover,save",
+        sizing_mode="stretch_width",
+    )
+    p.xaxis.formatter = get_time_tick_formatter()
+
+    p.quad(top=hist, bottom=0, left=edges[:-1], right=edges[1:], line_color="white")
+
+    return plot(p)
+
+
+def comm_profile(trace, **kwargs):
+    comm_matrix = trace.comm_matrix()
+
+    process = np.arange(0, comm_matrix.shape[0])
+    sends = comm_matrix.sum(axis=0)
+    receives = comm_matrix.sum(axis=1)
+
+    data = {"process": process, "sends": sends, "receives": receives}
+
+    p = figure(
+        y_range=(0, np.max(sends) + np.max(sends) / 4),
+        x_range=(-0.5, comm_matrix.shape[0] - 0.5),
+        x_axis_label="Process",
+        y_axis_label="Message Size",
+        sizing_mode="stretch_width",
+        tools="hover,save",
+    )
+
+    p.yaxis.formatter = get_size_tick_formatter()
+
+    p.vbar(
+        x=dodge("process", -0.1667, range=p.x_range),
+        top="sends",
+        width=0.2,
+        source=data,
+        color=get_palette(trace)["MPI_Send"],
+        legend_label="Total sent",
+    )
+    p.vbar(
+        x=dodge("process", 0.1667, range=p.x_range),
+        top="receives",
+        width=0.2,
+        source=data,
+        color=get_palette(trace)["MPI_Recv"],
+        legend_label="Total received",
+    )
+
+    plot(p)
