@@ -651,33 +651,33 @@ class Trace:
 
     def plot_timeline(self, **kwargs):
         # import this lazily to avoid circular dependencies
-        from pipit import plotting as plt
+        from pipit.plotting import core
 
-        return plt.timeline(self, **kwargs)
+        return core.timeline(self, **kwargs)
 
     def plot_comm_matrix(self, **kwargs):
         # import this lazily to avoid circular dependencies
-        from pipit import plotting as plt
+        from pipit.plotting import core
 
-        return plt.comm_matrix(self, **kwargs)
+        return core.comm_matrix(self, **kwargs)
 
     def plot_message_histogram(self, **kwargs):
         # import this lazily to avoid circular dependencies
-        from pipit import plotting as plt
+        from pipit.plotting import core
 
-        return plt.message_histogram(self, **kwargs)
+        return core.message_histogram(self, **kwargs)
 
     def plot_time_profile(self, **kwargs):
         # import this lazily to avoid circular dependencies
-        from pipit import plotting as plt
+        from pipit.plotting import core
 
-        return plt.time_profile(self, **kwargs)
+        return core.time_profile(self, **kwargs)
 
     def plot_flat_profile(self, **kwargs):
         # import this lazily to avoid circular dependencies
-        from pipit import plotting as plt
+        from pipit.plotting import core
 
-        return plt.flat_profile(self, **kwargs)
+        return core.flat_profile(self, **kwargs)
 
     def _get_matching_complete_or_request_event(self, instant):
         """Returns corresponding MpiIsendComplete event for an MpiIsend event (and vice

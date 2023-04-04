@@ -20,8 +20,6 @@ import math
 import numpy as np
 import pandas as pd
 
-import pipit as pp
-
 # Constants
 notebook_url = "http://localhost:8888"
 theme_default = """
@@ -263,7 +261,7 @@ def get_trimmed_tick_formatter():
 
 
 # Helper functions
-def plot(obj, notebook_url=None):
+def plot(obj):
     """Internal function used to wrap return values from plotting functions. If we are in a
         notebook, then `bokeh.io.show` is invoked and the plot is displayed immediately
         in the associated output cell. If we are in the Python shell, then a new Bokeh
@@ -310,10 +308,6 @@ def plot(obj, notebook_url=None):
         """
             )
         )
-
-        # Get default notebook url if not given
-        if notebook_url is None:
-            notebook_url = pp.config["vis"]["notebook_url"]
 
         # Show it in output cell
         output_notebook(hide_banner=True)
