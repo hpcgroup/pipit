@@ -277,10 +277,18 @@ def plot(obj):
     Args:
         obj: The Bokeh object to display.
     """
-    # if in_notebook():
-    #     from IPython.display import display, HTML
+    if in_notebook():
+        from IPython.display import display_html, HTML
 
-    #     display(HTML("<style>.container { width:100% !important; }</style>"))
+        display_html(
+            HTML(
+                """
+                <style>
+                @import url('https://fonts.cdnfonts.com/css/gill-sans?styles=17575');
+                </style>
+                """
+            )
+        )
 
     # Wrap the plot in a Bokeh app
     def bkapp(doc):
@@ -298,19 +306,6 @@ def plot(obj):
 
     # Case 2: Notebook
     if in_notebook():
-        # Add CSS to increase cell width
-        from IPython.core.display import HTML, display_html
-
-        display_html(
-            HTML(
-                """
-                <style>
-                @import url('https://fonts.cdnfonts.com/css/gill-sans?styles=17575');
-                </style>
-                """
-            )
-        )
-
         # Show it in output cell
         output_notebook(hide_banner=True)
         show(bkapp, notebook_url=notebook_url)
