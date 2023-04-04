@@ -21,8 +21,10 @@ import numpy as np
 import pandas as pd
 
 # Constants
+theme = "default"
 notebook_url = "http://localhost:8888"
-theme_default = """
+
+THEME_DEFAULT = """
     attrs:
         Plot:
             height: 400
@@ -43,7 +45,7 @@ theme_default = """
         Scatter:
             size: 9
 """
-theme_paper = """
+THEME_PAPER = """
     attrs:
         Plot:
             height: 420
@@ -285,7 +287,7 @@ def plot(obj):
         doc.add_root(obj)
         doc.theme = Theme(
             json=yaml.load(
-                theme_default,
+                THEME_DEFAULT if theme == "default" else THEME_PAPER,
                 Loader=yaml.FullLoader,
             )
         )
