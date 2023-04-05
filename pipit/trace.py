@@ -699,6 +699,10 @@ class Trace:
 
         events = self.filter("Timestamp (ns)", "between", [start, end]).events
 
+        # Delete inc/exc time calculations as these are no longer accurate
+        del events["time.inc"]
+        del events["time.exc"]
+
         # Clip values to be in [start, end]
         for col in ["Timestamp (ns)", "_matching_timestamp"]:
             events[col] = events[col].clip(start, end)
