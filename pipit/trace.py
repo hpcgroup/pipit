@@ -464,7 +464,7 @@ class Trace:
 
         imb_metric = metric + ".imbalance"
         imb_ranks = "Top processes"
-        mean_metric = "Mean " + metric
+        mean_metric = metric + ".mean"
 
         imbalance_dict[imb_metric] = []
         imbalance_dict[imb_ranks] = []
