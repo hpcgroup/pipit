@@ -58,6 +58,17 @@ class Trace:
 
         return NsightReader(filename).read()
 
+    @staticmethod
+    def from_csv(filename):
+        events_dataframe = pd.read_csv(filename)
+        print(events_dataframe.columns)
+
+        events_dataframe.sort_values(
+            by="Timestamp (ns)", axis=0, ascending=True, inplace=True, ignore_index=True
+        )
+
+        return Trace(None, events_dataframe)
+
     def _match_events(self):
         """Matches corresponding enter/leave events and adds two columns to the
         dataframe: _matching_event and _matching_timestamp
