@@ -433,18 +433,25 @@ class Trace:
 
         # Get timestamps and sizes
         timestamps = events["Timestamp (ns)"]
+        processes = events["Process"].astype(float)
         sizes = events["Attributes"].apply(lambda x: x["msg_length"])
 
-        return np.histogram(
+        hist, edges, _ = np.histogram2d(
             timestamps,
-            bins=bins,
-            weights=sizes if output == "size" else None,
+            processes,
+            bins=[bins, len(processes.unique())],
+            weights=sizes.tolist() if output == "size" else None,
             range=[
-                self.events["Timestamp (ns)"].min(),
-                self.events["Timestamp (ns)"].max(),
+                [
+                    self.events["Timestamp (ns)"].min(),
+                    self.events["Timestamp (ns)"].max(),
+                ],
+                None,
             ],
             **kwargs
         )
+
+        return np.transpose(hist), edges
 
     def comm_summary(self, output="size"):
         """Returns total communication volume per process.
