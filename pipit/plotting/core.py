@@ -16,6 +16,7 @@ from bokeh.models import (
     OpenHead,
     CustomJS,
     BasicTickFormatter,
+    NumeralTickFormatter,
 )
 from bokeh.palettes import RdYlBu11
 from bokeh.plotting import figure
@@ -405,7 +406,9 @@ def comm_matrix(trace, kind="heatmap", mapping="linear", labels=False, **kwargs)
         )
     elif mapping == "log":
         color_mapper = LogColorMapper(
-            palette=RdYlBu11, low=0.01, high=np.amax(comm_matrix)
+            palette=RdYlBu11,
+            low=max(np.amin(comm_matrix), 1),
+            high=np.amax(comm_matrix),
         )
     else:
         color_mapper = LinearColorMapper(palette="RdYlBu11", low=1, high=1)
@@ -538,6 +541,7 @@ def message_histogram(trace, **kwargs):
     p.xgrid.visible = False
     p.xaxis.formatter = get_size_tick_formatter()
     p.xaxis.minor_tick_line_color = None
+    p.yaxis.formatter = NumeralTickFormatter()
     # p.xaxis.ticker = AdaptiveTicker()
 
     hover = p.select(HoverTool)
@@ -683,13 +687,13 @@ def messages_over_time(trace, **kwargs):
     max_ts = trace.events["Timestamp (ns)"].max()
 
     hist, edges = np.histogram(
-        timestamps, bins=200, weights=sizes, range=(min_ts, max_ts)
+        timestamps, bins=100, weights=sizes, range=(min_ts, max_ts)
     )
 
     p = figure(
         y_range=(0, np.max(hist) + np.max(hist) / 4),
         x_axis_label="Time",
-        y_axis_label="Message size",
+        y_axis_label="Total volume sent",
         tools="hover,save",
         sizing_mode="stretch_width",
     )
@@ -790,14 +794,16 @@ def comm_profile(trace, **kwargs):
     data = {"process": process, "sends": sends, "receives": receives}
 
     p = figure(
-        y_range=(0, np.max(sends) + np.max(sends) / 4),
+        # y_range=(np.min(sends) * 0.8, np.max(sends) * 1.05),
         x_range=(-0.5, comm_matrix.shape[0] - 0.5),
         x_axis_label="Process",
-        y_axis_label="Message Size",
+        y_axis_label="Volume",
         sizing_mode="stretch_width",
         tools="hover,save",
     )
+    p.y_range.start = 0
 
+    p.xgrid.visible = False
     p.yaxis.formatter = get_size_tick_formatter()
     p.xaxis.ticker = BasicTicker(
         base=2,
@@ -822,5 +828,6 @@ def comm_profile(trace, **kwargs):
         color=get_palette(trace)["MPI_Recv"],
         legend_label="Total received",
     )
+    p.add_layout(p.legend[0], "right")
 
     plot(p)
