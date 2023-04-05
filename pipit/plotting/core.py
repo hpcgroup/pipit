@@ -184,6 +184,8 @@ def timeline(trace, show_depth=False, instant_events=False):
                 samples = samples[~samples["Timestamp (ns)"].isna()]
 
                 scatter_source.data = samples
+            else:
+                scatter_source.data = inst
 
         # Rasterize the rest
         small = func.tail(len(func) - 5000).copy(deep=True)
