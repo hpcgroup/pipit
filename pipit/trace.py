@@ -494,7 +494,8 @@ class Trace:
         """Returns total communication volume per process.
 
         Returns:
-            _type_: _description_
+            pd.DataFrame: DataFrame containing total communication volume sent and
+                received in each process
         """
         comm_matrix = self.comm_matrix(output=output)
 
