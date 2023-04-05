@@ -175,13 +175,15 @@ def timeline(trace, show_depth=False, instant_events=False):
         # Update scatter_source to keep sampled events
         if instant_events:
             inst = in_bounds[in_bounds["Event Type"] == "Instant"].copy(deep=False)
-            inst["bin"] = pd.cut(x=inst["Timestamp (ns)"], bins=1000, labels=False)
 
-            grouped = inst.groupby(["bin", "y"])
-            samples = grouped.first().reset_index()
-            samples = samples[~samples["Timestamp (ns)"].isna()]
+            if len(inst) > 500:
+                inst["bin"] = pd.cut(x=inst["Timestamp (ns)"], bins=1000, labels=False)
 
-            scatter_source.data = samples
+                grouped = inst.groupby(["bin", "y"])
+                samples = grouped.first().reset_index()
+                samples = samples[~samples["Timestamp (ns)"].isna()]
+
+                scatter_source.data = samples
 
         # Rasterize the rest
         small = func.tail(len(func) - 5000).copy(deep=True)
