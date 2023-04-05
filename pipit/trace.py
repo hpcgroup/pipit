@@ -692,10 +692,12 @@ class Trace:
         Returns:
             pipit.Trace: new Trace instance containing a view of the events DataFrame
         """
+        from .util import parse_time
+
         self._match_events()
 
-        start = start or self.events["Timestamp (ns)"].min()
-        end = end or self.events["Timestamp (ns)"].max()
+        start = parse_time(start) or self.events["Timestamp (ns)"].min()
+        end = parse_time(end) or self.events["Timestamp (ns)"].max()
 
         events = self.filter("Timestamp (ns)", "between", [start, end]).events
 
