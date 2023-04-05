@@ -668,9 +668,7 @@ def flat_profile(trace, x_axis_type="log", **kwargs):
     return plot(p)
 
 
-# IGNORE THE FOLLOWING FUNCTIONS
-
-
+# Ignore
 def messages_over_time(trace, **kwargs):
     sends = trace.events[trace.events["Name"].isin(["MpiSend", "MpiIsend"])]
 
@@ -699,6 +697,41 @@ def messages_over_time(trace, **kwargs):
     return plot(p)
 
 
+# Ignore
+def events_over_time_2d(trace, **kwargs):
+    min_ts = trace.events["Timestamp (ns)"].min()
+    max_ts = trace.events["Timestamp (ns)"].max()
+    num_ranks = len(trace.events["Process"].unique())
+
+    H, xe, ye = np.histogram2d(
+        x=trace.events["Timestamp (ns)"],
+        y=trace.events["Process"].astype(int),
+        bins=[50, num_ranks],
+        range=[[min_ts, max_ts], [-0.5, num_ranks - 0.5]],
+    )
+
+    p = figure(
+        x_range=[min(xe), max(xe)],
+        y_range=[max(ye), min(ye)],
+        x_axis_label="Time",
+        y_axis_label="Process",
+        sizing_mode="stretch_width",
+        tools="hover,save",
+    )
+    p.image(
+        image=[np.transpose(H)],
+        x=xe[0],
+        y=ye[-1],
+        dw=xe[-1] - xe[0],
+        dh=ye[-1] - ye[0],
+        palette="Viridis256",
+    )
+    p.xaxis.formatter = get_time_tick_formatter()
+
+    return plot(p)
+
+
+# Ignore
 def events_over_time(trace, **kwargs):
     from scipy.stats.kde import gaussian_kde
 
@@ -715,7 +748,7 @@ def events_over_time(trace, **kwargs):
     p.y_range.start = 0
     p.xaxis.formatter = get_time_tick_formatter()
 
-    hist, edges = np.histogram(ts, bins=100, density=True, range=(min_ts, max_ts))
+    hist, edges = np.histogram(ts, bins=50, density=True, range=(min_ts, max_ts))
     p.quad(
         top=hist,
         bottom=0,
@@ -726,22 +759,23 @@ def events_over_time(trace, **kwargs):
     )
 
     pdf = gaussian_kde(ts)
-    x = np.linspace(min_ts, max_ts, 200)
+    x = np.linspace(min_ts, max_ts, 500)
     p.line(x, pdf(x), line_color="#ff8888", line_width=4, alpha=0.7, legend_label="PDF")
-    p.line(
-        x,
-        np.cumsum(pdf(x)),
-        line_color="orange",
-        line_width=2,
-        alpha=0.7,
-        legend_label="CDF",
-    )
+    # p.line(
+    #     x,
+    #     np.cumsum(pdf(x)),
+    #     line_color="orange",
+    #     line_width=2,
+    #     alpha=0.7,
+    #     legend_label="CDF",
+    # )
 
     p.add_layout(p.legend[0], "right")
 
     return plot(p)
 
 
+# Ignore
 def comm_profile(trace, **kwargs):
     comm_matrix = trace.comm_matrix()
 
