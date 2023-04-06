@@ -808,8 +808,6 @@ class Trace:
         process=0,
         start_event="time-loop",
         metric="time.exc",
-        plot=True,
-        filename="pattern_detection.png",
     ):
         import stumpy
 
@@ -840,6 +838,9 @@ class Trace:
         ].index[-1]
 
         df = df.iloc[first_loop_enter + 1 : last_loop_leave]
+        filtered_df = df.loc[
+            (df[metric].notnull()) & (df["Process"] == process)
+        ]  # & (df["Name"] != "time-loop")
 
         x = df.loc[(df[metric].notnull()) & (df["Process"] == process)][
             "Timestamp (ns)"
@@ -850,34 +851,26 @@ class Trace:
 
         length_of_seq = int(len(y) / iterations)
         matrix_profile = stumpy.stump(y, length_of_seq)
-        dists, inde = stumpy.motifs(y, matrix_profile[:, 0], max_matches=iterations)
+        dists, indices = stumpy.motifs(y, matrix_profile[:, 0], max_matches=iterations)
 
-        if plot:
-            import matplotlib.pyplot as plt
-            from matplotlib.patches import Rectangle
+        # find the matches on the given trace
+        match_original = self.events.loc[
+            self.events["Timestamp (ns)"].isin(
+                filtered_df.iloc[indices[0]]["Timestamp (ns)"].values
+            )
+        ]
 
-            fig, axs = plt.subplots(2, sharex=True, gridspec_kw={"hspace": 0})
-            plt.suptitle("Pattern Detection", fontsize="20")
+        # filter out the events happening before the start of the
+        # iteration and after the end of the iteration.
+        self.events = self.events[
+            (self.events["Timestamp (ns)"] >= match_original.iloc[0]["Timestamp (ns)"])
+            & (
+                self.events["Timestamp (ns)"]
+                <= self.events.iloc[match_original.iloc[-1]._matching_event][
+                    "Timestamp (ns)"
+                ]
+            )
+            | (self.events["Name"] == match_original.iloc[0]["Name"])
+        ]
 
-            axs[0].plot(y)
-            axs[0].set_ylabel("Time", fontsize="14")
-
-            for idx in inde[0]:
-                print(idx, length_of_seq)
-                rect = Rectangle(
-                    (idx, 0),
-                    length_of_seq * 0.98,
-                    y.max(),
-                    fill=True,
-                    facecolor="lightgrey",
-                )
-                axs[0].add_patch(rect)
-
-            axs[1].set_xlabel("Index", fontsize="14")
-            axs[1].set_ylabel("Matrix Profile", fontsize="14")
-
-            for idx in inde[0]:
-                axs[1].axvline(x=idx, linestyle="dashed")
-
-            axs[1].plot(matrix_profile[:, 0])
-            plt.savefig(filename)
+        return (match_original, indices, matrix_profile, length_of_seq)
