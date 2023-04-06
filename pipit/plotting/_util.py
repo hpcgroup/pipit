@@ -12,6 +12,7 @@ from bokeh.models import (
     PrintfTickFormatter,
     NumeralTickFormatter,
 )
+
 # from bokeh.palettes import Category20_20
 from bokeh.transform import factor_cmap
 from bokeh.themes import Theme

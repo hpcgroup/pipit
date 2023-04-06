@@ -564,7 +564,7 @@ def time_profile(trace, **kwargs):
     The bars are color-coded by the function name, and their heights represent
     the exclusive time spent by each function in each bin."""
     normalized = kwargs.get("normalized")
-    profile = trace.time_profile(**kwargs)
+    profile = trace.time_profile(**kwargs).fillna(0)
 
     # Get function names
     func = profile.columns[3:]
