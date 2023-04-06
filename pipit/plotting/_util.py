@@ -12,7 +12,7 @@ from bokeh.models import (
     PrintfTickFormatter,
     NumeralTickFormatter,
 )
-from bokeh.palettes import Category20_20
+# from bokeh.palettes import Category20_20
 from bokeh.transform import factor_cmap
 from bokeh.themes import Theme
 import yaml
@@ -401,23 +401,48 @@ def get_height(num_yticks, height_per_tick=400):
     return clamp(int(math.log10(num_yticks) * height_per_tick + 50), 200, 900)
 
 
+PALETTE = [
+    "#1f77b4",
+    "#ff7f0e",
+    # "#2ca02c",         # reserved
+    # "#d62728",        # reserved
+    "#9467bd",
+    "#8c564b",
+    "#e377c2",
+    # "#7f7f7f",        # reserved
+    "#bcbd22",
+    "#17becf",
+    "#aec7e8",
+    "#ffbb78",
+    "#98df8a",
+    "#ff9896",
+    "#c5b0d5",
+    "#c49c94",
+    "#f7b6d2",
+    # "#c7c7c7",        # reserved
+    "#dbdb8d",
+    "#9edae5",
+]
+
+
 def get_palette(trace, scale=None):
-    trace.calc_inc_metrics(["Timestamp (ns)"])
+    trace.calc_exc_metrics(["Timestamp (ns)"])
     names = reversed(trace.flat_profile(["time.inc"]).index.tolist())
 
-    base_palette = list(Category20_20).copy()
+    base_palette = PALETTE.copy()
     palette = {}
 
-    palette["MPI_Send"] = base_palette.pop(0)
-    palette["MPI_Isend"] = palette["MPI_Send"]
+    palette["MPI_Send"] = "#2ca02c"
+    palette["MPI_Isend"] = "#2ca02c"
 
-    palette["MPI_Recv"] = base_palette.pop(5)
-    palette["MPI_Irecv"] = palette["MPI_Recv"]
+    palette["MPI_Recv"] = "#d62728"
+    palette["MPI_Irecv"] = "#d62728"
 
-    base_palette.pop(12)
-    palette["MPI_Wait"] = base_palette.pop(12)
-    palette["MPI_Waitall"] = palette["MPI_Wait"]
-    palette["Idle"] = palette["MPI_Wait"]
+    palette["MPI_Wait"] = "#c7c7c7"
+    palette["MPI_Waitall"] = "#c7c7c7"
+    palette["Idle"] = "#c7c7c7"
+
+    print(palette)
 
     for i, f in enumerate(names):
         if f not in palette:
