@@ -733,6 +733,16 @@ class Trace:
 
         return core.flat_profile(self, **kwargs)
 
+    def plot_comm_over_time(self, **kwargs):
+        from pipit.plotting import core
+
+        return core.comm_over_time(self, **kwargs)
+
+    def plot_comm_summary(self, **kwargs):
+        from pipit.plotting import core
+
+        return core.comm_summary(self, **kwargs)
+
     def _get_matching_complete_or_request_event(self, instant):
         """Returns corresponding MpiIsendComplete event for an MpiIsend event (and vice
         versa).

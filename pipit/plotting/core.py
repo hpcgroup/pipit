@@ -632,7 +632,7 @@ def time_profile(trace, **kwargs):
     return plot(p)
 
 
-def flat_profile(trace, x_axis_type="log", **kwargs):
+def flat_profile(trace, x_axis_type="linear", **kwargs):
     trace.calc_exc_metrics(["Timestamp (ns)"])
 
     profile = (
@@ -678,19 +678,9 @@ def flat_profile(trace, x_axis_type="log", **kwargs):
     return plot(p)
 
 
-# Ignore
-def messages_over_time(trace, **kwargs):
-    sends = trace.events[trace.events["Name"].isin(["MpiSend", "MpiIsend"])]
-
-    timestamps = sends["Timestamp (ns)"]
-    sizes = sends["Attributes"].apply(lambda x: x["msg_length"])
-
-    min_ts = trace.events["Timestamp (ns)"].min()
-    max_ts = trace.events["Timestamp (ns)"].max()
-
-    hist, edges = np.histogram(
-        timestamps, bins=100, weights=sizes, range=(min_ts, max_ts)
-    )
+def comm_over_time(trace, **kwargs):
+    hist, edges = trace.comm_over_time(**kwargs)
+    is_size = kwargs.pop("output", "size") == "size"
 
     p = figure(
         y_range=(0, np.max(hist) + np.max(hist) / 4),
@@ -704,100 +694,31 @@ def messages_over_time(trace, **kwargs):
 
     p.quad(top=hist, bottom=0, left=edges[:-1], right=edges[1:], line_color="white")
 
-    return plot(p)
-
-
-# Ignore
-def events_over_time_2d(trace, **kwargs):
-    min_ts = trace.events["Timestamp (ns)"].min()
-    max_ts = trace.events["Timestamp (ns)"].max()
-    num_ranks = len(trace.events["Process"].unique())
-
-    H, xe, ye = np.histogram2d(
-        x=trace.events["Timestamp (ns)"],
-        y=trace.events["Process"].astype(int),
-        bins=[50, num_ranks],
-        range=[[min_ts, max_ts], [-0.5, num_ranks - 0.5]],
+    hover = p.select(HoverTool)
+    hover.tooltips = get_html_tooltips(
+        {
+            "Bin": "@left{custom} - @right{custom}",
+            "Total volume sent:": "@top{custom}",
+        }
+        if is_size
+        else {"Bin": "@left{custom} - @right{custom}", "Number of messages": "@top"}
     )
-
-    p = figure(
-        x_range=[min(xe), max(xe)],
-        y_range=[max(ye), min(ye)],
-        x_axis_label="Time",
-        y_axis_label="Process",
-        sizing_mode="stretch_width",
-        tools="hover,save",
-    )
-    p.image(
-        image=[np.transpose(H)],
-        x=xe[0],
-        y=ye[-1],
-        dw=xe[-1] - xe[0],
-        dh=ye[-1] - ye[0],
-        palette="Viridis256",
-    )
-    p.xaxis.formatter = get_time_tick_formatter()
+    hover.formatters = {
+        "@left": get_time_hover_formatter(),
+        "@right": get_time_hover_formatter(),
+        "@top": get_size_hover_formatter(),
+    }
 
     return plot(p)
 
 
-# Ignore
-def events_over_time(trace, **kwargs):
-    from scipy.stats.kde import gaussian_kde
-
-    ts = trace.events["Timestamp (ns)"]
-    min_ts = ts.min()
-    max_ts = ts.max()
-
-    p = figure(
-        x_axis_label="Time",
-        y_axis_label="Count",
-        tools="hover,save",
-        sizing_mode="stretch_width",
-    )
-    p.y_range.start = 0
-    p.xaxis.formatter = get_time_tick_formatter()
-
-    hist, edges = np.histogram(ts, bins=50, density=True, range=(min_ts, max_ts))
-    p.quad(
-        top=hist,
-        bottom=0,
-        left=edges[:-1],
-        right=edges[1:],
-        line_color="white",
-        legend_label="Histogram",
-    )
-
-    pdf = gaussian_kde(ts)
-    x = np.linspace(min_ts, max_ts, 500)
-    p.line(x, pdf(x), line_color="#ff8888", line_width=4, alpha=0.7, legend_label="PDF")
-    # p.line(
-    #     x,
-    #     np.cumsum(pdf(x)),
-    #     line_color="orange",
-    #     line_width=2,
-    #     alpha=0.7,
-    #     legend_label="CDF",
-    # )
-
-    p.add_layout(p.legend[0], "right")
-
-    return plot(p)
-
-
-# Ignore
-def comm_profile(trace, **kwargs):
-    comm_matrix = trace.comm_matrix()
-
-    process = np.arange(0, comm_matrix.shape[0])
-    sends = comm_matrix.sum(axis=0)
-    receives = comm_matrix.sum(axis=1)
-
-    data = {"process": process, "sends": sends, "receives": receives}
+def comm_summary(trace, **kwargs):
+    summary = trace.comm_summary(**kwargs).reset_index()
+    is_size = kwargs.pop("output", "size") == "size"
 
     p = figure(
         # y_range=(np.min(sends) * 0.8, np.max(sends) * 1.05),
-        x_range=(-0.5, comm_matrix.shape[0] - 0.5),
+        x_range=(-0.5, len(summary) - 0.5),
         x_axis_label="Process",
         y_axis_label="Volume",
         sizing_mode="stretch_width",
@@ -815,21 +736,36 @@ def comm_profile(trace, **kwargs):
     )
 
     p.vbar(
-        x=dodge("process", -0.1667, range=p.x_range),
-        top="sends",
+        x=dodge("Process", -0.1667, range=p.x_range),
+        top="Sent",
         width=0.2,
-        source=data,
+        source=summary,
         color=get_palette(trace)["MPI_Send"],
         legend_label="Total sent",
     )
     p.vbar(
-        x=dodge("process", 0.1667, range=p.x_range),
-        top="receives",
+        x=dodge("Process", 0.1667, range=p.x_range),
+        top="Received",
         width=0.2,
-        source=data,
+        source=summary,
         color=get_palette(trace)["MPI_Recv"],
         legend_label="Total received",
     )
     p.add_layout(p.legend[0], "right")
+
+    hover = p.select(HoverTool)
+    hover.tooltips = get_html_tooltips(
+        {
+            "Process": "@Process",
+            "Sent": "@Sent{custom}",
+            "Received": "@Received{custom}",
+        }
+        if is_size
+        else {"Process": "@Process", "Sent": "@Sent", "Received": "@Received"}
+    )
+    hover.formatters = {
+        "@Sent": get_size_hover_formatter(),
+        "@Received": get_size_hover_formatter(),
+    }
 
     plot(p)
