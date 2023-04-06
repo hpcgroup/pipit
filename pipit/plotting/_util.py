@@ -427,7 +427,7 @@ PALETTE = [
 
 def get_palette(trace, scale=None):
     trace.calc_exc_metrics(["Timestamp (ns)"])
-    names = reversed(trace.flat_profile(["time.inc"]).index.tolist())
+    names = reversed(trace.flat_profile(["time.exc"]).index.tolist())
 
     base_palette = PALETTE.copy()
     palette = {}
@@ -441,8 +441,6 @@ def get_palette(trace, scale=None):
     palette["MPI_Wait"] = "#c7c7c7"
     palette["MPI_Waitall"] = "#c7c7c7"
     palette["Idle"] = "#c7c7c7"
-
-    print(palette)
 
     for i, f in enumerate(names):
         if f not in palette:
