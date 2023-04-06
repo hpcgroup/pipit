@@ -464,9 +464,11 @@ class Trace:
 
         imb_metric = metric + ".imbalance"
         imb_ranks = "Top processes"
+        mean_metric = metric + ".mean"
 
         imbalance_dict[imb_metric] = []
         imbalance_dict[imb_ranks] = []
+        imbalance_dict[mean_metric] = []
 
         functions = set(self.events.loc[self.events["Event Type"] == "Enter"]["Name"])
         for function in functions:
@@ -474,12 +476,13 @@ class Trace:
 
             top_n = curr_series.sort_values(ascending=False).iloc[0:num_display]
 
+            imbalance_dict[mean_metric].append(curr_series.mean())
             imbalance_dict[imb_metric].append(top_n.values[0] / curr_series.mean())
             imbalance_dict[imb_ranks].append(list(top_n.index))
 
         imbalance_df = pd.DataFrame(imbalance_dict)
         imbalance_df.index = functions
-        imbalance_df.sort_values(by=(imb_metric), axis=0, inplace=True, ascending=False)
+        imbalance_df.sort_values(by=mean_metric, axis=0, inplace=True, ascending=False)
 
         return imbalance_df
 
