@@ -300,7 +300,9 @@ def timeline(trace, show_depth=False, instant_events=False):
         dimension=1,
         grid_line_color="white",
         grid_line_width=2 if show_depth else 5,
-        ticker=FixedTicker(ticks=depth_ticks - 0.49),
+        ticker=FixedTicker(
+            ticks=np.concatenate([depth_ticks - 0.49, depth_ticks + 0.49])
+        ),
         level="glyph",
     )
     g2 = Grid(

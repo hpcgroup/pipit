@@ -12,6 +12,7 @@ from bokeh.models import (
     PrintfTickFormatter,
     NumeralTickFormatter,
 )
+from bokeh.palettes import Category20_20
 from bokeh.transform import factor_cmap
 from bokeh.themes import Theme
 import yaml
@@ -363,37 +364,6 @@ def clamp(val, minimum, maximum):
     return val
 
 
-# Generated with https://medialab.github.io/iwanthue/
-# Slightly more lenient chroma/lightness than default preset
-# Hues restrained to "cool"
-COOL = [
-    "#4d8464",
-    "#3e69b2",
-    "#7fbe37",
-    "#6899ce",
-    "#4ac36b",
-    "#56b5c7",
-    "#52832f",
-    "#72c19b",
-    "#365525",
-    "#97ba63",
-]
-
-# Hues restrained to "warm"
-WARM = [
-    "#ce98d7",
-    "#db5036",
-    "#9859ca",
-    "#a94937",
-    "#c849af",
-    "#dc8e76",
-    "#89578d",
-    "#d03c73",
-    "#975156",
-    "#df809c",
-]
-
-
 def hex_to_rgb(hex):
     hex = hex.strip("#")
 
@@ -432,39 +402,27 @@ def get_height(num_yticks, height_per_tick=400):
 
 
 def get_palette(trace, scale=None):
-    # Idea: use cool for MPI, divide warm among non-MPIs
-    functions = (
-        trace.events[trace.events["Event Type"] == "Enter"]["Name"].unique().tolist()
-    )
+    trace.calc_inc_metrics(["Timestamp (ns)"])
+    names = reversed(trace.flat_profile(["time.inc"]).index.tolist())
 
-    mpi = sorted(list(filter(lambda x: x.startswith("MPI_"), functions)))
-    nonmpi = sorted(list(set(functions).difference(mpi)))
-
+    base_palette = list(Category20_20).copy()
     palette = {}
-    cool = COOL.copy()
-    warm = WARM.copy()
 
-    # reserved colors
-    palette["MPI"] = average_hex(*cool)
-
-    palette["MPI_Init"] = cool.pop(len(cool) - 1)
-    palette["MPI_Finalize"] = palette["MPI_Init"]
-
-    palette["MPI_Send"] = cool.pop(0)
+    palette["MPI_Send"] = base_palette.pop(0)
     palette["MPI_Isend"] = palette["MPI_Send"]
 
-    palette["MPI_Recv"] = cool.pop(0)
+    palette["MPI_Recv"] = base_palette.pop(5)
     palette["MPI_Irecv"] = palette["MPI_Recv"]
 
-    # assign remaining MPI functions based on index
-    for i, f in enumerate(mpi):
-        if f not in palette:
-            palette[f] = cool[i % len(cool)]
+    base_palette.pop(12)
+    palette["MPI_Wait"] = base_palette.pop(12)
+    palette["MPI_Waitall"] = palette["MPI_Wait"]
+    palette["Idle"] = palette["MPI_Wait"]
 
-    # assign remaining functions based on index
-    for i, f in enumerate(nonmpi):
+    for i, f in enumerate(names):
         if f not in palette:
-            palette[f] = warm[i % len(warm)]
+            # palette[f] = base_palette[hash(f) % len(base_palette)]
+            palette[f] = base_palette[i % len(base_palette)]
 
     # apply multiplier
     if scale:
