@@ -566,6 +566,10 @@ def time_profile(trace, **kwargs):
     normalized = kwargs.get("normalized")
     profile = trace.time_profile(**kwargs).fillna(0)
 
+    # Move "Idle" to the top
+    if "Idle" in profile.columns:
+        profile.insert(len(profile.columns) - 1, "Idle", profile.pop("Idle"))
+
     # Get function names
     func = profile.columns[3:]
     func_trimmed = trimmed(func).tolist()
@@ -577,6 +581,7 @@ def time_profile(trace, **kwargs):
         y_axis_label="Time Contribution",
         tools="hover,save",
         sizing_mode="stretch_width",
+        height=max(400, 20 * len(profile.columns)),
     )
 
     # Prepare colors
@@ -606,6 +611,7 @@ def time_profile(trace, **kwargs):
     p.outline_line_color = None
 
     # Move legend to right side
+    p.legend[0].items = list(reversed(p.legend[0].items))
     p.add_layout(p.legend[0], "right")
 
     # Configure hover
