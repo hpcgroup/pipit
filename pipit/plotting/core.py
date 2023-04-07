@@ -578,7 +578,7 @@ def time_profile(trace, **kwargs):
     p = figure(
         # title="Time Profile",
         x_axis_label="Time",
-        y_axis_label="Time Contribution",
+        y_axis_label="% utilization" if normalized else "Time Contribution",
         tools="hover,save",
         sizing_mode="stretch_width",
         height=max(400, 20 * len(profile.columns)),

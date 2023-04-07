@@ -50,7 +50,7 @@ THEME_DEFAULT = """
 THEME_PAPER = """
     attrs:
         Plot:
-            height: 420
+            height: 600
             width: 800
             toolbar_location: "above"
             outline_line_width: 0
@@ -440,6 +440,7 @@ def get_palette(trace, scale=None):
     palette["MPI_Irecv"] = "#d62728"
 
     palette["MPI_Wait"] = "#c7c7c7"
+    palette["MPI_Waitany"] = "#c7c7c7"
     palette["MPI_Waitall"] = "#c7c7c7"
     palette["Idle"] = "#c7c7c7"
 
