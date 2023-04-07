@@ -669,7 +669,7 @@ class Trace:
             )
 
         combined_df = pd.concat([fp[metric_col] for fp in flat_profiles], axis=1).T
-        combined_df.index = [len(trace.events) for trace in traces]
+        combined_df.index = [len(set(trace.events["Process"])) for trace in traces]
         combined_df.index.rename("Number of Processes", inplace=True)
 
         function_sums = combined_df.sum()
