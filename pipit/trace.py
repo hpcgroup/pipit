@@ -651,3 +651,28 @@ class Trace:
         df.insert(0, "bin_end", edges[1:])
 
         return df
+
+    @staticmethod
+    def multirun_analysis(
+        traces=[], metric_column="Timestamp (ns)", groupby_column="Name"
+    ):
+        flat_profiles = []
+        for trace in traces:
+            trace.calc_exc_metrics([metric_column])
+            metric_col = (
+                "time.exc"
+                if metric_column == "Timestamp (ns)"
+                else metric_column + ".exc"
+            )
+            flat_profiles.append(
+                trace.flat_profile(metrics=[metric_col], groupby_column=groupby_column)
+            )
+
+        combined_df = pd.concat([fp[metric_col] for fp in flat_profiles], axis=1).T
+        combined_df.index = [len(trace.events) for trace in traces]
+        combined_df.index.rename("Number of Processes", inplace=True)
+
+        function_sums = combined_df.sum()
+        combined_df = combined_df[function_sums.sort_values(ascending=False).index]
+
+        return combined_df
