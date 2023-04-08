@@ -60,13 +60,19 @@ class Trace:
 
     @staticmethod
     def from_csv(filename):
-        events_dataframe = pd.read_csv(filename, skipinitialspace = True)
-        if "Timestamp (s)" in events_dataframe.columns:
-            events_dataframe["Timestamp (s)"] *= (10**9)
-            events_dataframe.rename(columns={"Timestamp (s)": "Timestamp (ns)"}, inplace=True)
+        events_dataframe = pd.read_csv(filename, skipinitialspace=True)
 
+        # if timestamps are in seconds, convert them to nanoseconds
+        if "Timestamp (s)" in events_dataframe.columns:
+            events_dataframe["Timestamp (s)"] *= 10**9
+            events_dataframe.rename(
+                columns={"Timestamp (s)": "Timestamp (ns)"}, inplace=True
+            )
+
+        # ensure that ranks are ints
         events_dataframe = events_dataframe.astype({"Process": "int32"})
 
+        # make certain columns categorical
         events_dataframe = events_dataframe.astype(
             {
                 "Event Type": "category",
@@ -75,6 +81,7 @@ class Trace:
             }
         )
 
+        # sort the dataframe by Timestamp
         events_dataframe.sort_values(
             by="Timestamp (ns)", axis=0, ascending=True, inplace=True, ignore_index=True
         )
