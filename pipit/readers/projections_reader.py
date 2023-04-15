@@ -263,7 +263,7 @@ class ProjectionsReader:
                     + log_file
                     + " is missing."
                 )
-            
+
         num_cpus = mp.cpu_count()
         if num_processes is None or num_processes < 1 or num_processes > num_cpus:
             # uses all processes to parallelize reading by default
@@ -285,7 +285,7 @@ class ProjectionsReader:
     def read(self):
         if self.num_pes < 1:
             return None
-        
+
         pool_size, pool = self.num_processes, mp.Pool(self.num_processes)
 
         # Read each log file and store as list of dataframes
@@ -435,7 +435,10 @@ class ProjectionsReader:
                     data["Attributes"].append(details)
 
                 # Not sure if this should be instant or enter/leave
-                elif int(line_arr[0]) == ProjectionsConstants.USER_SUPPLIED_BRACKETED_NOTE:
+                elif (
+                    int(line_arr[0])
+                    == ProjectionsConstants.USER_SUPPLIED_BRACKETED_NOTE
+                ):
                     time = line_arr[1]
                     end_time = line_arr[2]
                     user_event_id = line_arr[3]
@@ -720,7 +723,11 @@ class ProjectionsReader:
 
                     user_event_name = sts_reader.get_user_event(user_event_id)
 
-                    details = {"From PE": pe, "Event ID": event, "Event Type": "User Event"}
+                    details = {
+                        "From PE": pe,
+                        "Event ID": event,
+                        "Event Type": "User Event",
+                    }
 
                     data["Name"].append(user_event_name)
                     data["Event Type"].append("Instant")
