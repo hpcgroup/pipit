@@ -245,9 +245,8 @@ class ProjectionsReader:
 
         if not hasattr(self, "executable_location"):
             raise ValueError("Invalid directory for projections - no sts files found.")
-        # read sts file and get number of PEs
-        self.sts_reader = STSReader(self.executable_location + ".sts")
-        self.num_pes = self.sts_reader.num_pes
+        
+        self.num_pes = STSReader(self.executable_location + ".sts").num_pes
 
         # make sure all the log files exist
         for i in range(self.num_pes):
@@ -305,7 +304,7 @@ class ProjectionsReader:
 
     def _read_log_file(self, rank_size) -> pd.DataFrame:
         # has information needed in sts file
-        sts_reader = self.sts_reader
+        sts_reader = STSReader(self.executable_location + ".sts")
 
         rank, size = rank_size[0], rank_size[1]
         per_process = int(self.num_pes // size)
