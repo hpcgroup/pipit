@@ -300,6 +300,7 @@ class ProjectionsReader:
             by="Timestamp (ns)", axis=0, ascending=True, inplace=True, ignore_index=True
         )
 
+        # categorical for memory savings
         trace_df = trace_df.astype(
             {
                 "Name": "category",
@@ -307,6 +308,9 @@ class ProjectionsReader:
                 "Process": "category",
             }
         )
+
+        # re-order columns
+        trace_df = trace_df[["Timestamp (ns)", "Event Type", "Name", "Process", "Attributes"]]
 
         return pipit.trace.Trace(None, trace_df)
 
