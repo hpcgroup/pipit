@@ -285,6 +285,9 @@ class ProjectionsReader:
         if self.num_pes < 1:
             return None
 
+        if self.num_processes > self.num_pes:
+            self.num_processes = self.num_pes
+
         pool_size, pool = self.num_processes, mp.Pool(self.num_processes)
 
         # Read each log file and store as list of dataframes
@@ -310,7 +313,9 @@ class ProjectionsReader:
         )
 
         # re-order columns
-        trace_df = trace_df[["Timestamp (ns)", "Event Type", "Name", "Process", "Attributes"]]
+        trace_df = trace_df[
+            ["Timestamp (ns)", "Event Type", "Name", "Process", "Attributes"]
+        ]
 
         return pipit.trace.Trace(None, trace_df)
 
