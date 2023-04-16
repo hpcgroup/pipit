@@ -245,7 +245,7 @@ class ProjectionsReader:
 
         if not hasattr(self, "executable_location"):
             raise ValueError("Invalid directory for projections - no sts files found.")
-        
+
         self.num_pes = STSReader(self.executable_location + ".sts").num_pes
 
         # make sure all the log files exist
@@ -325,7 +325,16 @@ class ProjectionsReader:
             begin_int = (rank * per_process) + remainder
             end_int = ((rank + 1) * per_process) + remainder
 
-        print("rank: " + str(rank) + " " + "begin int: " + str(begin_int) + " "  + "end int: " + str(end_int))
+        print(
+            "rank: "
+            + str(rank)
+            + " "
+            + "begin int: "
+            + str(begin_int)
+            + " "
+            + "end int: "
+            + str(end_int)
+        )
         print("")
 
         dfs = []
