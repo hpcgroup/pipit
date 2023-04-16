@@ -325,18 +325,6 @@ class ProjectionsReader:
             begin_int = (rank * per_process) + remainder
             end_int = ((rank + 1) * per_process) + remainder
 
-        print(
-            "rank: "
-            + str(rank)
-            + " "
-            + "begin int: "
-            + str(begin_int)
-            + " "
-            + "end int: "
-            + str(end_int)
-        )
-        print("")
-
         dfs = []
         for pe_num in range(begin_int, end_int, 1):
             # create an empty dict to append to
