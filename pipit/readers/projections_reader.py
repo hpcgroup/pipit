@@ -300,6 +300,14 @@ class ProjectionsReader:
             by="Timestamp (ns)", axis=0, ascending=True, inplace=True, ignore_index=True
         )
 
+        trace_df = trace_df.astype(
+            {
+                "Name": "category",
+                "Event Type": "category",
+                "Process": "category",
+            }
+        )
+
         return pipit.trace.Trace(None, trace_df)
 
     def _read_log_file(self, rank_size) -> pd.DataFrame:
@@ -316,6 +324,9 @@ class ProjectionsReader:
         else:
             begin_int = (rank * per_process) + remainder
             end_int = ((rank + 1) * per_process) + remainder
+
+        print("rank: " + str(rank) + " " + "begin int: " + str(begin_int) + " "  + "end int: " + str(end_int))
+        print("")
 
         dfs = []
         for pe_num in range(begin_int, end_int, 1):
