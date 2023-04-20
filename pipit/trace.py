@@ -811,66 +811,37 @@ class Trace:
     ):
         import stumpy
 
-        self.calc_exc_metrics()
-        df = self.events.copy(deep=True)
+def detect_pattern(
+    self, data, iterations=None, window_size=None, process=0, metric="time.exc"
+):
+    import stumpy
 
-        iterations = len(
-            df[
-                (df["Name"] == start_event)
-                & (df["Event Type"] == "Enter")
-                & (df["Process"] == process)
+    y = data.loc[(data["time.exc"].notnull()) & (data["Process"] == 0)][
+        "time.exc"
+    ].values[:]
+    matrix_profile = stumpy.stump(y, window_size)
+    dists, indices = stumpy.motifs(y, matrix_profile[:, 0], max_matches=iterations)
+
+    filtered_df = data.loc[(data[metric].notnull()) & (data["Process"] == process)]
+
+    # find the matches on the given trace
+    match_original = self.events.loc[
+        self.events["Timestamp (ns)"].isin(
+            filtered_df.iloc[indices[0]]["Timestamp (ns)"].values
+        )
+    ]
+
+    # filter out the events happening before the start of the
+    # iteration and after the end of the iteration.
+    self.events = self.events[
+        (self.events["Timestamp (ns)"] >= match_original.iloc[0]["Timestamp (ns)"])
+        & (
+            self.events["Timestamp (ns)"]
+            <= self.events.iloc[match_original.iloc[-1]._matching_event][
+                "Timestamp (ns)"
             ]
         )
+        | (self.events["Name"] == match_original.iloc[0]["Name"])
+    ]
 
-        df = df[df["Process"] == process]
-        df.reset_index(inplace=True)
-
-        first_loop_enter = df[
-            (df["Name"] == start_event)
-            & (df["Event Type"] == "Enter")
-            & (df["Process"] == process)
-        ].index[0]
-
-        last_loop_leave = df[
-            (df["Name"] == start_event)
-            & (df["Event Type"] == "Leave")
-            & (df["Process"] == process)
-        ].index[-1]
-
-        df = df.iloc[first_loop_enter + 1 : last_loop_leave]
-        filtered_df = df.loc[
-            (df[metric].notnull()) & (df["Process"] == process)
-        ]  # & (df["Name"] != "time-loop")
-
-        x = df.loc[(df[metric].notnull()) & (df["Process"] == process)][
-            "Timestamp (ns)"
-        ].values[:]
-        y = df.loc[(df[metric].notnull()) & (df["Process"] == process)][metric].values[
-            :
-        ]
-
-        length_of_seq = int(len(y) / iterations)
-        matrix_profile = stumpy.stump(y, length_of_seq)
-        dists, indices = stumpy.motifs(y, matrix_profile[:, 0], max_matches=iterations)
-
-        # find the matches on the given trace
-        match_original = self.events.loc[
-            self.events["Timestamp (ns)"].isin(
-                filtered_df.iloc[indices[0]]["Timestamp (ns)"].values
-            )
-        ]
-
-        # filter out the events happening before the start of the
-        # iteration and after the end of the iteration.
-        self.events = self.events[
-            (self.events["Timestamp (ns)"] >= match_original.iloc[0]["Timestamp (ns)"])
-            & (
-                self.events["Timestamp (ns)"]
-                <= self.events.iloc[match_original.iloc[-1]._matching_event][
-                    "Timestamp (ns)"
-                ]
-            )
-            | (self.events["Name"] == match_original.iloc[0]["Name"])
-        ]
-
-        return (match_original, indices, matrix_profile, length_of_seq)
+    return match_original
