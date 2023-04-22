@@ -12,6 +12,9 @@ def parse_time(time) -> float:
     Returns:
         float: Timestamp in nanoseconds.
     """
+    if time is None:
+        return None
+
     if isinstance(time, numbers.Number):
         return time
 

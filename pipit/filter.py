@@ -2,22 +2,11 @@ from .util import parse_time
 
 
 class Filter:
-    """Represents a boolean expression that can be evaluated for each event in a
-    Trace instance.
+    """
+    A filter that can be used to select a subset of events from a Trace instance
+    based on a condition on a field, like `Name == "MPI_Init"` or `Process > 5`.
 
-    For example:    ("Name", "==", "MPI_Init")
-                    ("Process", ">", 5)
-
-    The expression can refer to any field that currently exists in the events
-    DataFrame. It supports convenient operations, like comparison and array
-    membership.
-
-    Filter instances can be shared and reused across multiple Traces. Logical
-    operators like AND, OR, and NOT can be also be applied to Filter instances.
-
-    When a Trace is queried with a Filter, a new Trace instance is created
-    containing a view of the events DataFrame of the original Trace. All of Pipit's
-    analysis and plotting functions can be applied to the new Trace.
+    Filter instances can be modified with the AND, OR, and NOT logical operators.
     """
 
     def __init__(
@@ -26,35 +15,30 @@ class Filter:
         operator=None,
         value=None,
         expr=None,
-        trim=True,
     ):
         """
         Args:
-            field (str, optional): DataFrame field/column name to operate on.
+            field (str, optional): DataFrame column to filter on.
 
-            operator (str, optional): The operator used to evaluate this expression.
-                Allowed operators:
-                "<", "<=", "==", ">=", ">", "!=", "in", "not-in", "between"
+            operator (str, optional): The comparison operator to use for filtering.
+                Available operators are `<`, `<=`, `==`, `>=`, `>`, `!=`, `in`, `not-in`,
+                and `between`.
 
-            value (optional): The value to compare to. For "in" and "not-in"
-                operators, this can be a list of any size. For "between", this
-                must be a list or tuple of 2 elements, containing the lower and upper
-                bound. For all other operators, must be a scalar value, like "MPI_Init"
-                or 1.5e+5.
+            value (optional): The value to compare against when filtering. If operator
+                is `in` or `not-in`, this must be a list of values. If operator is
+                `between`, this must be a list of 2 elements, containing the start
+                and end values.
 
-            expr (str, optional): Instead of providing the field, operator, and value,
-                you may provide a Pandas query expression, which will be supplied to
-                pandas.DataFrame.eval.
+            expr (str, optional): Pandas expression that can be provided as an
+                alternative to the field, operator, and value parameters. When evaluated
+                with `pandas.DataFrame.eval`, it should return a boolean mask indicating
+                whether each event should be included in the filtered Trace.
                 See https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.eval.html. # noqa: E501
-
-            trim (bool, optional): When filtering by timestamp, whether to trim functions
-                so that Enter/Leave timestamps are within the value. Defaults to True.
         """
         self.field = field
         self.operator = operator
         self.value = value
         self.expr = expr
-        self.trim = trim
 
     def __and__(self, other):
         return And(self, other)
@@ -76,23 +60,23 @@ class Filter:
             )
 
     def _eval(self, trace):
-        """Evaluate this filter on a Trace
+        """Evaluatea this filter on a Trace.
 
-        Returns a boolean vector that determines whether each row of the events
-        DataFrame should be included in the selection. This result can be supplied
-        to `Trace.loc` to get a subset of the Trace.
+        Returns:
+            pd.Series: Boolean mask that indicates whether each event should be included
+                in the filtered Trace.
         """
         value = self.value
 
-        # Parse value into float
+        # Parse value into float, if needed
         if self.field and "time" in self.field.lower():
             value = parse_time(self.value)
 
-        # Get boolean vector using pd.DataFrame.eval
+        # Get boolean mask using pd.DataFrame.eval
         if self.expr:
             result = trace.events.eval(self.expr)
 
-        # Get boolean vector using pd.Series comparison
+        # Get boolean mask using pd.Series comparison
         elif self.operator == "==":
             result = trace.events[self.field] == value
 
@@ -118,16 +102,18 @@ class Filter:
             result = ~trace.events[self.field].isin(value)
 
         elif self.operator == "between":
-            trace._match_events()
-
-            start = value[0]
-            end = value[1]
+            start, end = value
 
             if self.field != "Timestamp (ns)":
                 result = (trace.events[self.field] >= start) & (
                     trace.events[self.field] <= end
                 )
             else:
+                # Special case if field is timestamp
+                trace._match_events()
+
+                # This ensures that if any part of a function occurs in a time range,
+                # then both the Enter and Leave events are included in the filter
                 result = (
                     (
                         (trace.events["Event Type"] == "Instant")
@@ -158,8 +144,11 @@ class And(Filter):
         self.filters = args
 
     def _eval(self, trace):
+        # Evaluate the first filter on the trace
         results = self.filters[0]._eval(trace)
 
+        # Evaluate the rest of the filters, one at a time,
+        # and AND the result each time
         for i in range(1, len(self.filters)):
             results = results & self.filters[i]._eval(trace)
 
@@ -178,8 +167,11 @@ class Or(Filter):
         self.filters = args
 
     def _eval(self, trace):
+        # Evaluate the first filter on the trace
         results = self.filters[0]._eval(trace)
 
+        # Evaluate the rest of the filters, one at a time,
+        # and OR the result each time
         for i in range(1, len(self.filters)):
             results = results | self.filters[i]._eval(trace)
 

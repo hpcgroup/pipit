@@ -651,66 +651,76 @@ class Trace:
         return df
 
     def _eval(self, *args, **kwargs):
-        """Evaluates a Filter for each event in this Trace.
+        """
+        Evaluates a Filter object on the `events` DataFrame, returning a boolean mask.
 
         Allowed inputs:
-        - Arguments used to create a Filter instance
-        - One or more Filter instances
+        - Filter object
+        - Arguments used to create a Filter object
 
         Returns:
-            pd.Series: Boolean vector containing evaluated result for each event.
+            pd.Series: Boolean mask that indicates whether each event should be included
+                in the filtered Trace.
         """
+        # Import lazily to avoid circular dependencies
         from .filter import Filter
 
+        # If input is a Filter object, then evaluate it
         if len(kwargs) == 0 and isinstance(args[0], Filter):
             return args[0]._eval(self)
-        else:
-            return Filter(*args, **kwargs)._eval(self)
+
+        # Otherwise, create new a Filter object, and then evaluate it
+        return Filter(*args, **kwargs)._eval(self)
 
     def filter(self, *args, **kwargs):
-        """Filter events with a boolean filter.
+        """
+        Returns a new Trace instance containing a filtered subset of the original data.
 
         Allowed inputs:
-        - Arguments used to create a Filter instance
-        - One or more Filter instances
+        - Filter object
+        - Arguments used to create a Filter object
 
         Returns:
-            pipit.Trace: new Trace instance containing filtered copy of the events
+            pipit.Trace: new Trace instance containing filtered subset of the `events`
             DataFrame.
         """
-        results = self._eval(*args, **kwargs)
-        return Trace(self.definitions, self.events.loc[results].copy(deep=False))
+        # Pass arguments to _eval function, which returns a boolean mask
+        bool_mask = self._eval(*args, **kwargs)
 
-    def trim(self, start=None, end=None):
-        """Trims functions so that their Enter and Leave timestamps are bounded within
-        a time range.
+        # Apply boolean mask using loc indexing
+        filtered_events = self.events.loc[bool_mask].copy(deep=False)
+
+        # Return a new Trace instance
+        return Trace(self.definitions, filtered_events)
+
+    def trim(self, start=-float("inf"), end=float("inf")):
+        """
+        Returns a new Trace instance containing only events that occur in a specified
+        time window. The timestamps of `Enter` and `Leave` events are clipped to be
+        within the window.
 
         Args:
-        start (float): Start of the time range.
-        end (float): End of the time range.
+            start (float): Start of the time window. Defaults to -inf.
+            end (float): End of the time window. Defaults to inf.
 
         Returns:
             pipit.Trace: new Trace instance containing a view of the events DataFrame
         """
         from .util import parse_time
 
-        self._match_events()
+        # Parse start and end into float (in nanoseconds)
+        start = parse_time(start)
+        end = parse_time(end)
 
-        start = parse_time(start) or self.events["Timestamp (ns)"].min()
-        end = parse_time(end) or self.events["Timestamp (ns)"].max()
-
+        # Filter to events within time window
         events = self.filter("Timestamp (ns)", "between", [start, end]).events
 
-        # Delete inc/exc time calculations as these are no longer accurate
-        if "time.inc" in events.columns:
-            del events["time.inc"]
-
-        if "time.exc" in events.columns:
-            del events["time.exc"]
-
-        # Clip values to be in [start, end]
+        # Clip timestamps within [start, end]
         for col in ["Timestamp (ns)", "_matching_timestamp"]:
             events[col] = events[col].clip(start, end)
+
+        # Delete inc/exc metrics, since these are no longer accurate
+        events.drop(columns=self.inc_metrics + self.exc_metrics, inplace=True)
 
         # Return new Trace instance containing modified events
         return Trace(self.definitions, events)
