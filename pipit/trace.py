@@ -6,8 +6,6 @@
 import numpy as np
 import pandas as pd
 
-import logging
-
 
 class Trace:
     """A trace dataset is read into an object of this type, which includes one
@@ -27,35 +25,6 @@ class Trace:
         # will store columns names for inc/exc metrics
         self.inc_metrics = []
         self.exc_metrics = []
-
-        # Validate columns
-        required_cols = {"Timestamp (ns)", "Event Type", "Name", "Process"}
-        col_diff = required_cols.difference(self.events.columns)
-
-        if len(col_diff) != 0:
-            logging.warning(
-                "This Trace instance is invalid, as it is missing required columns %s. "
-                "You may continue working with it, but the Pipit API may produce "
-                "undesireable or incorrect results." % list(col_diff)
-            )
-            return
-
-        # Validate rows
-        row_diff = len(self.events[self.events["Event Type"] == "Enter"]) - len(
-            self.events[self.events["Event Type"] == "Leave"]
-        )
-
-        if row_diff != 0:
-            logging.warning(
-                "This Trace instance is invalid, as it has %s more %s rows than "
-                "%s rows. You may continue working with it, but the Pipit API may "
-                "produce undesireable or incorrect results."
-                % (
-                    abs(row_diff),
-                    "Enter" if row_diff > 0 else "Leave",
-                    "Leave" if row_diff > 0 else "Enter",
-                )
-            )
 
     @staticmethod
     def from_otf2(dirname, num_processes=None):
@@ -715,7 +684,7 @@ class Trace:
 
     def _eval(self, *args, **kwargs):
         """
-        Evaluates a Filter object on the `events` DataFrame, returning a boolean mask.
+        Evaluates a Filter object and returns a boolean mask.
 
         Allowed inputs:
         - Filter object

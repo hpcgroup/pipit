@@ -2,7 +2,7 @@ import re
 import numbers
 
 
-def parse_time(time) -> float:
+def parse_time(ts) -> float:
     """Parses human-readable timestamp to ns.
 
     parse_time("130 ms") -> 130000000.0
@@ -12,33 +12,33 @@ def parse_time(time) -> float:
     Returns:
         float: Timestamp in nanoseconds.
     """
-    if time is None:
-        return None
+    # If ts is a list or slice, parse each element
+    if type(ts) == list:
+        return [parse_time(t) for t in ts]
 
-    if isinstance(time, numbers.Number):
-        return time
-
-    if type(time) == list:
-        return [parse_time(t) for t in time]
-
-    if type(time) == slice:
+    if type(ts) == slice:
         return slice(
-            parse_time(time.start) if time.start else -float("inf"),
-            parse_time(time.stop) if time.stop else float("inf"),
+            parse_time(ts.start) if ts.start else -float("inf"),
+            parse_time(ts.stop) if ts.stop else float("inf"),
         )
 
-    if time.isnumeric():
-        return float(time)
+    # If ts is already a number, return it
+    if ts is None or isinstance(ts, numbers.Number):
+        return ts
 
+    if ts.isnumeric():
+        return float(ts)
+
+    # Parse ts string into nanoseconds
     n = 0
 
-    d = re.search(r"(\d+\.?\d*)\s?d\b", time)
-    hr = re.search(r"(\d+\.?\d*)\s?hr\b", time)
-    m = re.search(r"(\d+\.?\d*)\s?m\b", time)
-    s = re.search(r"(\d+\.?\d*)\s?s\b", time)
-    ms = re.search(r"(\d+\.?\d*)\s?ms\b", time)
-    us = re.search(r"(\d+\.?\d*)\s?us\b", time)
-    ns = re.search(r"(\d+\.?\d*)\s?ns\b", time)
+    d = re.search(r"(\d+\.?\d*)\s?d\b", ts)
+    hr = re.search(r"(\d+\.?\d*)\s?hr\b", ts)
+    m = re.search(r"(\d+\.?\d*)\s?m\b", ts)
+    s = re.search(r"(\d+\.?\d*)\s?s\b", ts)
+    ms = re.search(r"(\d+\.?\d*)\s?ms\b", ts)
+    us = re.search(r"(\d+\.?\d*)\s?us\b", ts)
+    ns = re.search(r"(\d+\.?\d*)\s?ns\b", ts)
 
     if d:
         n += float(d.group(1)) * 1e9 * 3600 * 24
