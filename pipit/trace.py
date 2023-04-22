@@ -89,6 +89,36 @@ class Trace:
 
         return NsightReader(filename).read()
 
+    @staticmethod
+    def from_csv(filename):
+        events_dataframe = pd.read_csv(filename, skipinitialspace=True)
+
+        # if timestamps are in seconds, convert them to nanoseconds
+        if "Timestamp (s)" in events_dataframe.columns:
+            events_dataframe["Timestamp (s)"] *= 10**9
+            events_dataframe.rename(
+                columns={"Timestamp (s)": "Timestamp (ns)"}, inplace=True
+            )
+
+        # ensure that ranks are ints
+        events_dataframe = events_dataframe.astype({"Process": "int32"})
+
+        # make certain columns categorical
+        events_dataframe = events_dataframe.astype(
+            {
+                "Event Type": "category",
+                "Name": "category",
+                "Process": "category",
+            }
+        )
+
+        # sort the dataframe by Timestamp
+        events_dataframe.sort_values(
+            by="Timestamp (ns)", axis=0, ascending=True, inplace=True, ignore_index=True
+        )
+
+        return Trace(None, events_dataframe)
+
     def _match_events(self):
         """Matches corresponding enter/leave events and adds two columns to the
         dataframe: _matching_event and _matching_timestamp
@@ -132,32 +162,44 @@ class Trace:
                 # observed improvement in performance when using lists.
 
                 event_types = list(filtered_df["Event Type"])
-                df_indices, timestamps = list(filtered_df.index), list(
-                    filtered_df["Timestamp (ns)"]
+                df_indices, timestamps, names = (
+                    list(filtered_df.index),
+                    list(filtered_df["Timestamp (ns)"]),
+                    list(filtered_df.Name),
                 )
 
                 # Iterate through all events of filtered DataFrame
                 for i in range(len(filtered_df)):
-                    curr_df_index, curr_timestamp, evt_type = (
+                    curr_df_index, curr_timestamp, evt_type, curr_name = (
                         df_indices[i],
                         timestamps[i],
                         event_types[i],
+                        names[i],
                     )
 
                     if evt_type == "Enter":
                         # Add current dataframe index and timestamp to stack
-                        stack.append((curr_df_index, curr_timestamp))
+                        stack.append((curr_df_index, curr_timestamp, curr_name))
                     else:
-                        # Pop corresponding enter event's dataframe index
-                        # and timestamp
-                        enter_df_index, enter_timestamp = stack.pop()
+                        # we want to iterate through the stack in reverse order
+                        # until we find the corresponding "Enter" Event
+                        enter_name, i = None, len(stack) - 1
+                        while enter_name != curr_name and i > -1:
+                            enter_df_index, enter_timestamp, enter_name = stack[i]
+                            i -= 1
 
-                        # Fill in the lists with the matching values
-                        matching_events[enter_df_index] = curr_df_index
-                        matching_events[curr_df_index] = enter_df_index
+                        if enter_name == curr_name:
+                            # remove matched event from the stack
+                            del stack[i + 1]
 
-                        matching_times[enter_df_index] = curr_timestamp
-                        matching_times[curr_df_index] = enter_timestamp
+                            # Fill in the lists with the matching values if event found
+                            matching_events[enter_df_index] = curr_df_index
+                            matching_events[curr_df_index] = enter_df_index
+
+                            matching_times[enter_df_index] = curr_timestamp
+                            matching_times[curr_df_index] = enter_timestamp
+                        else:
+                            continue
 
             self.events["_matching_event"] = matching_events
             self.events["_matching_timestamp"] = matching_times
@@ -165,21 +207,31 @@ class Trace:
             self.events = self.events.astype({"_matching_event": "Int32"})
 
     def _match_caller_callee(self):
-        """Matches callers (parents) to callees (children) and adds two
+        """Matches callers (parents) to callees (children) and adds three
         columns to the dataframe:
-        _parent, and _children
+        _depth, _parent, and _children
+        _depth is the depth of the event in the call tree (starting from 0 for root)
         _parent is the dataframe index of a row's parent event.
         _children is a list of dataframe indices of a row's children events.
         """
 
         if "_children" not in self.events.columns:
             children = [None] * len(self.events)
-            parent = [float("nan")] * len(self.events)
+            depth, parent = [float("nan")] * len(self.events), [float("nan")] * len(
+                self.events
+            )
+
+            # match events so we can
+            # ignore unmatched ones
+            self._match_events()
 
             # only use enter and leave rows
             # to determine calling relationships
             enter_leave_df = self.events.loc[
-                self.events["Event Type"].isin(["Enter", "Leave"])
+                (
+                    self.events["Event Type"].isin(["Enter", "Leave"])
+                    & (self.events["_matching_event"].notnull())
+                )
             ]
 
             # list of processes and/or threads to iterate over
@@ -230,6 +282,7 @@ class Trace:
 
                             parent[curr_df_index] = parent_df_index
 
+                        depth[curr_df_index] = curr_depth
                         curr_depth += 1
 
                         # add enter dataframe index to stack
@@ -243,14 +296,16 @@ class Trace:
 
                         curr_depth -= 1
 
-            self.events["_parent"], self.events["_children"] = (
+            self.events["_depth"], self.events["_parent"], self.events["_children"] = (
+                depth,
                 parent,
                 children,
             )
 
-            self.events = self.events.astype({"_parent": "Int32"})
-
-            self.events = self.events.astype({"_parent": "category"})
+            self.events = self.events.astype({"_depth": "Int32", "_parent": "Int32"})
+            self.events = self.events.astype(
+                {"_depth": "category", "_parent": "category"}
+            )
 
     def calc_inc_metrics(self, columns=None):
         # if no columns are specified by the user, then we calculate
@@ -261,7 +316,11 @@ class Trace:
         if "_matching_event" not in self.events.columns:
             self._match_events()
 
-        enter_df = self.events.loc[self.events["Event Type"] == "Enter"]
+        # only filter to enters that have a matching event
+        enter_df = self.events.loc[
+            (self.events["Event Type"] == "Enter")
+            & (self.events["_matching_event"].notnull())
+        ]
 
         # calculate inclusive metric for each column specified
         for col in columns:
@@ -273,7 +332,9 @@ class Trace:
                 # the values at the enter rows from the values
                 # at the corresponding leave rows
                 self.events.loc[
-                    self.events["Event Type"] == "Enter", metric_col_name
+                    (self.events["_matching_event"].notnull())
+                    & (self.events["Event Type"] == "Enter"),
+                    metric_col_name,
                 ] = (
                     self.events[col][enter_df["_matching_event"]].values
                     - enter_df[col].values
@@ -286,8 +347,7 @@ class Trace:
         columns = self.numeric_cols if columns is None else columns
 
         # match caller and callee rows
-        if "_children" not in self.events.columns:
-            self._match_caller_callee()
+        self._match_caller_callee()
 
         # exclusive metrics only change for rows that have children
         filtered_df = self.events.loc[self.events["_children"].notnull()]
@@ -465,9 +525,11 @@ class Trace:
 
         imb_metric = metric + ".imbalance"
         imb_ranks = "Top processes"
+        mean_metric = metric + ".mean"
 
         imbalance_dict[imb_metric] = []
         imbalance_dict[imb_ranks] = []
+        imbalance_dict[mean_metric] = []
 
         functions = set(self.events.loc[self.events["Event Type"] == "Enter"]["Name"])
         for function in functions:
@@ -475,12 +537,13 @@ class Trace:
 
             top_n = curr_series.sort_values(ascending=False).iloc[0:num_display]
 
+            imbalance_dict[mean_metric].append(curr_series.mean())
             imbalance_dict[imb_metric].append(top_n.values[0] / curr_series.mean())
             imbalance_dict[imb_ranks].append(list(top_n.index))
 
         imbalance_df = pd.DataFrame(imbalance_dict)
         imbalance_df.index = functions
-        imbalance_df.sort_values(by=(imb_metric), axis=0, inplace=True, ascending=False)
+        imbalance_df.sort_values(by=mean_metric, axis=0, inplace=True, ascending=False)
 
         return imbalance_df
 

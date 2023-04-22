@@ -316,7 +316,7 @@ class ProjectionsReader:
 
                 data["Name"].append("Idle")
                 data["Event Type"].append("Enter")
-                data["Timestamp (ns)"].append(time)
+                data["Timestamp (ns)"].append(time * 1000)
                 data["Process"].append(pe_num)
                 data["Attributes"].append(details)
 
@@ -328,7 +328,7 @@ class ProjectionsReader:
 
                 data["Name"].append("Idle")
                 data["Event Type"].append("Leave")
-                data["Timestamp (ns)"].append(time)
+                data["Timestamp (ns)"].append(time * 1000)
                 data["Process"].append(pe_num)
                 data["Attributes"].append(details)
 
@@ -341,7 +341,7 @@ class ProjectionsReader:
 
                 data["Name"].append("Pack")
                 data["Event Type"].append("Enter")
-                data["Timestamp (ns)"].append(time)
+                data["Timestamp (ns)"].append(time * 1000)
                 data["Process"].append(pe_num)
                 data["Attributes"].append(details)
 
@@ -353,7 +353,7 @@ class ProjectionsReader:
 
                 data["Name"].append("Pack")
                 data["Event Type"].append("Leave")
-                data["Timestamp (ns)"].append(time)
+                data["Timestamp (ns)"].append(time * 1000)
                 data["Process"].append(pe_num)
                 data["Attributes"].append(details)
 
@@ -366,7 +366,7 @@ class ProjectionsReader:
 
                 data["Name"].append("Unpack")
                 data["Event Type"].append("Enter")
-                data["Timestamp (ns)"].append(time)
+                data["Timestamp (ns)"].append(time * 1000)
                 data["Process"].append(pe_num)
                 data["Attributes"].append(details)
 
@@ -378,7 +378,7 @@ class ProjectionsReader:
 
                 data["Name"].append("Unpack")
                 data["Event Type"].append("Leave")
-                data["Timestamp (ns)"].append(time)
+                data["Timestamp (ns)"].append(time * 1000)
                 data["Process"].append(pe_num)
                 data["Attributes"].append(details)
 
@@ -402,7 +402,7 @@ class ProjectionsReader:
 
                 data["Name"].append("User Supplied Note")
                 data["Event Type"].append("Instant")
-                data["Timestamp (ns)"].append(time)
+                data["Timestamp (ns)"].append(time * 1000)
                 data["Process"].append(pe_num)
                 data["Attributes"].append(details)
 
@@ -424,7 +424,7 @@ class ProjectionsReader:
 
                 data["Name"].append("User Supplied Bracketed Note")
                 data["Event Type"].append("Enter")
-                data["Timestamp (ns)"].append(time)
+                data["Timestamp (ns)"].append(time * 1000)
                 data["Process"].append(pe_num)
                 data["Attributes"].append(details)
 
@@ -443,7 +443,7 @@ class ProjectionsReader:
 
                 data["Name"].append("Memory Usage")
                 data["Event Type"].append("Instant")
-                data["Timestamp (ns)"].append(time)
+                data["Timestamp (ns)"].append(time * 1000)
                 data["Process"].append(pe_num)
                 data["Attributes"].append(details)
 
@@ -468,7 +468,7 @@ class ProjectionsReader:
 
                 data["Name"].append(sts_reader.get_entry_name(entry))
                 data["Event Type"].append("Instant")
-                data["Timestamp (ns)"].append(time)
+                data["Timestamp (ns)"].append(time * 1000)
                 data["Process"].append(pe_num)
                 data["Attributes"].append(details)
 
@@ -497,7 +497,7 @@ class ProjectionsReader:
 
                 data["Name"].append(sts_reader.get_entry_name(entry))
                 data["Event Type"].append("Instant")
-                data["Timestamp (ns)"].append(time)
+                data["Timestamp (ns)"].append(time * 1000)
                 data["Process"].append(pe_num)
                 data["Attributes"].append("To " + str(numPEs) + "processors")
 
@@ -535,7 +535,7 @@ class ProjectionsReader:
 
                 data["Name"].append(sts_reader.get_entry_name(entry))
                 data["Event Type"].append("Enter")
-                data["Timestamp (ns)"].append(time)
+                data["Timestamp (ns)"].append(time * 1000)
                 data["Process"].append(pe_num)
                 data["Attributes"].append(details)
 
@@ -564,7 +564,7 @@ class ProjectionsReader:
 
                 data["Name"].append(sts_reader.get_entry_name(entry))
                 data["Event Type"].append("Leave")
-                data["Timestamp (ns)"].append(time)
+                data["Timestamp (ns)"].append(time * 1000)
                 data["Process"].append(pe_num)
                 data["Attributes"].append(None)
 
@@ -574,7 +574,7 @@ class ProjectionsReader:
 
                 data["Name"].append("Trace")
                 data["Event Type"].append("Enter")
-                data["Timestamp (ns)"].append(time)
+                data["Timestamp (ns)"].append(time * 1000)
                 data["Process"].append(pe_num)
                 data["Attributes"].append(None)
 
@@ -583,7 +583,7 @@ class ProjectionsReader:
 
                 data["Name"].append("Trace")
                 data["Event Type"].append("Leave")
-                data["Timestamp (ns)"].append(time)
+                data["Timestamp (ns)"].append(time * 1000)
                 data["Process"].append(pe_num)
                 data["Attributes"].append(None)
 
@@ -604,7 +604,7 @@ class ProjectionsReader:
 
                 data["Name"].append("Message Receive")
                 data["Event Type"].append("Instant")
-                data["Timestamp (ns)"].append(time)
+                data["Timestamp (ns)"].append(time * 1000)
                 data["Process"].append(pe_num)
                 data["Attributes"].append(details)
 
@@ -619,7 +619,7 @@ class ProjectionsReader:
 
                 data["Name"].append("Enque")
                 data["Event Type"].append("Instant")
-                data["Timestamp (ns)"].append(time)
+                data["Timestamp (ns)"].append(time * 1000)
                 data["Process"].append(pe_num)
                 data["Attributes"].append(details)
 
@@ -633,7 +633,7 @@ class ProjectionsReader:
 
                 data["Name"].append("Deque")
                 data["Event Type"].append("Instant")
-                data["Timestamp (ns)"].append(time)
+                data["Timestamp (ns)"].append(time * 1000)
                 data["Process"].append(pe_num)
                 data["Attributes"].append(details)
 
@@ -647,7 +647,7 @@ class ProjectionsReader:
 
                 data["Name"].append("Interrupt")
                 data["Event Type"].append("Enter")
-                data["Timestamp (ns)"].append(time)
+                data["Timestamp (ns)"].append(time * 1000)
                 data["Process"].append(pe_num)
                 data["Attributes"].append(details)
 
@@ -660,7 +660,7 @@ class ProjectionsReader:
 
                 data["Name"].append("Interrupt")
                 data["Event Type"].append("Leave")
-                data["Timestamp (ns)"].append(time)
+                data["Timestamp (ns)"].append(time * 1000)
                 data["Process"].append(pe_num)
                 data["Attributes"].append(details)
 
@@ -670,7 +670,7 @@ class ProjectionsReader:
 
                 data["Name"].append("Computation")
                 data["Event Type"].append("Enter")
-                data["Timestamp (ns)"].append(time)
+                data["Timestamp (ns)"].append(time * 1000)
                 data["Process"].append(pe_num)
                 data["Attributes"].append(None)
 
@@ -679,7 +679,7 @@ class ProjectionsReader:
 
                 data["Name"].append("Computation")
                 data["Event Type"].append("Leave")
-                data["Timestamp (ns)"].append(time)
+                data["Timestamp (ns)"].append(time * 1000)
                 data["Process"].append(pe_num)
                 data["Attributes"].append(None)
 
@@ -696,7 +696,7 @@ class ProjectionsReader:
 
                 data["Name"].append(user_event_name)
                 data["Event Type"].append("Instant")
-                data["Timestamp (ns)"].append(time)
+                data["Timestamp (ns)"].append(time * 1000)
                 data["Process"].append(pe_num)
                 data["Attributes"].append(details)
 
@@ -718,7 +718,7 @@ class ProjectionsReader:
 
                 data["Name"].append(user_event_name)
                 data["Event Type"].append("Instant")
-                data["Timestamp (ns)"].append(time)
+                data["Timestamp (ns)"].append(time * 1000)
                 data["Process"].append(pe_num)
                 data["Attributes"].append(details)
 
@@ -738,7 +738,7 @@ class ProjectionsReader:
 
                 data["Name"].append("User Event Pair")
                 data["Event Type"].append("Enter")
-                data["Timestamp (ns)"].append(time)
+                data["Timestamp (ns)"].append(time * 1000)
                 data["Process"].append(pe_num)
                 data["Attributes"].append(details)
 
@@ -758,7 +758,7 @@ class ProjectionsReader:
 
                 data["Name"].append("User Event Pair")
                 data["Event Type"].append("Leave")
-                data["Timestamp (ns)"].append(time)
+                data["Timestamp (ns)"].append(time * 1000)
                 data["Process"].append(pe_num)
                 data["Attributes"].append(details)
 
@@ -781,7 +781,7 @@ class ProjectionsReader:
 
                 data["Name"].append(user_stat_name)
                 data["Event Type"].append("Instant")
-                data["Timestamp (ns)"].append(time)
+                data["Timestamp (ns)"].append(time * 1000)
                 data["Process"].append(pe_num)
                 data["Attributes"].append(details)
 
@@ -790,7 +790,7 @@ class ProjectionsReader:
             time = data["Timestamp (ns)"][-1]
             data["Name"].append("Computation")
             data["Event Type"].append("Leave")
-            data["Timestamp (ns)"].append(time)
+            data["Timestamp (ns)"].append(time * 1000)
             data["Process"].append(pe_num)
             data["Attributes"].append(None)
 
