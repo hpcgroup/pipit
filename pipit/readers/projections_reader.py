@@ -7,7 +7,7 @@ import os
 import gzip
 import pandas
 import pipit.trace
-from util.cct import create_cct
+from pipit.util.cct import create_cct
 
 
 class ProjectionsConstants:

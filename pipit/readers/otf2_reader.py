@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 import multiprocessing as mp
 import pipit.trace
-from util.cct import create_cct
+from pipit.util.cct import create_cct
 
 
 class OTF2Reader:
