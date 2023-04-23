@@ -29,6 +29,18 @@ You can get pipit from its `GitHub repository
    getting_started
    user_guide
 
+.. toctree::
+   :maxdepth: 2
+   :caption: Developer Docs
+
+   developer_guide
+
+.. toctree::
+   :maxdepth: 2
+   :caption: API Docs
+
+   Pipit API Docs <source/pipit>
+
 
 ##################
 Indices and tables
