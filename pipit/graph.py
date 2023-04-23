@@ -9,19 +9,18 @@ class Node:
     referenced by any calling_context_id directly under it
     """
 
-    def __init__(self, name_id, name, parent) -> None:
-        self.calling_context_ids = []
-        self.name_id = name_id
-        self.name = name
+    def __init__(self, id, parent, level=None) -> None:
+        self._pipit_nid = id
         self.children = []
         self.parent = parent
-        self.level = self._calculate_level()
+
+        if level is None:
+            self.level = self._calculate_level()
+        else:
+            self.level = level
 
     def add_child(self, child_node):
         self.children.append(child_node)
-
-    def add_calling_context_id(self, calling_context_id):
-        self.calling_context_ids.append(calling_context_id)
 
     def get_level(self):
         """This function returns the depth of the current node
@@ -31,8 +30,7 @@ class Node:
 
     def get_intersection(self, node: "Node"):
         """Given two nodes, this function returns the interesection of them
-        starting from their root nodes
-
+        starting from their root nodes (least common ancestor)
         If the two nodes do not share the same root node, their intersection
         would be None, otherwise it returns the nodes that they have in
         common (starting from the root) as a new Node
@@ -71,13 +69,7 @@ class Node:
         return return_list
 
     def __str__(self) -> str:
-        return (
-            self.name
-            + ": "
-            + str(self.calling_context_ids)
-            + " -- level: "
-            + str(self.level)
-        )
+        return "ID: " + str(self._pipit_nid) + " -- Level: " + str(self.level)
 
     def _calculate_level(self):
         """private function to get depth of node"""
@@ -90,7 +82,7 @@ class Node:
         if type(obj) != Node:
             return False
         else:
-            return self.calling_context_ids == obj.calling_context_ids
+            return self._pipit_nid == obj._pipit_nid
 
 
 class Graph:
@@ -98,14 +90,9 @@ class Graph:
 
     def __init__(self) -> None:
         self.roots = []
-        self.calling_context_id_map = {}
-
-    def add_to_map(self, calling_context_id, node):
-        """adds association between a calling_context_id and a specific node"""
-        self.calling_context_id_map[calling_context_id] = node
 
     def add_root(self, node):
         self.roots.append(node)
 
-    def get_node(self, calling_context_id) -> "Node":
-        return self.calling_context_id_map.get(str(calling_context_id))
+    def __str__(self) -> str:
+        return "Roots: " + str([str(curr_root) for curr_root in self.roots])
