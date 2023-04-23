@@ -32,6 +32,7 @@ class Node:
     def get_intersection(self, node: "Node"):
         """Given two nodes, this function returns the interesection of them
         starting from their root nodes
+        
         If the two nodes do not share the same root node, their intersection
         would be None, otherwise it returns the nodes that they have in
         common (starting from the root) as a new Node
