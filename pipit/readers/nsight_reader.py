@@ -103,7 +103,7 @@ class NsightReader:
 
         # Applying the column list to the dataframe to rearrange
         self.df = self.df.loc[:, cols]
-                
+
         cct = create_cct(self.df)
 
         trace = pipit.trace.Trace(None, self.df, cct)

@@ -24,9 +24,7 @@ def create_cct(events):
     node_id = 0  # each node has a unique id
 
     # Filter the DataFrame to only Enter/Leave
-    enter_leave_df = events.loc[
-        events["Event Type"].isin(["Enter", "Leave"])
-    ]
+    enter_leave_df = events.loc[events["Event Type"].isin(["Enter", "Leave"])]
 
     # list of processes and/or threads to iterate over
     if "Thread" in events.columns:
@@ -45,9 +43,7 @@ def create_cct(events):
                 & (enter_leave_df["Thread"] == curr_thread)
             ]
         else:
-            filtered_df = enter_leave_df.loc[
-                (enter_leave_df["Process"] == curr_loc)
-            ]
+            filtered_df = enter_leave_df.loc[(enter_leave_df["Process"] == curr_loc)]
 
         curr_depth, callpath = 0, ""
 
