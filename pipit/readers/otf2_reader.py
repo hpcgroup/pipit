@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 import multiprocessing as mp
 import pipit.trace
+from util.cct import create_cct
 
 
 class OTF2Reader:
@@ -516,7 +517,8 @@ class OTF2Reader:
 
         self.events = self.read_events()  # events
 
-        trace = pipit.trace.Trace(self.definitions, self.events, None)
-        trace._create_cct()  # create cct
+        cct = create_cct(self.events)
+
+        trace = pipit.trace.Trace(self.definitions, self.events, cct)
 
         return trace

@@ -5,6 +5,7 @@
 
 import pandas as pd
 import pipit.trace
+from pipit.util.cct import create_cct
 
 
 class NsightReader:
@@ -102,8 +103,9 @@ class NsightReader:
 
         # Applying the column list to the dataframe to rearrange
         self.df = self.df.loc[:, cols]
+                
+        cct = create_cct(self.df)
 
-        trace = pipit.trace.Trace(None, self.df, None)
-        trace._create_cct()
+        trace = pipit.trace.Trace(None, self.df, cct)
 
         return trace

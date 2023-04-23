@@ -3,11 +3,11 @@
 #
 # SPDX-License-Identifier: MIT
 
-
+import os
 import gzip
 import pandas
 import pipit.trace
-import os
+from util.cct import create_cct
 
 
 class ProjectionsConstants:
@@ -286,8 +286,9 @@ class ProjectionsReader:
         # Concatinate the dataframes list into dataframe containing entire trace
         trace_df = pandas.concat(dataframes_list, ignore_index=True)
 
-        trace = pipit.trace.Trace(None, trace_df, None)
-        trace._create_cct()
+        cct = create_cct(trace_df)
+
+        trace = pipit.trace.Trace(None, trace_df, cct)
 
         return trace
 
