@@ -59,7 +59,11 @@ def timeline(trace, show_depth=False, instant_events=False):
 
     # Prepare data for plotting
     events = (
-        trace.events[trace.events["Event Type"].isin(["Enter", "Instant"])]
+        trace.events[
+            trace.events["Event Type"].isin(
+                ["Enter", "Instant"] if instant_events else ["Enter"]
+            )
+        ]
         .sort_values(by="time.inc", ascending=False)
         .copy(deep=False)
     )
@@ -82,12 +86,14 @@ def timeline(trace, show_depth=False, instant_events=False):
     )
 
     events["name_trimmed"] = trimmed(events["Name"])
+    events["_matching_event"] = events["_matching_event"].fillna(-1)
 
     # Only select a subset of columns for plotting
     events = events[
         [
             "Timestamp (ns)",
             "_matching_timestamp",
+            "_matching_event",
             "y",
             "Name",
             "time.inc",
@@ -153,6 +159,9 @@ def timeline(trace, show_depth=False, instant_events=False):
     def update_cds(event):
         x0 = event.x0 if event is not None else min_ts
         x1 = event.x1 if event is not None else max_ts
+
+        x0 = x0 - (x1 - x0) * 0.25
+        x1 = x1 + (x1 - x0) * 0.25
 
         # Remove events that are out of bounds
         in_bounds = events[
@@ -229,8 +238,8 @@ def timeline(trace, show_depth=False, instant_events=False):
             )
 
     # Create Bokeh plot
-    min_height = 50 + 22 * len(events["Name"].unique())
-    plot_height = 80 + 25 * num_ys
+    min_height = 50 + 16 * len(events["Name"].unique())
+    plot_height = 80 + (18 if show_depth else 18) * num_ys
     height = clamp(plot_height, min_height, 900)
 
     p = figure(
@@ -242,7 +251,7 @@ def timeline(trace, show_depth=False, instant_events=False):
         output_backend="webgl",
         sizing_mode="stretch_width",
         height=height,
-        x_axis_label="Time",
+        # x_axis_label="Time",
     )
 
     p.min_border_bottom = height - plot_height
@@ -266,7 +275,7 @@ def timeline(trace, show_depth=False, instant_events=False):
         left="Timestamp (ns)",
         right="_matching_timestamp",
         y="y",
-        height=1 if show_depth else 0.7,
+        height=0.8 if show_depth else 0.7,
         source=hbar_source,
         fill_color=fill_cmap,
         line_color=line_cmap,
@@ -289,11 +298,11 @@ def timeline(trace, show_depth=False, instant_events=False):
             line_width=0.8,
             marker="diamond",
             source=scatter_source,
-            legend_label="Instant event",
+            # legend_label="Instant event",
         )
 
     # Add custom grid lines
-    p.xgrid.visible = False
+    # p.xgrid.visible = False
     p.ygrid.visible = False
 
     g1 = Grid(
@@ -307,7 +316,7 @@ def timeline(trace, show_depth=False, instant_events=False):
     )
     g2 = Grid(
         dimension=1,
-        grid_line_width=1,
+        grid_line_width=2,
         # band_fill_color="gray",
         # band_fill_alpha=0.1,
         ticker=FixedTicker(ticks=process_ticks - 0.5),
@@ -319,6 +328,7 @@ def timeline(trace, show_depth=False, instant_events=False):
     # Additional plot config
     p.xaxis.formatter = get_time_tick_formatter()
     p.xaxis.minor_tick_line_color = None
+
     p.yaxis.formatter = FuncTickFormatter(
         args={
             "uniques": uniques,
@@ -337,8 +347,10 @@ def timeline(trace, show_depth=False, instant_events=False):
     p.on_event(Tap, tap_callback)
 
     # Move legend to the right
-    # p.legend.location = (10, 35)
     p.add_layout(p.legend[0], "right")
+    p.legend.location = "top_right"
+    p.legend.glyph_width = 16
+    p.legend.glyph_height = 16
 
     # Make initial call to our callback
     update_cds(None)
@@ -349,11 +361,10 @@ def timeline(trace, show_depth=False, instant_events=False):
         {
             "Name": "@Name",
             "Process": "@Process",
-            "Enter": "@{Timestamp (ns)}{custom}",
-            "Leave": "@{_matching_timestamp}{custom}",
-            "Exc Time": "@{time.exc}{custom}",
-            "Inc Time": "@{time.inc}{custom}",
-            "Index": "@{index}",
+            "Enter": "@{Timestamp (ns)}{custom} [@{index}]",
+            "Leave": "@{_matching_timestamp}{custom} [@{_matching_event}]",
+            "Time (inc)": "@{time.inc}{custom}",
+            "Time (exc)": "@{time.exc}{custom}",
         }
     )
     hover.formatters = {

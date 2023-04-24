@@ -140,15 +140,22 @@ FORMAT_TIME_JS = """
     }
 
     if (x >= 1e9)
-        return (y / 1e9).toFixed(2) + " s"
+        return (y / 1e9).toFixed(2) + "s"
 
     if (x >= 1e6)
-        return (y / 1e6).toFixed(2) + " ms"
+        return (y / 1e6).toFixed(2) + "ms"
 
-    if (x >= 1e3)
-        return (y / 1e3).toFixed(2) + " us"
+    if (x >= 1e3) {
+        var ms = Math.floor(y / 1e6);
+        var us = ((y - ms * 1e6) / 1e3).toFixed(0);
+        return ms + "ms " + us + "us"
+    }
 
-    return x.toFixed(2) + " ns"
+    var ms = Math.floor(y / 1e6);
+    var us = Math.floor((y - ms * 1e6) / 1e3);
+    var ns = Math.round(y % 1000);
+
+    return ms + "ms " + us + "us " + ns + "ns";
 """
 
 
@@ -402,17 +409,7 @@ def get_height(num_yticks, height_per_tick=400):
     return clamp(int(math.log10(num_yticks) * height_per_tick + 50), 200, 900)
 
 
-PALETTE = [
-    "#1f77b4",
-    "#ff7f0e",
-    # "#2ca02c",         # reserved
-    # "#d62728",        # reserved
-    "#9467bd",
-    "#8c564b",
-    "#e377c2",
-    # "#7f7f7f",        # reserved
-    "#bcbd22",
-    "#17becf",
+LIGHT = [
     "#aec7e8",
     "#ffbb78",
     "#98df8a",
@@ -420,21 +417,38 @@ PALETTE = [
     "#c5b0d5",
     "#c49c94",
     "#f7b6d2",
-    # "#c7c7c7",        # reserved
+    # "#c7c7c7",            # reserved for idle
     "#dbdb8d",
     "#9edae5",
+]
+DARK = [
+    # "#1f77b4",            # reserved for send
+    "#ff7f0e",
+    "#2ca02c",
+    # "#d62728",            # reserved for recv
+    "#9467bd",
+    "#8c564b",
+    "#e377c2",
+    # "#7f7f7f",            # take out
+    "#bcbd22",
+    "#17becf",
 ]
 
 
 def get_palette(trace, scale=None):
-    trace.calc_exc_metrics(["Timestamp (ns)"])
-    names = reversed(trace.flat_profile(["time.exc"]).index.tolist())
+    funcs = trace.events[trace.events["Event Type"] == "Enter"]
+    # names = funcs["Name"].unique().tolist()
+    names = reversed(trace.flat_profile(["time.inc"]).index.tolist())
+    depths = (
+        funcs.groupby("Name")["_depth"]
+        .agg(lambda x: x.value_counts().index[0])
+        .to_dict()
+    )
 
-    base_palette = PALETTE.copy()
     palette = {}
 
-    palette["MPI_Send"] = "#2ca02c"
-    palette["MPI_Isend"] = "#2ca02c"
+    palette["MPI_Send"] = "#1f77b4"
+    palette["MPI_Isend"] = "#1f77b4"
 
     palette["MPI_Recv"] = "#d62728"
     palette["MPI_Irecv"] = "#d62728"
@@ -444,10 +458,19 @@ def get_palette(trace, scale=None):
     palette["MPI_Waitall"] = "#c7c7c7"
     palette["Idle"] = "#c7c7c7"
 
+    dark_index = 0
+    light_index = 0
+
     for i, f in enumerate(names):
         if f not in palette:
-            # palette[f] = base_palette[hash(f) % len(base_palette)]
-            palette[f] = base_palette[i % len(base_palette)]
+            if depths[f] % 2 == 0:
+                # palette[f] = LIGHT[hash(f) % len(LIGHT)]
+                palette[f] = LIGHT[light_index % len(LIGHT)]
+                light_index += 1
+            else:
+                # palette[f] = DARK[hash(f) % len(DARK)]
+                palette[f] = DARK[dark_index % len(DARK)]
+                dark_index += 1
 
     # apply multiplier
     if scale:
