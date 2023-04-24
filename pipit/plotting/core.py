@@ -238,19 +238,19 @@ def timeline(trace, show_depth=False, instant_events=False):
             )
 
     # Create Bokeh plot
-    min_height = 50 + 16 * len(events["Name"].unique())
-    plot_height = 80 + (18 if show_depth else 18) * num_ys
+    min_height = 50 + 22 * len(events["Name"].unique())
+    plot_height = 70 + (18 if show_depth else 18) * num_ys
     height = clamp(plot_height, min_height, 900)
 
     p = figure(
         # title="Timeline",
-        x_range=(min_ts, max_ts),
+        x_range=(min_ts, max_ts + (max_ts - min_ts) * 0.05),
         y_range=(num_ys - 0.5, -0.5),
         x_axis_location="above",
         tools="hover,xpan,reset,xbox_zoom,xwheel_zoom,save",
         output_backend="webgl",
-        sizing_mode="stretch_width",
         height=height,
+        sizing_mode="stretch_width"
         # x_axis_label="Time",
     )
 
@@ -275,7 +275,7 @@ def timeline(trace, show_depth=False, instant_events=False):
         left="Timestamp (ns)",
         right="_matching_timestamp",
         y="y",
-        height=0.8 if show_depth else 0.7,
+        height=0.8 if show_depth else 0.8,
         source=hbar_source,
         fill_color=fill_cmap,
         line_color=line_cmap,
@@ -308,7 +308,7 @@ def timeline(trace, show_depth=False, instant_events=False):
     g1 = Grid(
         dimension=1,
         grid_line_color="white",
-        grid_line_width=2 if show_depth else 5,
+        grid_line_width=2 if show_depth else 2,
         ticker=FixedTicker(
             ticks=np.concatenate([depth_ticks - 0.49, depth_ticks + 0.49])
         ),
@@ -327,8 +327,6 @@ def timeline(trace, show_depth=False, instant_events=False):
 
     # Additional plot config
     p.xaxis.formatter = get_time_tick_formatter()
-    p.xaxis.minor_tick_line_color = None
-
     p.yaxis.formatter = FuncTickFormatter(
         args={
             "uniques": uniques,
@@ -340,7 +338,6 @@ def timeline(trace, show_depth=False, instant_events=False):
 
     p.yaxis.ticker = FixedTicker(ticks=process_ticks + 0.1)
     p.yaxis.major_tick_line_color = None
-    p.yaxis.minor_tick_line_color = None
 
     p.toolbar.active_scroll = p.select(dict(type=WheelZoomTool))[0]
     p.on_event(RangesUpdate, update_cds)
@@ -348,7 +345,6 @@ def timeline(trace, show_depth=False, instant_events=False):
 
     # Move legend to the right
     p.add_layout(p.legend[0], "right")
-    p.legend.location = "top_right"
     p.legend.glyph_width = 16
     p.legend.glyph_height = 16
 
@@ -360,11 +356,11 @@ def timeline(trace, show_depth=False, instant_events=False):
     hover.tooltips = get_html_tooltips(
         {
             "Name": "@Name",
-            "Process": "@Process",
+            # "Process": "@Process",
             "Enter": "@{Timestamp (ns)}{custom} [@{index}]",
             "Leave": "@{_matching_timestamp}{custom} [@{_matching_event}]",
-            "Time (inc)": "@{time.inc}{custom}",
-            "Time (exc)": "@{time.exc}{custom}",
+            "Time (Inc)": "@{time.inc}{custom}",
+            "Time (Exc)": "@{time.exc}{custom}",
         }
     )
     hover.formatters = {
@@ -435,7 +431,6 @@ def comm_matrix(trace, kind="heatmap", mapping="linear", labels=False, **kwargs)
         y_range=(N - 0.5, -0.5),
         x_axis_location="above",
         tools="hover,pan,reset,wheel_zoom,save",
-        # sizing_mode="stretch_width",
         width=get_height(N, 300) + 150,
         height=get_height(N, 300),
     )
@@ -546,13 +541,10 @@ def message_histogram(trace, **kwargs):
         x_axis_label="Message size",
         y_axis_label="Number of messages",
         tools="hover,save",
-        sizing_mode="stretch_width",
-        x_range=(edges[0], edges[-1]),
     )
 
     p.quad(top=hist, bottom=0, left=edges[:-1], right=edges[1:], line_color="white")
 
-    p.xgrid.visible = False
     p.xaxis.formatter = get_size_tick_formatter()
     p.yaxis.formatter = NumeralTickFormatter()
 
@@ -590,7 +582,6 @@ def time_profile(trace, **kwargs):
         x_axis_label="Time",
         y_axis_label="% utilization" if normalized else "Time Contribution",
         tools="hover,save",
-        sizing_mode="stretch_width",
         height=max(400, 20 * len(profile.columns)),
     )
 
@@ -616,8 +607,7 @@ def time_profile(trace, **kwargs):
     )
     p.xaxis.formatter = get_time_tick_formatter()
     p.y_range.start = 0
-    p.xgrid.grid_line_color = None
-    p.axis.minor_tick_line_color = None
+    p.xgrid.visible = False
     p.outline_line_color = None
 
     # Move legend to right side
@@ -659,17 +649,14 @@ def flat_profile(trace, x_axis_type="linear", **kwargs):
     y_range = profile["Name"].tolist()
 
     p = figure(
-        # title="Flat Profile",
         y_range=y_range,
-        x_range=[min(profile["time.exc"]) / 2, max(profile["time.exc"] * 2)]
-        if x_axis_type == "log"
-        else [0, max(profile["time.exc"])],
         x_axis_label="Total Time (Exc)",
         y_axis_label="Function Name",
         tools="hover,save",
         x_axis_type=x_axis_type,
         height=len(y_range) * 30 + 40,
     )
+    p.x_range.start = 0 if x_axis_type == "linear" else min(profile["time.exc"]) / 2
 
     p.hbar(
         y="Name",
@@ -680,7 +667,7 @@ def flat_profile(trace, x_axis_type="linear", **kwargs):
         color=get_factor_cmap("Name", trace),
     )
 
-    p.ygrid.grid_line_color = None
+    p.ygrid.visible = False
     p.xaxis.formatter = get_time_tick_formatter()
     p.yaxis.formatter = get_trimmed_tick_formatter()
 
@@ -702,7 +689,6 @@ def comm_over_time(trace, **kwargs):
         x_axis_label="Time",
         y_axis_label="Total volume sent",
         tools="hover,save",
-        sizing_mode="stretch_width",
     )
     p.xaxis.formatter = get_time_tick_formatter()
     p.yaxis.formatter = get_size_tick_formatter()
@@ -735,9 +721,8 @@ def comm_summary(trace, **kwargs):
         y_range=(len(summary) - 0.5, -0.5),
         x_axis_label="Volume",
         y_axis_label="Process",
-        sizing_mode="stretch_width",
         tools="hover,save",
-        height=len(summary) * 100 + 40,
+        height=min(700, len(summary) * 100 + 40),
     )
     p.x_range.start = 0
 

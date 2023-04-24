@@ -30,7 +30,7 @@ THEME_DEFAULT = """
     attrs:
         Plot:
             height: 350
-            width: 600
+            width: 700
             toolbar_location: "above"
             outline_line_width: 0
         Axis:
@@ -48,14 +48,17 @@ THEME_DEFAULT = """
             border_line_color: null
             glyph_width: 16
             glyph_height: 16
+            margin: 5
         Scatter:
             size: 9
+        DataRange1d:
+            range_padding: 0.05
 """
 THEME_PAPER = """
     attrs:
         Plot:
             height: 350
-            width: 600
+            width: 700
             toolbar_location: "above"
             outline_line_width: 0
         Title:
@@ -84,8 +87,11 @@ THEME_PAPER = """
             border_line_color: null
             glyph_width: 16
             glyph_height: 16
+            margin: 5
         Scatter:
             size: 12
+        DataRange1d:
+            range_padding: 0.05
 """
 
 
@@ -155,15 +161,26 @@ FORMAT_TIME_JS = """
 
     if (x >= 1e3) {
         var ms = Math.floor(y / 1e6);
-        var us = ((y - ms * 1e6) / 1e3).toFixed(0);
-        return ms + "ms " + us + "us"
+        var us = ((y - ms * 1e6) / 1e3);
+
+        var str = "";
+        if (ms) str += ms + "ms ";
+        if (us) str += Math.round(us) + "us";
+
+        return str;
     }
 
     var ms = Math.floor(y / 1e6);
     var us = Math.floor((y - ms * 1e6) / 1e3);
     var ns = Math.round(y % 1000);
 
-    return ms + "ms " + us + "us " + ns + "ns";
+    var str = "";
+
+    if (ms) str += ms + "ms ";
+    if (us) str += us + "us ";
+    if (ns) str += ns + "ns";
+
+    return str;
 """
 
 
