@@ -547,15 +547,14 @@ def message_histogram(trace, **kwargs):
         y_axis_label="Number of messages",
         tools="hover,save",
         sizing_mode="stretch_width",
+        x_range=(edges[0], edges[-1]),
     )
 
     p.quad(top=hist, bottom=0, left=edges[:-1], right=edges[1:], line_color="white")
 
     p.xgrid.visible = False
     p.xaxis.formatter = get_size_tick_formatter()
-    p.xaxis.minor_tick_line_color = None
     p.yaxis.formatter = NumeralTickFormatter()
-    # p.xaxis.ticker = AdaptiveTicker()
 
     hover = p.select(HoverTool)
     hover.tooltips = get_html_tooltips(
@@ -665,12 +664,11 @@ def flat_profile(trace, x_axis_type="linear", **kwargs):
         x_range=[min(profile["time.exc"]) / 2, max(profile["time.exc"] * 2)]
         if x_axis_type == "log"
         else [0, max(profile["time.exc"])],
-        x_axis_label="Total Exc Time",
+        x_axis_label="Total Time (Exc)",
         y_axis_label="Function Name",
         tools="hover,save",
-        sizing_mode="stretch_width",
         x_axis_type=x_axis_type,
-        height=get_height(len(y_range), 400),
+        height=len(y_range) * 30 + 40,
     )
 
     p.hbar(
@@ -678,7 +676,7 @@ def flat_profile(trace, x_axis_type="linear", **kwargs):
         left=min(profile["time.exc"]) / 2,
         right="time.exc",
         source=profile,
-        height=0.7,
+        height=0.8,
         color=get_factor_cmap("Name", trace),
     )
 
@@ -688,7 +686,7 @@ def flat_profile(trace, x_axis_type="linear", **kwargs):
 
     hover = p.select(HoverTool)
     hover.tooltips = get_html_tooltips(
-        {"Name": "@Name", "Total Exc Time": "@{time.exc}{custom}"}
+        {"Name": "@Name", "Total Time (Exc)": "@{time.exc}{custom}"}
     )
     hover.formatters = {"@{time.exc}": get_time_hover_formatter()}
 
@@ -734,36 +732,36 @@ def comm_summary(trace, **kwargs):
     is_size = kwargs.pop("output", "size") == "size"
 
     p = figure(
-        # y_range=(np.min(sends) * 0.8, np.max(sends) * 1.05),
-        x_range=(-0.5, len(summary) - 0.5),
-        x_axis_label="Process",
-        y_axis_label="Volume",
+        y_range=(len(summary) - 0.5, -0.5),
+        x_axis_label="Volume",
+        y_axis_label="Process",
         sizing_mode="stretch_width",
         tools="hover,save",
+        height=len(summary) * 100 + 40,
     )
-    p.y_range.start = 0
+    p.x_range.start = 0
 
-    p.xgrid.visible = False
-    p.yaxis.formatter = get_size_tick_formatter()
-    p.xaxis.ticker = BasicTicker(
+    p.ygrid.visible = False
+    p.xaxis.formatter = get_size_tick_formatter()
+    p.yaxis.ticker = BasicTicker(
         base=2,
         desired_num_ticks=min(len(trace.events["Process"].unique()), 16),
         min_interval=1,
         num_minor_ticks=0,
     )
 
-    p.vbar(
-        x=dodge("Process", -0.1667, range=p.x_range),
-        top="Sent",
-        width=0.2,
+    p.hbar(
+        y=dodge("Process", -0.1667, range=p.y_range),
+        right="Sent",
+        height=0.2,
         source=summary,
         color=get_palette(trace)["MPI_Send"],
         legend_label="Total sent",
     )
-    p.vbar(
-        x=dodge("Process", 0.1667, range=p.x_range),
-        top="Received",
-        width=0.2,
+    p.hbar(
+        y=dodge("Process", 0.1667, range=p.y_range),
+        right="Received",
+        height=0.2,
         source=summary,
         color=get_palette(trace)["MPI_Recv"],
         legend_label="Total received",

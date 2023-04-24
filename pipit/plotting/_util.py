@@ -29,14 +29,16 @@ notebook_url = "http://localhost:8888"
 THEME_DEFAULT = """
     attrs:
         Plot:
-            height: 400
-            width: 800
+            height: 350
+            width: 600
             toolbar_location: "above"
             outline_line_width: 0
         Axis:
             axis_label_text_font_style: "bold"
+            minor_tick_line_color: null
         Toolbar:
             autohide: true
+            logo: null
         HoverTool:
             point_policy: "follow_mouse"
         Legend:
@@ -44,14 +46,16 @@ THEME_DEFAULT = """
             spacing: -1
             padding: 0
             border_line_color: null
+            glyph_width: 16
+            glyph_height: 16
         Scatter:
             size: 9
 """
 THEME_PAPER = """
     attrs:
         Plot:
-            height: 600
-            width: 800
+            height: 350
+            width: 600
             toolbar_location: "above"
             outline_line_width: 0
         Title:
@@ -63,11 +67,13 @@ THEME_PAPER = """
             axis_label_text_font: "Gill Sans"
             major_label_text_font_size: "16pt"
             major_label_text_font: "Gill Sans"
+            minor_tick_line_color: null
         ColorBar:
             major_label_text_font_size: "16pt"
             major_label_text_font: "Gill Sans"
         Toolbar:
             autohide: true
+            logo: null
         HoverTool:
             point_policy: "follow_mouse"
         Legend:
@@ -76,6 +82,8 @@ THEME_PAPER = """
             spacing: -1
             padding: 0
             border_line_color: null
+            glyph_width: 16
+            glyph_height: 16
         Scatter:
             size: 12
 """
