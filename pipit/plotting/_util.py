@@ -32,7 +32,6 @@ THEME_DEFAULT = """
             height: 350
             width: 700
             toolbar_location: "above"
-            outline_line_width: 0
         Axis:
             axis_label_text_font_style: "bold"
             minor_tick_line_color: null
@@ -43,12 +42,10 @@ THEME_DEFAULT = """
             point_policy: "follow_mouse"
         Legend:
             label_text_font_size: "8.5pt"
-            spacing: -1
-            padding: 0
+            spacing: 10
             border_line_color: null
             glyph_width: 16
             glyph_height: 16
-            margin: 5
         Scatter:
             size: 9
         DataRange1d:

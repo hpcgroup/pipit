@@ -17,9 +17,10 @@ from bokeh.models import (
     CustomJS,
     BasicTickFormatter,
     NumeralTickFormatter,
+    RangeTool,
 )
 from bokeh.palettes import RdYlBu11
-from bokeh.plotting import figure
+from bokeh.plotting import figure, column
 from bokeh.transform import dodge
 from bokeh.events import RangesUpdate, Tap
 
@@ -36,7 +37,7 @@ from ._util import (
     get_height,
     get_factor_cmap,
     get_palette,
-    clamp,
+    # clamp,
     trimmed,
 )
 
@@ -105,7 +106,7 @@ def timeline(trace, show_depth=False, instant_events=False):
     ]
 
     # Define CDS for glyphs to be empty
-    hbar_source = ColumnDataSource(events.head(0))
+    hbar_source = ColumnDataSource(events.head(1))
     scatter_source = ColumnDataSource(events.head(0))
     image_source = ColumnDataSource(
         data=dict(
@@ -238,23 +239,23 @@ def timeline(trace, show_depth=False, instant_events=False):
             )
 
     # Create Bokeh plot
-    min_height = 50 + 22 * len(events["Name"].unique())
-    plot_height = 70 + (18 if show_depth else 18) * num_ys
-    height = clamp(plot_height, min_height, 900)
+    # min_height = 50 + 22 * len(events["Name"].unique())
+    plot_height = 60 + 22 * num_ys
+    # height = clamp(plot_height, min_height, 900)
 
     p = figure(
-        # title="Timeline",
         x_range=(min_ts, max_ts + (max_ts - min_ts) * 0.05),
         y_range=(num_ys - 0.5, -0.5),
         x_axis_location="above",
         tools="hover,xpan,reset,xbox_zoom,xwheel_zoom,save",
         output_backend="webgl",
-        height=height,
-        sizing_mode="stretch_width"
+        height=min(500, plot_height),
+        sizing_mode="stretch_width",
+        toolbar_location=None,
         # x_axis_label="Time",
     )
 
-    p.min_border_bottom = height - plot_height
+    # p.min_border_bottom = height - plot_height
 
     # Create color maps
     fill_cmap = get_factor_cmap("Name", trace)
@@ -344,9 +345,9 @@ def timeline(trace, show_depth=False, instant_events=False):
     p.on_event(Tap, tap_callback)
 
     # Move legend to the right
-    p.add_layout(p.legend[0], "right")
-    p.legend.glyph_width = 16
-    p.legend.glyph_height = 16
+    p.add_layout(p.legend[0], "below")
+    p.legend.orientation = "horizontal"
+    p.legend.location = "center"
 
     # Make initial call to our callback
     update_cds(None)
@@ -384,8 +385,43 @@ def timeline(trace, show_depth=False, instant_events=False):
     """
     )
 
+    # Range selector
+    profile = trace.time_profile(num_bins=100).fillna(0)
+    func = profile.columns[3:]
+    select = figure(
+        tools="",
+        height=80,
+        title=(
+            "Drag the middle and edges of the selection box to change the range above",
+        ),
+        # title="Timeline",
+        toolbar_location=None,
+        y_axis_type=None,
+        x_range=(min_ts, max_ts + (max_ts - min_ts) * 0.05),
+        # x_axis_location="above",
+    )
+    bin_size = profile.loc[0]["bin_start"] - profile.loc[0]["bin_end"]
+    palette = get_palette(trace)
+    select.vbar_stack(
+        func,
+        x=dodge("bin_start", -bin_size / 2, p.x_range),
+        width=bin_size,
+        color=[palette[f] for f in func],
+        source=profile,
+        fill_alpha=1.0,
+        line_width=1,
+    )
+    select.xaxis.formatter = get_time_tick_formatter()
+
+    range_tool = RangeTool(x_range=p.x_range)
+    range_tool.overlay.fill_color = "navy"
+    range_tool.overlay.fill_alpha = 0.35
+
+    select.add_tools(range_tool)
+    select.toolbar.active_multi = range_tool
+
     # Return plot with wrapper function
-    return plot(p)
+    return plot(column(p, select, sizing_mode="stretch_width"))
 
 
 def comm_matrix(trace, kind="heatmap", mapping="linear", labels=False, **kwargs):
