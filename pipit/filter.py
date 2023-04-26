@@ -41,15 +41,25 @@ class Filter:
         self.expr = expr
 
     def __and__(self, other):
+        """Returns a new Filter instance that combines this filter and another filter
+        with the logical AND operator.
+        """
         return And(self, other)
 
     def __or__(self, other):
+        """Returns a new Filter instance that combines this filter and another filter
+        with the logical OR operator.
+        """
         return Or(self, other)
 
     def __invert__(self):
+        """Returns a new Filter instance that negates this filter with the logical NOT
+        operator.
+        """
         return Not(self)
 
     def __repr__(self):
+        """Returns a string representation of this filter."""
         if self.expr is not None:
             return f"Filter {self.expr.__repr__()}"
 
@@ -66,71 +76,81 @@ class Filter:
             pd.Series: Boolean mask that indicates whether each event should be included
                 in the filtered Trace.
         """
-        value = self.value
+        # If an expression is provided, evaluate it using pd.DataFrame.eval
+        if self.expr is not None:
+            return trace.events.eval(self.expr)
 
-        # Parse value into float, if needed
-        if self.field and "time" in self.field.lower():
-            value = parse_time(self.value)
+        # Otherwise, evaluate the filter using speficied field, operator, and value
+        field, operator, value = self.field, self.operator, self.value
 
-        # Get boolean mask using pd.DataFrame.eval
-        if self.expr:
-            result = trace.events.eval(self.expr)
+        # Convert value to float if filtering on a time field
+        if field and "time" in field.lower():
+            value = parse_time(value)
 
-        # Get boolean mask using pd.Series comparison
-        elif self.operator == "==":
-            result = trace.events[self.field] == value
-
-        elif self.operator == "!=":
-            result = trace.events[self.field] != value
-
-        elif self.operator == "<":
-            result = trace.events[self.field] < value
-
-        elif self.operator == "<=":
-            result = trace.events[self.field] <= value
-
-        elif self.operator == ">":
-            result = trace.events[self.field] > value
-
-        elif self.operator == ">=":
-            result = trace.events[self.field] >= value
-
-        elif self.operator == "in":
-            result = trace.events[self.field].isin(value)
-
-        elif self.operator == "not-in":
-            result = ~trace.events[self.field].isin(value)
-
-        elif self.operator == "between":
-            start, end = value
-
-            if self.field != "Timestamp (ns)":
-                result = (trace.events[self.field] >= start) & (
-                    trace.events[self.field] <= end
+        # Evaluate the filter
+        # If field is not Timestamp, then evaluation is straightforward
+        if field != "Timestamp (ns)":
+            if operator == "==":
+                result = trace.events[field] == value
+            elif operator == "!=":
+                result = trace.events[field] != value
+            elif operator == "<":
+                result = trace.events[field] < value
+            elif operator == "<=":
+                result = trace.events[field] <= value
+            elif operator == ">":
+                result = trace.events[field] > value
+            elif operator == ">=":
+                result = trace.events[field] >= value
+            elif operator == "in":
+                result = trace.events[field].isin(value)
+            elif operator == "not-in":
+                result = ~trace.events[field].isin(value)
+            elif operator == "between":
+                result = (trace.events[field] >= value[0]) & (
+                    trace.events[field] <= value[1]
                 )
             else:
-                # Special case if field is timestamp
-                trace._match_events()
-
-                # This ensures that if any part of a function occurs in a time range,
-                # then both the Enter and Leave events are included in the filter
-                result = (
-                    (
-                        (trace.events["Event Type"] == "Instant")
-                        & (trace.events["Timestamp (ns)"] >= start)
-                        & (trace.events["Timestamp (ns)"] <= end)
-                    )
-                    | (
-                        (trace.events["Event Type"] == "Enter")
-                        & (trace.events["_matching_timestamp"] >= start)
-                        & (trace.events["Timestamp (ns)"] <= end)
-                    )
-                    | (
-                        (trace.events["Event Type"] == "Leave")
-                        & (trace.events["Timestamp (ns)"] >= start)
-                        & (trace.events["_matching_timestamp"] <= end)
-                    )
+                raise ValueError(
+                    f'Invalid comparison operator "{operator}" for field "{field}"'
                 )
+        else:
+            # We need to ensure that if any of function duration is in the
+            # time range, then both Enter and Leave events are included in the mask
+            trace._match_events()
+
+            # Extract start and end timestamps if operator is <, <=, >, >=, or between
+            start, end = float("-inf"), float("inf")
+
+            if operator == "<" or operator == "<=":
+                end = value
+            elif operator == ">" or operator == ">=":
+                start = value
+            elif operator == "between":
+                start, end = value
+            else:
+                raise ValueError(
+                    f'Invalid comparison operator "{operator}" for field "{field}"'
+                )
+
+            # Handle each event type separately
+            result = (
+                (
+                    (trace.events["Event Type"] == "Instant")
+                    & (trace.events["Timestamp (ns)"] >= start)
+                    & (trace.events["Timestamp (ns)"] <= end)
+                )
+                | (
+                    (trace.events["Event Type"] == "Enter")
+                    & (trace.events["_matching_timestamp"] >= start)
+                    & (trace.events["Timestamp (ns)"] <= end)
+                )
+                | (
+                    (trace.events["Event Type"] == "Leave")
+                    & (trace.events["Timestamp (ns)"] >= start)
+                    & (trace.events["_matching_timestamp"] <= end)
+                )
+            )
 
         return result
 

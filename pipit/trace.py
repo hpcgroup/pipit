@@ -725,15 +725,17 @@ class Trace:
         # Return a new Trace instance
         return Trace(self.definitions, filtered_events)
 
-    def trim(self, start=-float("inf"), end=float("inf")):
+    def slice(self, start=-float("inf"), end=float("inf"), clip_values=True):
         """
         Returns a new Trace instance containing only events that occur in a specified
-        time window. The timestamps of `Enter` and `Leave` events are clipped to be
-        within the window.
+        time window. The timestamps of `Enter` and `Leave` events are optionally
+        clipped to be within the window.
 
         Args:
             start (float): Start of the time window. Defaults to -inf.
             end (float): End of the time window. Defaults to inf.
+            clip_values (bool): If True, clips timestamp values of `Enter` and `Leave`
+                events to be within the window. Otherwise, does not modify timestamps.
 
         Returns:
             pipit.Trace: new Trace instance containing a view of the events DataFrame
@@ -744,12 +746,38 @@ class Trace:
         start = parse_time(start)
         end = parse_time(end)
 
-        # Filter to events within time window
-        events = self.filter("Timestamp (ns)", "between", [start, end]).events
+        # Ensure that events and caller-callees are matched
+        self._match_events()
+        self._match_caller_callee()
 
-        # Clip timestamps within [start, end]
-        for col in ["Timestamp (ns)", "_matching_timestamp"]:
-            events[col] = events[col].clip(start, end)
+        # Determine which events lie within time window
+        # This ensures that if any part of a function occurs in a time range,
+        # then both the Enter and Leave events are included in the filter
+        mask = (
+            (
+                (self.events["Event Type"] == "Instant")
+                & (self.events["Timestamp (ns)"] >= start)
+                & (self.events["Timestamp (ns)"] <= end)
+            )
+            | (
+                (self.events["Event Type"] == "Enter")
+                & (self.events["_matching_timestamp"] >= start)
+                & (self.events["Timestamp (ns)"] <= end)
+            )
+            | (
+                (self.events["Event Type"] == "Leave")
+                & (self.events["Timestamp (ns)"] >= start)
+                & (self.events["_matching_timestamp"] <= end)
+            )
+        )
+        events = self.events.loc[mask].copy(deep=False)
+
+        # Clip timestamps within [start, end] if specified
+        if clip_values:
+            events["Timestamp (ns)"] = events["Timestamp (ns)"].clip(start, end)
+            events["_matching_timestamp"] = events["_matching_timestamp"].clip(
+                start, end
+            )
 
         # Delete inc/exc metrics, since these are no longer accurate
         events.drop(columns=self.inc_metrics + self.exc_metrics, inplace=True)
