@@ -391,9 +391,8 @@ def timeline(trace, show_depth=False, instant_events=False):
     select = figure(
         tools="",
         height=80,
-        title=(
-            "Drag the middle and edges of the selection box to change the range above",
-        ),
+        title="Drag the middle and edges of the selection box"
+        "to change the range above",
         # title="Timeline",
         toolbar_location=None,
         y_axis_type=None,
@@ -570,14 +569,12 @@ def message_histogram(trace, **kwargs):
     The heights of the bars represent the frequency of messages per size range."""
     hist, edges = trace.message_histogram(**kwargs)
 
-    # Create bokeh plot
     p = figure(
-        # title="Message Histogram",
-        y_range=(0, np.max(hist) + np.max(hist) / 4),
         x_axis_label="Message size",
         y_axis_label="Number of messages",
         tools="hover,save",
     )
+    p.y_range.start = 0
 
     p.quad(top=hist, bottom=0, left=edges[:-1], right=edges[1:], line_color="white")
 
@@ -721,11 +718,11 @@ def comm_over_time(trace, **kwargs):
     is_size = kwargs.pop("output", "size") == "size"
 
     p = figure(
-        y_range=(0, np.max(hist) + np.max(hist) / 4),
         x_axis_label="Time",
-        y_axis_label="Total volume sent",
+        y_axis_label="Total volume sent" if is_size else "Number of messages",
         tools="hover,save",
     )
+    p.y_range.start = 0
     p.xaxis.formatter = get_time_tick_formatter()
     p.yaxis.formatter = get_size_tick_formatter()
 
