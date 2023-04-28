@@ -7,6 +7,34 @@
 Getting Started
 ***************
 
+Introduction
+=============
+
+
+Pipit is an open-source Python library for analyzing parallel execution
+traces.
+
+It supports various trace formats, including OTF2, HPCToolkit, and
+Nsight. Pipit implements several operations for in-depth exploration and
+analysis of trace data. Built on top of Pandas, Pipit is highly scalable
+and extensible for custom analysis needs.
+
+Compared to other trace analysis/visualization tools, Pipit:
+
+-  Provides a unified interface for outputs of many different tracing
+   tools, which can be extended by writing custom *readers*
+
+-  Provides a programmatic API, allowing users to write simple code for
+   trace analysis, allowing for flexibility of exploration, scalability,
+   reproducibility, and automation/ saving of workflows using Jupyter
+   notebooks
+
+-  Automates certain common performance analysis tasks for analyzing
+   single and multiple executions
+
+-  Provides a visualization API that can be used to display analysis
+   results
+
 Prerequisites
 =============
 
