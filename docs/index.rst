@@ -13,12 +13,10 @@ Pipit
 #####
 
 Pipit is an open-source Python library for analyzing parallel execution
-traces.
-
-It supports various trace formats, including OTF2, HPCToolkit, and
-Nsight. Pipit implements several operations for in-depth exploration and
-analysis of trace data. Built on top of Pandas, Pipit is highly scalable
-and extensible for custom analysis needs.
+traces. It supports various trace formats, including OTF2, HPCToolkit, and
+Nsight, and implements several operations for in-depth exploration and
+analysis of trace data. Built on top of Pandas, Pipit is highly scalable and
+extensible for custom analysis needs.
 
 You can get pipit from its `GitHub repository
 <https://github.com/hpcgroup/pipit>`_:
