@@ -50,6 +50,41 @@ Pipit is available on `GitHub <https://github.com/hpcgroup/pipit>`_
 Installation
 ============
 
+You can get pipit from its `GitHub repository
+<https://github.com/hpcgroup/pipit>`_ using this command:
+
+.. code-block:: console
+
+  $ git clone https://github.com/hpcgroup/pipit.git
+
+This will create a directory called ``pipit``.
+
+Install and Build Pipit
+-----------------------
+
+
+
+Check Installation
+------------------
+
+Once pipit is installed, you should be able to import it into the Python interpreter and use it in interactive mode:
+
+.. code-block:: console
+
+  $ python
+  Python 3.8.12 (default, Jul 10 2022, 16:35:51)
+  [GCC 9.4.0] on linux
+  Type "help", "copyright", "credits" or "license" for more information.
+  >>>
+
+Typing ``import pipit`` at the prompt should succeed without any error
+messages:
+
+.. code-block:: console
+
+  >>> import pipit
+  >>>
+
 
 Supported data formats
 ======================
