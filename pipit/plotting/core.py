@@ -19,26 +19,26 @@ from .util import (
 
 
 def comm_matrix(
-    data, output="size", cmap="log", palette="Viridis256", return_figure=False
+    data, output="size", cmap="log", palette="Viridis256", return_fig=False
 ):
     """
-    Plot the Trace's communication matrix.
+    Plot the trace's communication matrix.
 
     Args:
         data (numpy.ndarray): a 2D numpy array of shape (N, N) containing the
             communication matrix between N processes.
-        output (str, optional): "size" or "count"
+        output (str, optional): Specifies whether the matrix contains "size"
+            or "count" values. Defaults to "size".
         cmap (str, optional): Specifies the color mapping. Options are "log",
-            "linear", and "any"
+            "linear", and "any". Defaults to "log".
         palette (str, optional): Name of Bokeh color palette to use. Defaults to
             "Viridis256".
-        return_figure (bool, optional): Whether to return the Bokeh figure
+        return_fig (bool, optional): Specifies whether to return the Bokeh figure
             object. Defaults to False, which displays the result and returns nothing.
 
     Returns:
-        None or Bokeh figure object
+        Bokeh figure object if return_fig, None otherwise
     """
-
     N = data.shape[0]
 
     # Define color mapper
@@ -85,7 +85,6 @@ def comm_matrix(
 
     # Customize plot
     p.axis.ticker = get_process_ticker(N=N)
-    # p.axis.major_tick_line_color = None
     p.grid.visible = False
 
     # Configure hover
@@ -106,4 +105,4 @@ def comm_matrix(
     hover.formatters = {"@image": get_size_hover_formatter()}
 
     # Return plot
-    return show(p, return_figure=return_figure)
+    return show(p, return_fig=return_fig)

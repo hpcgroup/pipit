@@ -44,7 +44,7 @@ def in_notebook():
     return True
 
 
-def show(p, return_figure=False):
+def show(p, return_fig=False):
     """Used to wrap return values of plotting functions.
 
     If return_figure is True, then just returns the figure object, otherwise starts a
@@ -54,7 +54,7 @@ def show(p, return_figure=False):
     See https://docs.bokeh.org/en/latest/docs/user_guide/output/jupyter.html#bokeh-server-applications,   # noqa E501
     https://docs.bokeh.org/en/latest/docs/user_guide/server/library.html.
     """
-    if return_figure:
+    if return_fig:
         return p
 
     # Load Gill Sans font from CDN
