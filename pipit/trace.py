@@ -26,6 +26,10 @@ class Trace:
         self.inc_metrics = []
         self.exc_metrics = []
 
+        from .plotting.util import generate_palette
+
+        self.palette = generate_palette(self)
+
     @staticmethod
     def from_otf2(dirname, num_processes=None):
         """Read an OTF2 trace into a new Trace object."""
