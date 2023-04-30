@@ -7,4 +7,14 @@
 User Guide
 **********
 
+Data Structures in Pipit
+=============
 
+Reading in a dataset
+=============
+
+DataFrame Operations
+=============
+
+Visualizing the Data
+=============
