@@ -3,6 +3,7 @@ DEFAULT = """
         Plot:
             height: 350
             width: 700
+            background_fill_color: "#fafafa"
         Axis:
             axis_label_text_font_style: "bold"
             minor_tick_line_color: null
