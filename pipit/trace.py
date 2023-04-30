@@ -694,3 +694,12 @@ class Trace:
 
         # Return the Bokeh plot
         return core.comm_matrix(data, output=output, *args, **kwargs)
+
+    def plot_message_histogram(self, bins=20, *args, **kwargs):
+        from .plotting import core
+
+        # Generate the data
+        data = self.message_histogram(bins=bins)
+
+        # Return the Bokeh plot
+        return core.message_histogram(data, *args, **kwargs)
