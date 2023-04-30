@@ -10,8 +10,23 @@ from pipit.util.cct import create_cct
 
 class Trace:
     """
-    A trace dataset is read into an object of this type, which
-    includes one or more dataframes and a calling context tree.
+    A Trace object represents trace data collected during the execution of a program.
+    It provides an organized and structured view of the data collected, with DataFrames
+    for both the trace data and metadata.
+
+    The most important DataFrame in the Trace object is the `events` DataFrame,
+    which holds a record of every event as it occurs, including essential details like
+    event type, timestamp, and the process in which it occurs. These events can be either
+    "Instant" events that take place at a particular time point or pairs of "Enter" and
+    "Leave" events that indicate function intervals.
+
+    In addition to providing access to the raw trace data, the Trace object offers
+    various analysis and visualization operations, making it easy to sift through the
+    data and extract insights. These operations include trace filtering, grouping,
+    aggregation, and profiling, as well as visualization methods such as call graphs,
+    flame charts, and communication matrices. With the help of the Trace object,
+    you can easily navigate complex trace data and gain a deep understanding of
+    program execution behavior.
     """
 
     def __init__(self, definitions, events, cct=None):
@@ -292,6 +307,19 @@ class Trace:
             )
 
     def calc_inc_metrics(self, columns=None):
+        """
+        Calculates the specified *inclusive* metrics for each event in the trace, and
+        stores the results in a new column of the events DataFrame.
+
+        For instance, if the specified metric is "Timestamp (ns)", this method creates
+        a new column called "time.exc", which contains the inclusive time spent in each
+        function call. The inclusive time of a function call is calculated as the difference
+        between its "Enter" and "Leave" timestamps, and *includes time spent in any
+        sub-functions called by that function.*
+
+        Note that this method modifies the events DataFrame in place and does not return a new DataFrame. 
+        """      
+                
         # if no columns are specified by the user, then we calculate
         # inclusive metrics for all the numeric columns in the trace
         columns = self.numeric_cols if columns is None else columns
@@ -327,6 +355,19 @@ class Trace:
                 self.inc_metrics.append(metric_col_name)
 
     def calc_exc_metrics(self, columns=None):
+        """
+        Calculates the specified *exclusive* metrics for each event in the trace, and
+        stores the results in a new column of the events DataFrame.
+
+        For instance, if the specified metric is "Timestamp (ns)", this method creates
+        a new column called "time.exc", which contains the exclusive time spent in each
+        function call. The exclusive time of a function call is calculated as the difference
+        between its "Enter" and "Leave" timestamps, and does not include time spent in any
+        sub-functions called by that function. 
+
+        Note that this method modifies the events DataFrame in place and does not return a new DataFrame. 
+        """       
+
         # calculate exc metrics for all numeric columns if not specified
         columns = self.numeric_cols if columns is None else columns
 
