@@ -10,11 +10,26 @@ User Guide
 Data Structures in Pipit
 =============
 
-Reading in a dataset
+Reading in a Dataset
 =============
 
-DataFrame Operations
+Trace Operations
 =============
+
+Extracting Calling Relationships
+------------------
+
+Analyzing Overall Performance
+------------------
+
+Analyzing Communication Performance
+------------------
+
+Identifying Performance Issues
+------------------
+
+Data Reduction
+------------------
 
 Visualizing the Data
 =============
