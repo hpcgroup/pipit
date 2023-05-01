@@ -42,20 +42,27 @@ Every time a leave row is encountered, we pop the top of the stack, which is
 the matching enter row index and timestamp for that leave row. These are added
 to the the appropriate rows in the DataFrame to form two new columns.
 
-The resulting columns created from trace._match_events() are displayed below:
+A simple example of the resulting columns created from trace._match_events() are displayed below:
+
+.. image:: images/_match_events.png
+   :width: 600
 
 **_match_caller_callee:**
 The _match_caller_callee function identifies parent child relationships by traversing
 the DataFrame and creating three new columns in the DataFrame: row index of a
 function invocation's parent, list of row indices of all its children, and its
-depth in the calling context tree.
+depth in the calling context tree. Note that these values are only stored in the
+enter rows of events.
 
 Similar to _match_events}, the DataFrame is filtered to enter/leave events for the current process and thread being iterated over.
 Using a stack of DataFrame indices, it keeps track of the parent index. For enter rows, it peeks the stack to get the parent index which
 is used to modify the current event's parent and the parent's children. The current depth in the call tree is also incremented.
 When a leave row is encountered, an element is popped from the stack and the current depth is decremented.
 
-The resulting 3 new columns added by trace._match_caller_callee() are as follows:
+An example of the resulting 3 new columns added by trace._match_caller_callee() are as follows:
+
+.. image:: images/_match_caller_callee.png
+   :width: 600
 
 **_create_cct:**
 
@@ -73,11 +80,15 @@ of each function invocation, we need to first derive the inclusive values for
 each metric (including execution time). The calc_inc_metrics function uses _match_events
 to match indices of enter and leave rows. Once events are matched, corresponding pairs of
 events can be used to calculate the inclusive metrics associated with each function.
+Note that the inclusive values are only stored in the enter rows of events.
 
 The function takes a parameter *columns* which can either be a string indicating a single
 column or a list of columns for which to calculate inclusive metrics for. If this isn't specified,
 the function adds a corresponding inclusive values column for every numerical column in the DataFrame.
-The result of the default command trace.calc_inc_metrics() is displayed in the image below:
+An example of the result of the default command trace.calc_inc_metrics() is displayed in the image below:
+
+.. image:: images/calc_inc_metrics.png
+   :width: 600
 
 **calc_exc_metrics:**
 This function calculates the exclusive time and other metrics associated
@@ -85,18 +96,22 @@ with each function invocation. This function first calls calc_inc_metrics
 to calculate inclusive values for each metric. It then uses the parent-child
 relationships obtained from _match_caller_callee to subtract the children's metrics
 from each parent function's inclusive values to get the exclusive metrics.
+Note that the exclusive values are only stored in the enter rows of events.
 
 The function takes a parameter *columns* which can either be a string indicating a single
 column or a list of columns for which to calculate exclusive metrics for. If this isn't specified,
 the function adds a corresponding exclusive values column for every numerical column in the DataFrame.
 Note that if the inclusive values column does not exist prior to calling this function, it will also be calculated.
-The result of the default command trace.calc_exc_metrics() is displayed in the image below:
+An example result of the default command trace.calc_exc_metrics() is displayed in the image below:
 
+.. image:: images/calc_exc_metrics.png
+   :width: 600
 
 **flat_profile:**
 Once we calculate the inclusive and exclusive metrics per function invocation,
 we can use the power of pandas and operations such as groupby to easily calculate
-the total time spent in each function.
+the total time spent in each function. Note that calc_exc_metrics has to be called
+prior to using this function.
 
 This function takes three parameters and returns a DataFrame. The first, *metrics*, is a single string or list of strings
 denoting the columns/metrics to be aggregated in the resulting DataFrame. If not specified, the default is aggregate all metrics.
@@ -104,7 +119,10 @@ The second, *groupby_column*, is the column over which to aggregate the metrics.
 The third, *per_process*, indicates whether the user wants to aggregate the metrics over process as well. The default for this is False
 where metrics are summed over each process and then the average is taken (ex: average time spent in a function per process). However, if store
 to true, the resulting DataFrame will be indexed by both the groupby_column values and the Process so that an average is not taken over processes.
-The default values for all parameters, trace.flat_profile(), results in a DataFrame like this:
+The default values for all parameters, trace.flat_profile(), results in a DataFrame like this as an example:
+
+.. image:: images/flat_profile.png
+   :width: 600
 
 **time_profile:**
 
@@ -123,7 +141,10 @@ size of the message exchanged.
 The first dimension of the returned 2D array is senders and the second dimension is receivers (ex: comm_matrix[sender_rank][receiver_rank]).
 This function takes one parameter, *output*, which can either be "size" so that the returned 2D array contains the total number of bytes communicated or
 "count" where the values are the number of messages exchanged instead. The default value for this parameter is "size". The default command, trace.comm_matrix(),
-will result in a 2D array like the following image:
+will result in a 2D array like the following image as an example:
+
+.. image:: images/comm_matrix.png
+   :width: 600
 
 **message_size_histogram:**
 
