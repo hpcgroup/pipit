@@ -353,110 +353,82 @@ class ProjectionsReader:
                     pass
 
                 elif int(line_arr[0]) == ProjectionsConstants.BEGIN_IDLE:
-                    time = int(line_arr[1])
+                    time = int(line_arr[1]) * 1000
                     pe = int(line_arr[2])
 
                     details = {"From PE": pe}
 
-                    data["Name"].append("Idle")
-                    data["Event Type"].append("Enter")
-                    data["Timestamp (ns)"].append(time * 1000)
-                    data["Process"].append(pe_num)
-                    data["Attributes"].append(details)
+                    _add_to_trace_dict(data, "Idle", "Enter", time, pe_num, details)
 
                 elif int(line_arr[0]) == ProjectionsConstants.END_IDLE:
-                    time = int(line_arr[1])
+                    time = int(line_arr[1]) * 1000
                     pe = int(line_arr[2])
 
                     details = {"From PE": pe}
 
-                    data["Name"].append("Idle")
-                    data["Event Type"].append("Leave")
-                    data["Timestamp (ns)"].append(time * 1000)
-                    data["Process"].append(pe_num)
-                    data["Attributes"].append(details)
+                    _add_to_trace_dict(data, "Idle", "Leave", time, pe_num, details)
 
                 # Pack message to be sent
                 elif int(line_arr[0]) == ProjectionsConstants.BEGIN_PACK:
-                    time = int(line_arr[1])
+                    time = int(line_arr[1]) * 1000
                     pe = int(line_arr[2])
 
                     details = {"From PE": pe}
 
-                    data["Name"].append("Pack")
-                    data["Event Type"].append("Enter")
-                    data["Timestamp (ns)"].append(time * 1000)
-                    data["Process"].append(pe_num)
-                    data["Attributes"].append(details)
+                    _add_to_trace_dict(data, "Pack", "Enter", time, pe_num, details)
 
                 elif int(line_arr[0]) == ProjectionsConstants.END_PACK:
-                    time = int(line_arr[1])
+                    time = int(line_arr[1]) * 1000
                     pe = int(line_arr[2])
 
                     details = {"From PE": pe}
 
-                    data["Name"].append("Pack")
-                    data["Event Type"].append("Leave")
-                    data["Timestamp (ns)"].append(time * 1000)
-                    data["Process"].append(pe_num)
-                    data["Attributes"].append(details)
+                    _add_to_trace_dict(data, "Pack", "Leave", time, pe_num, details)
 
                 # Unpacking a received message
                 elif int(line_arr[0]) == ProjectionsConstants.BEGIN_UNPACK:
-                    time = int(line_arr[1])
+                    time = int(line_arr[1]) * 1000
                     pe = int(line_arr[2])
 
                     details = {"From PE": pe}
 
-                    data["Name"].append("Unpack")
-                    data["Event Type"].append("Enter")
-                    data["Timestamp (ns)"].append(time * 1000)
-                    data["Process"].append(pe_num)
-                    data["Attributes"].append(details)
+                    _add_to_trace_dict(data, "Unpack", "Enter", time, pe_num, details)
 
                 elif int(line_arr[0]) == ProjectionsConstants.END_UNPACK:
-                    time = int(line_arr[1])
+                    time = int(line_arr[1]) * 1000
                     pe = int(line_arr[2])
 
                     details = {"From PE": pe}
 
-                    data["Name"].append("Unpack")
-                    data["Event Type"].append("Leave")
-                    data["Timestamp (ns)"].append(time * 1000)
-                    data["Process"].append(pe_num)
-                    data["Attributes"].append(details)
+                    _add_to_trace_dict(data, "Unpack", "Leave", time, pe_num, details)
 
                 elif int(line_arr[0]) == ProjectionsConstants.USER_SUPPLIED:
                     user_supplied = line_arr[1]
                     details = {"User Supplied": user_supplied}
 
-                    data["Name"].append("User Supplied")
-                    data["Event Type"].append("Instant")
-                    data["Timestamp (ns)"].append(-1)
-                    data["Process"].append(pe_num)
-                    data["Attributes"].append(details)
+                    _add_to_trace_dict(
+                        data, "User Supplied", "Instant", -1, pe_num, details
+                    )
 
                 elif int(line_arr[0]) == ProjectionsConstants.USER_SUPPLIED_NOTE:
-                    time = line_arr[1]
+                    time = line_arr[1] * 1000
                     note = ""
                     for i in range(2, len(line_arr)):
                         note = note + line_arr[i] + " "
 
                     details = {"Note": note}
 
-                    data["Name"].append("User Supplied Note")
-                    data["Event Type"].append("Instant")
-                    data["Timestamp (ns)"].append(time * 1000)
-                    data["Process"].append(pe_num)
-                    data["Attributes"].append(details)
+                    _add_to_trace_dict(
+                        data, "User Supplied Note", "Instant", time, pe_num, details
+                    )
 
                 # Not sure if this should be instant or enter/leave
                 elif (
                     int(line_arr[0])
                     == ProjectionsConstants.USER_SUPPLIED_BRACKETED_NOTE
                 ):
-                    time = line_arr[1]
-                    end_time = line_arr[2]
+                    time = line_arr[1] * 1000
+                    end_time = line_arr[2] * 1000
                     user_event_id = line_arr[3]
                     note = ""
                     for i in range(4, len(line_arr)):
@@ -469,36 +441,40 @@ class ProjectionsReader:
                         "Note": note,
                     }
 
-                    data["Name"].append("User Supplied Bracketed Note")
-                    data["Event Type"].append("Enter")
-                    data["Timestamp (ns)"].append(time * 1000)
-                    data["Process"].append(pe_num)
-                    data["Attributes"].append(details)
+                    _add_to_trace_dict(
+                        data,
+                        "User Supplied Bracketed Note",
+                        "Enter",
+                        time,
+                        pe_num,
+                        details,
+                    )
 
-                    data["Name"].append("User Supplied Bracketed Note")
-                    data["Event Type"].append("Leave")
-                    data["Timestamp (ns)"].append(end_time)
-                    data["Process"].append(pe_num)
-                    data["Attributes"].append(details)
+                    _add_to_trace_dict(
+                        data,
+                        "User Supplied Bracketed Note",
+                        "Leave",
+                        end_time,
+                        pe_num,
+                        details,
+                    )
 
                 # Memory Usage at timestamp
                 elif int(line_arr[0]) == ProjectionsConstants.MEMORY_USAGE:
                     memory_usage = int(line_arr[1])
-                    time = int(line_arr[2])
+                    time = int(line_arr[2]) * 1000
 
                     details = {"Memory Usage": memory_usage}
 
-                    data["Name"].append("Memory Usage")
-                    data["Event Type"].append("Instant")
-                    data["Timestamp (ns)"].append(time * 1000)
-                    data["Process"].append(pe_num)
-                    data["Attributes"].append(details)
+                    _add_to_trace_dict(
+                        data, "Memory Usage", "Instant", time, pe_num, details
+                    )
 
                 # New chare create message being sent
                 elif int(line_arr[0]) == ProjectionsConstants.CREATION:
                     mtype = int(line_arr[1])
                     entry = int(line_arr[2])
-                    time = int(line_arr[3])
+                    time = int(line_arr[3]) * 1000
                     event = int(line_arr[4])
                     pe = int(line_arr[5])
                     msglen = int(line_arr[6])
@@ -513,16 +489,19 @@ class ProjectionsReader:
                         "Send Time": send_time,
                     }
 
-                    data["Name"].append(sts_reader.get_entry_name(entry))
-                    data["Event Type"].append("Instant")
-                    data["Timestamp (ns)"].append(time * 1000)
-                    data["Process"].append(pe_num)
-                    data["Attributes"].append(details)
+                    _add_to_trace_dict(
+                        data,
+                        sts_reader.get_entry_name(entry),
+                        "Instant",
+                        time,
+                        pe_num,
+                        details,
+                    )
 
                 elif int(line_arr[0]) == ProjectionsConstants.CREATION_MULTICAST:
                     mtype = int(line_arr[1])
                     entry = int(line_arr[2])
-                    time = int(line_arr[3])
+                    time = int(line_arr[3]) * 1000
                     event = int(line_arr[4])
                     pe = int(line_arr[5])
                     msglen = int(line_arr[6])
@@ -542,17 +521,20 @@ class ProjectionsReader:
                         "Destinatopn PEs": destPEs,
                     }
 
-                    data["Name"].append(sts_reader.get_entry_name(entry))
-                    data["Event Type"].append("Instant")
-                    data["Timestamp (ns)"].append(time * 1000)
-                    data["Process"].append(pe_num)
-                    data["Attributes"].append("To " + str(numPEs) + "processors")
+                    _add_to_trace_dict(
+                        data,
+                        sts_reader.get_entry_name(entry),
+                        "Instant",
+                        time,
+                        pe_num,
+                        "To " + str(numPEs) + "processors",
+                    )
 
                 # Processing of chare (i.e. execution) ?
                 elif int(line_arr[0]) == ProjectionsConstants.BEGIN_PROCESSING:
                     mtype = int(line_arr[1])
                     entry = int(line_arr[2])
-                    time = int(line_arr[3])
+                    time = int(line_arr[3]) * 1000
                     event = int(line_arr[4])
                     pe = int(line_arr[5])
                     msglen = int(line_arr[6])
@@ -580,16 +562,19 @@ class ProjectionsReader:
                         "perf counts list": perf_counts,
                     }
 
-                    data["Name"].append(sts_reader.get_entry_name(entry))
-                    data["Event Type"].append("Enter")
-                    data["Timestamp (ns)"].append(time * 1000)
-                    data["Process"].append(pe_num)
-                    data["Attributes"].append(details)
+                    _add_to_trace_dict(
+                        data,
+                        sts_reader.get_entry_name(entry),
+                        "Enter",
+                        time,
+                        pe_num,
+                        details,
+                    )
 
                 elif int(line_arr[0]) == ProjectionsConstants.END_PROCESSING:
                     mtype = int(line_arr[1])
                     entry = int(line_arr[2])
-                    time = int(line_arr[3])
+                    time = int(line_arr[3]) * 1000
                     event = int(line_arr[4])
                     pe = int(line_arr[5])
                     msglen = int(line_arr[6])
@@ -609,35 +594,30 @@ class ProjectionsReader:
                         "perf counts list": perf_counts,
                     }
 
-                    data["Name"].append(sts_reader.get_entry_name(entry))
-                    data["Event Type"].append("Leave")
-                    data["Timestamp (ns)"].append(time * 1000)
-                    data["Process"].append(pe_num)
-                    data["Attributes"].append(None)
+                    _add_to_trace_dict(
+                        data,
+                        sts_reader.get_entry_name(entry),
+                        "Leave",
+                        time,
+                        pe_num,
+                        None,
+                    )
 
                 # For selective tracing - when trace is called inside code
                 elif int(line_arr[0]) == ProjectionsConstants.BEGIN_TRACE:
-                    time = int(line_arr[1])
+                    time = int(line_arr[1]) * 1000
 
-                    data["Name"].append("Trace")
-                    data["Event Type"].append("Enter")
-                    data["Timestamp (ns)"].append(time * 1000)
-                    data["Process"].append(pe_num)
-                    data["Attributes"].append(None)
+                    _add_to_trace_dict(data, "Trace", "Enter", time, pe_num, None)
 
                 elif int(line_arr[0]) == ProjectionsConstants.END_TRACE:
-                    time = int(line_arr[1])
+                    time = int(line_arr[1]) * 1000
 
-                    data["Name"].append("Trace")
-                    data["Event Type"].append("Leave")
-                    data["Timestamp (ns)"].append(time * 1000)
-                    data["Process"].append(pe_num)
-                    data["Attributes"].append(None)
+                    _add_to_trace_dict(data, "Trace", "Leave", time, pe_num, None)
 
                 # Message Receive ?
                 elif int(line_arr[0]) == ProjectionsConstants.MESSAGE_RECV:
                     mtype = int(line_arr[1])
-                    time = int(line_arr[2])
+                    time = int(line_arr[2]) * 1000
                     event = int(line_arr[3])
                     pe = int(line_arr[4])
                     message_length = int(line_arr[5])
@@ -649,91 +629,69 @@ class ProjectionsReader:
                         "Message Length": message_length,
                     }
 
-                    data["Name"].append("Message Receive")
-                    data["Event Type"].append("Instant")
-                    data["Timestamp (ns)"].append(time * 1000)
-                    data["Process"].append(pe_num)
-                    data["Attributes"].append(details)
+                    _add_to_trace_dict(
+                        data, "Message Receive", "Instant", time, pe_num, details
+                    )
 
                 # queueing creation ?
                 elif int(line_arr[0]) == ProjectionsConstants.ENQUEUE:
                     mtype = int(line_arr[1])
-                    time = int(line_arr[2])
+                    time = int(line_arr[2]) * 1000
                     event = int(line_arr[3])
                     pe = int(line_arr[4])
 
                     details = {"From PE": pe, "Message Type": mtype, "Event ID": event}
 
-                    data["Name"].append("Enque")
-                    data["Event Type"].append("Instant")
-                    data["Timestamp (ns)"].append(time * 1000)
-                    data["Process"].append(pe_num)
-                    data["Attributes"].append(details)
+                    _add_to_trace_dict(data, "Enque", "Instant", time, pe_num, details)
 
                 elif int(line_arr[0]) == ProjectionsConstants.DEQUEUE:
                     mtype = int(line_arr[1])
-                    time = int(line_arr[2])
+                    time = int(line_arr[2]) * 1000
                     event = int(line_arr[3])
                     pe = int(line_arr[4])
 
                     details = {"From PE": pe, "Message Type": mtype, "Event ID": event}
 
-                    data["Name"].append("Deque")
-                    data["Event Type"].append("Instant")
-                    data["Timestamp (ns)"].append(time * 1000)
-                    data["Process"].append(pe_num)
-                    data["Attributes"].append(details)
+                    _add_to_trace_dict(data, "Deque", "Instant", time, pe_num, details)
 
                 # Interrupt from different chare ?
                 elif int(line_arr[0]) == ProjectionsConstants.BEGIN_INTERRUPT:
-                    time = int(line_arr[1])
+                    time = int(line_arr[1]) * 1000
                     event = int(line_arr[2])
                     pe = int(line_arr[3])
 
                     details = {"From PE": pe, "Event ID": event}
 
-                    data["Name"].append("Interrupt")
-                    data["Event Type"].append("Enter")
-                    data["Timestamp (ns)"].append(time * 1000)
-                    data["Process"].append(pe_num)
-                    data["Attributes"].append(details)
+                    _add_to_trace_dict(
+                        data, "Interrupt", "Enter", time, pe_num, details
+                    )
 
                 elif int(line_arr[0]) == ProjectionsConstants.END_INTERRUPT:
-                    time = int(line_arr[1])
+                    time = int(line_arr[1]) * 1000
                     event = int(line_arr[2])
                     pe = int(line_arr[3])
 
                     details = {"From PE": pe, "Event ID": event}
 
-                    data["Name"].append("Interrupt")
-                    data["Event Type"].append("Leave")
-                    data["Timestamp (ns)"].append(time * 1000)
-                    data["Process"].append(pe_num)
-                    data["Attributes"].append(details)
+                    _add_to_trace_dict(
+                        data, "Interrupt", "Leave", time, pe_num, details
+                    )
 
                 # Very start of the program - encapsulates every other event
                 elif int(line_arr[0]) == ProjectionsConstants.BEGIN_COMPUTATION:
-                    time = int(line_arr[1])
+                    time = int(line_arr[1]) * 1000
 
-                    data["Name"].append("Computation")
-                    data["Event Type"].append("Enter")
-                    data["Timestamp (ns)"].append(time * 1000)
-                    data["Process"].append(pe_num)
-                    data["Attributes"].append(None)
+                    _add_to_trace_dict(data, "Computation", "Enter", time, pe_num, None)
 
                 elif int(line_arr[0]) == ProjectionsConstants.END_COMPUTATION:
-                    time = int(line_arr[1])
+                    time = int(line_arr[1]) * 1000
 
-                    data["Name"].append("Computation")
-                    data["Event Type"].append("Leave")
-                    data["Timestamp (ns)"].append(time * 1000)
-                    data["Process"].append(pe_num)
-                    data["Attributes"].append(None)
+                    _add_to_trace_dict(data, "Computation", "Leave", time, pe_num, None)
 
                 # User event (in code)
                 elif int(line_arr[0]) == ProjectionsConstants.USER_EVENT:
                     user_event_id = int(line_arr[1])
-                    time = int(line_arr[2])
+                    time = int(line_arr[2]) * 1000
                     event = int(line_arr[3])
                     pe = int(line_arr[4])
 
@@ -745,15 +703,13 @@ class ProjectionsReader:
                         "Event Type": "User Event",
                     }
 
-                    data["Name"].append(user_event_name)
-                    data["Event Type"].append("Instant")
-                    data["Timestamp (ns)"].append(time * 1000)
-                    data["Process"].append(pe_num)
-                    data["Attributes"].append(details)
+                    _add_to_trace_dict(
+                        data, user_event_name, "Instant", time, pe_num, details
+                    )
 
                 elif int(line_arr[0]) == ProjectionsConstants.USER_EVENT_PAIR:
                     user_event_id = int(line_arr[1])
-                    time = int(line_arr[2])
+                    time = int(line_arr[2]) * 1000
                     event = int(line_arr[3])
                     pe = int(line_arr[4])
                     nested_id = int(line_arr[5])
@@ -767,15 +723,13 @@ class ProjectionsReader:
                         "Event Type": "User Event Pair",
                     }
 
-                    data["Name"].append(user_event_name)
-                    data["Event Type"].append("Instant")
-                    data["Timestamp (ns)"].append(time * 1000)
-                    data["Process"].append(pe_num)
-                    data["Attributes"].append(details)
+                    _add_to_trace_dict(
+                        data, user_event_name, "Instant", time, pe_num, details
+                    )
 
                 elif int(line_arr[0]) == ProjectionsConstants.BEGIN_USER_EVENT_PAIR:
                     user_event_id = int(line_arr[1])
-                    time = int(line_arr[2])
+                    time = int(line_arr[2]) * 1000
                     event = int(line_arr[3])
                     pe = int(line_arr[4])
                     nested_id = int(line_arr[5])
@@ -787,15 +741,13 @@ class ProjectionsReader:
                         "User Event Name": sts_reader.get_user_event(user_event_id),
                     }
 
-                    data["Name"].append("User Event Pair")
-                    data["Event Type"].append("Enter")
-                    data["Timestamp (ns)"].append(time * 1000)
-                    data["Process"].append(pe_num)
-                    data["Attributes"].append(details)
+                    _add_to_trace_dict(
+                        data, "User Event Pair", "Enter", time, pe_num, details
+                    )
 
                 elif int(line_arr[0]) == ProjectionsConstants.END_USER_EVENT_PAIR:
                     user_event_id = int(line_arr[1])
-                    time = int(line_arr[2])
+                    time = int(line_arr[2]) * 1000
                     event = int(line_arr[3])
                     pe = int(line_arr[4])
                     nested_id = int(line_arr[5])
@@ -807,15 +759,13 @@ class ProjectionsReader:
                         "User Event Name": sts_reader.get_user_event(user_event_id),
                     }
 
-                    data["Name"].append("User Event Pair")
-                    data["Event Type"].append("Leave")
-                    data["Timestamp (ns)"].append(time * 1000)
-                    data["Process"].append(pe_num)
-                    data["Attributes"].append(details)
+                    _add_to_trace_dict(
+                        "User Event Pair", "Leave", time, pe_num, details
+                    )
 
                 # User stat (in code)
                 elif int(line_arr[0]) == ProjectionsConstants.USER_STAT:
-                    time = int(line_arr[1])
+                    time = int(line_arr[1]) * 1000
                     user_time = int(line_arr[2])
                     stat = float(line_arr[3])
                     pe = int(line_arr[4])
@@ -830,22 +780,24 @@ class ProjectionsReader:
                         "Event Type": "User Stat",
                     }
 
-                    data["Name"].append(user_stat_name)
-                    data["Event Type"].append("Instant")
-                    data["Timestamp (ns)"].append(time * 1000)
-                    data["Process"].append(pe_num)
-                    data["Attributes"].append(details)
+                    _add_to_trace_dict(
+                        data, user_stat_name, "Instant", time, pe_num, details
+                    )
 
             # Making sure that the log file ends with END_COMPUTATION
             if len(data["Name"]) > 0 and data["Name"][-1] != "Computation":
-                time = data["Timestamp (ns)"][-1]
-                data["Name"].append("Computation")
-                data["Event Type"].append("Leave")
-                data["Timestamp (ns)"].append(time * 1000)
-                data["Process"].append(pe_num)
-                data["Attributes"].append(None)
+                time = data["Timestamp (ns)"][-1] * 1000
+                _add_to_trace_dict(data, "Computation", "Leave", time, pe_num, None)
 
             log_file.close()
             dfs.append(pd.DataFrame(data))
 
         return pd.concat(dfs)
+
+
+def _add_to_trace_dict(data, name, evt_type, time, process, attributes):
+    data["Name"].append(name)
+    data["Event Type"].append(evt_type)
+    data["Timestamp (ns)"].append(time)
+    data["Process"].append(process)
+    data["Attributes"].append(attributes)
