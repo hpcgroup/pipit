@@ -478,7 +478,7 @@ class ProjectionsReader:
                     event = int(line_arr[4])
                     pe = int(line_arr[5])
                     msglen = int(line_arr[6])
-                    send_time = int(line_arr[7])
+                    send_time = int(line_arr[7]) * 1000
 
                     details = {
                         "From PE": pe,
@@ -505,7 +505,7 @@ class ProjectionsReader:
                     event = int(line_arr[4])
                     pe = int(line_arr[5])
                     msglen = int(line_arr[6])
-                    send_time = int(line_arr[7])
+                    send_time = int(line_arr[7]) * 1000
                     numPEs = int(line_arr[8])
                     destPEs = []
                     for i in (0, numPEs):
@@ -766,7 +766,7 @@ class ProjectionsReader:
                 # User stat (in code)
                 elif int(line_arr[0]) == ProjectionsConstants.USER_STAT:
                     time = int(line_arr[1]) * 1000
-                    user_time = int(line_arr[2])
+                    user_time = int(line_arr[2]) * 1000
                     stat = float(line_arr[3])
                     pe = int(line_arr[4])
                     user_event_id = int(line_arr[5])
