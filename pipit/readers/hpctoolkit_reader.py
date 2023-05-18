@@ -10,6 +10,12 @@ from pipit.graph import Graph, Node
 
 
 class MetaReader:
+    # adds new context id and return new nid
+    def _add_context_id(self, context_id) -> int:
+        self.nid_to_ctx[self.current_nid] = context_id
+        self.current_nid += 1
+        return self.current_nid - 1
+    
     def __init__(self, file_location):
         # open the file to ready in binary mode (rb)
         self.file = open(file_location, "rb")
@@ -18,6 +24,9 @@ class MetaReader:
         self.byte_order = "little"
         self.signed = False
         self.encoding = "ASCII"
+        self.current_nid = 0
+        self.nid_to_ctx = {}
+        self.node_map = {}
 
         # The meta.db header consists of the common .db header and n sections.
         # We're going to do a little set up work, so that's easy to change if
@@ -595,11 +604,10 @@ class MetaReader:
         # context = {"string_index": string_index}
         self.context_map[context_id] = context
         # Create Node for this context
-        node: Node = Node(context_id, None, None)
-        node.add_calling_context_id(context_id)
+        node: Node = Node(self._add_context_id(context_id), None)
         # Adding the Node to the CCT
         self.cct.add_root(node)
-        self.cct.add_to_map(context_id, node)
+        self.node_map[context_id] = node
 
         # Reading the children contexts
         self.__read_children_contexts(children_pointer, children_size, node, context_id)
@@ -724,20 +732,19 @@ class MetaReader:
             if lexical_type == 2 or lexical_type == 3:
                 # source line type or single line instruction
                 # meaning we don't want to create a node for this
-                self.cct.add_to_map(context_id, parent_node)
+                self.node_map[context_id] = parent_node
                 next_parent_node = parent_node
 
             else:
                 # otherwise we do want to create a node
                 # Creating Node for this context
-                node = Node(context_id, None, parent_node)
-                node.add_calling_context_id(context_id)
+                node = Node(self._add_context_id(context_id), parent_node)
 
                 # Connecting this node to the parent node
                 parent_node.add_child(node)
 
                 # Adding this node to the graph
-                self.cct.add_to_map(context_id, node)
+                self.node_map[context_id] = node
 
                 if lexical_type == 0:
                     # function call
@@ -1208,7 +1215,7 @@ class TraceReader:
                 current_node = None
             else:
                 # at a new non-idle context
-                current_node = self.meta_reader.cct.get_node(context_id)
+                current_node = self.meta_reader.node_map[context_id]
 
             # First we want to close all the "enter" events from the last sample
             # that aren't still running
@@ -1220,9 +1227,10 @@ class TraceReader:
 
                 # closing each "enter" column until we reach the common_node
                 while last_node != common_node:
+                    curr_ctx_id = self.meta_reader.nid_to_ctx[last_node._pipit_nid]
                     context_information = (
                         self.meta_reader.get_information_from_context_id(
-                            last_node.calling_context_ids[0]
+                            curr_ctx_id
                         )
                     )
 
@@ -1241,7 +1249,7 @@ class TraceReader:
                         context_information["line"]
                     )
                     self.data["Calling Context ID"].append(
-                        last_node.calling_context_ids[0]
+                        curr_ctx_id
                     )
 
                     last_node = last_node.parent
@@ -1255,9 +1263,10 @@ class TraceReader:
                 entry_nodes = current_node.get_node_list(intersect_level)
                 for i in range(len(entry_nodes)):
                     entry_node = entry_nodes[-1 * i - 1]
+                    curr_ctx_id = self.meta_reader.nid_to_ctx[entry_node._pipit_nid]
                     context_information = (
                         self.meta_reader.get_information_from_context_id(
-                            entry_node.calling_context_ids[0]
+                            curr_ctx_id
                         )
                     )
 
@@ -1276,7 +1285,7 @@ class TraceReader:
                         context_information["line"]
                     )
                     self.data["Calling Context ID"].append(
-                        entry_node.calling_context_ids[0]
+                        curr_ctx_id
                     )
 
             last_node = current_node
@@ -1293,8 +1302,9 @@ class TraceReader:
 
             # closing each "enter" column until we reach the common_node
             while last_node != common_node:
+                curr_ctx_id = self.meta_reader.nid_to_ctx[last_node._pipit_nid]
                 context_information = self.meta_reader.get_information_from_context_id(
-                    last_node.calling_context_ids[0]
+                    curr_ctx_id
                 )
 
                 self.data["Name"].append(str(context_information["function"]))
@@ -1309,7 +1319,7 @@ class TraceReader:
                 self.data["Node"].append(last_node)
                 self.data["Source File Name"].append(context_information["file"])
                 self.data["Source File Line Number"].append(context_information["line"])
-                self.data["Calling Context ID"].append(last_node.calling_context_ids[0])
+                self.data["Calling Context ID"].append(curr_ctx_id)
                 last_node = last_node.parent
 
 
