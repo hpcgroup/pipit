@@ -15,7 +15,7 @@ class MetaReader:
         self.nid_to_ctx[self.current_nid] = context_id
         self.current_nid += 1
         return self.current_nid - 1
-    
+
     def __init__(self, file_location):
         # open the file to ready in binary mode (rb)
         self.file = open(file_location, "rb")
@@ -1229,9 +1229,7 @@ class TraceReader:
                 while last_node != common_node:
                     curr_ctx_id = self.meta_reader.nid_to_ctx[last_node._pipit_nid]
                     context_information = (
-                        self.meta_reader.get_information_from_context_id(
-                            curr_ctx_id
-                        )
+                        self.meta_reader.get_information_from_context_id(curr_ctx_id)
                     )
 
                     self.data["Name"].append(str(context_information["function"]))
@@ -1248,9 +1246,7 @@ class TraceReader:
                     self.data["Source File Line Number"].append(
                         context_information["line"]
                     )
-                    self.data["Calling Context ID"].append(
-                        curr_ctx_id
-                    )
+                    self.data["Calling Context ID"].append(curr_ctx_id)
 
                     last_node = last_node.parent
             # Now we want to add all the new "enter" events after
@@ -1265,9 +1261,7 @@ class TraceReader:
                     entry_node = entry_nodes[-1 * i - 1]
                     curr_ctx_id = self.meta_reader.nid_to_ctx[entry_node._pipit_nid]
                     context_information = (
-                        self.meta_reader.get_information_from_context_id(
-                            curr_ctx_id
-                        )
+                        self.meta_reader.get_information_from_context_id(curr_ctx_id)
                     )
 
                     self.data["Name"].append(str(context_information["function"]))
@@ -1284,9 +1278,7 @@ class TraceReader:
                     self.data["Source File Line Number"].append(
                         context_information["line"]
                     )
-                    self.data["Calling Context ID"].append(
-                        curr_ctx_id
-                    )
+                    self.data["Calling Context ID"].append(curr_ctx_id)
 
             last_node = current_node
             last_id = context_id
