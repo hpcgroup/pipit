@@ -22,7 +22,7 @@ class NsightReader:
         """
 
         # Read in csv or multiple csvs
-        file_paths = glob.glob(self.dirname+'/*.csv')
+        file_paths = glob.glob(self.dirname + "/*.csv")
 
         dfs = []
         for file in file_paths:
