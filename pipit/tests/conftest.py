@@ -24,7 +24,6 @@ def ping_pong_hpct_trace(data_dir, tmpdir):
 
     for f in glob(os.path.join(str(hpct_db_dir), "*.db")):
         shutil.copy(f, str(tmpdir))
-    # shutil.copy(os.path.join(hpct_db_dir, "experiment.xml"), str(tmpdir))
 
     return tmpdir
 
