@@ -5,13 +5,14 @@
 
 import pandas as pd
 import pipit.trace
+import glob
 
 
 class NsightReader:
     """Reader for Nsight trace files"""
 
-    def __init__(self, file_name) -> None:
-        self.file_name = file_name
+    def __init__(self, dirname) -> None:
+        self.dirname = dirname
         self.df = None
 
     def read(self):
@@ -20,8 +21,17 @@ class NsightReader:
         utilizes pandas to convert it from a csv into a dataframe.
         """
 
-        # Read in csv
-        self.df = pd.read_csv(self.file_name)
+        # Read in csv or multiple csvs
+        file_paths = glob.glob(self.dirname+'/*.csv')
+
+        dfs = []
+        for file in file_paths:
+            df = pd.read_csv(file)
+            dfs.append(df)
+
+        combined_df = pd.concat(dfs, ignore_index=True)
+
+        self.df = combined_df
 
         # Grab the set of the column PID columns to see if
         # mutliprocess and convert to a list
