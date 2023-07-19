@@ -1,7 +1,10 @@
 from pipit import Trace
 import numpy as np
-from faketest import gen_fake_tree, emit_tree_file
+from faketest import gen_fake_tree, emit_tree_file, gen_forest
 import pandas as pd
+
+
+function_names = ["foo", "bar", "baz", "quux", "grault", "garply", "waldo"]
 
 
 def test_with_fake_data():
@@ -12,7 +15,8 @@ def test_with_fake_data():
     """
     num_processes = 8
     # generate one fake tree per process, 2000 functions in the tree
-    trees = [gen_fake_tree(2000) for n in range(num_processes)]
+    seed_tree = gen_fake_tree(200, function_names)
+    trees = gen_forest(seed_tree, num_processes)
     test_file = open("fake.csv", "w")
     ground_truth = open("fake_ground.csv", "w")
     emit_tree_file(trees, test_file, ground_truth)

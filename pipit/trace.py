@@ -5,6 +5,7 @@
 
 import numpy as np
 import pandas as pd
+import ast
 
 
 class Trace:
@@ -71,6 +72,13 @@ class Trace:
 
         # ensure that ranks are ints
         events_dataframe = events_dataframe.astype({"Process": "int32"})
+
+        # ensure that the attributes are a dict, not a string
+        if "Attributes" in events_dataframe.columns:
+            # use literal_eval so we're not running a security risk
+            events_dataframe["Attributes"] = events_dataframe["Attributes"].apply(
+                ast.literal_eval
+            )
 
         # make certain columns categorical
         events_dataframe = events_dataframe.astype(
