@@ -73,6 +73,7 @@ class Trace:
         # ensure that ranks are ints
         events_dataframe = events_dataframe.astype({"Process": "int32"})
 
+        # this next part is needed for fake test reading
         # ensure that the attributes are a dict, not a string
         if "Attributes" in events_dataframe.columns:
             # use literal_eval so we're not running a security risk
