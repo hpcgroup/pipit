@@ -229,9 +229,10 @@ def gen_fake_tree(num_nodes, function_names, copy_subtrees=True):
     """
     Generates a whole tree of FakeNodes by randomly appending children.
     """
-    nodes = [gen_fake_node(function_names) for n in range(num_nodes)]
-    root = nodes[0]
-    for index, node in enumerate(nodes[1:]):
+    root = gen_fake_node(function_names)
+    # continue to add nodes until we've reached the target
+    while root.total_nodes < num_nodes:
+        node = gen_fake_node(function_names)
         # choose a node that's currently in the graph to add child to
         parent = root.choose_random_node()
         # select a random point for that child to run
@@ -243,7 +244,7 @@ def gen_fake_tree(num_nodes, function_names, copy_subtrees=True):
         else:
             subtree = random.choice(same_name)
             # larger subtrees are less likely to be copied
-            if random.random() > 0.7 / (subtree.total_nodes**0.5):
+            if random.random() > 4 / (subtree.total_nodes**0.5):
                 parent.add_child(node, run_time)
             else:
                 subtree = subtree.deepcopy()
@@ -318,12 +319,11 @@ def add_fake_mpi_events(trees, num_pairs):
         second_tree.insert_at_time(second_node, second_evt)
 
 
-def emit_tree_file(trees, test_file, ground_truth_file):
+def emit_tree_data(trees):
     """
-    Writes trees (one per process) as a CSV to the File object test_file.
-    At the same time, write ground truth function call information
-    to the File object ground_truth_file.
-    ground_truth_file will contain columns corresponding to Pipit's
+    Writes trees (one per process) as a CSV and returns them.
+    At the same time, return ground truth function call information.
+    The ground truth data will contain columns corresponding to Pipit's
     time.inc, time.exc.
     """
     data = []
@@ -345,7 +345,26 @@ def emit_tree_file(trees, test_file, ground_truth_file):
             "time.exc",
         ],
     ).sort_values("Timestamp (s)")
-    dataframe[["Timestamp (s)", "Event Type", "Name", "Process", "Attributes"]].to_csv(
-        test_file, index=False
-    )
-    dataframe[["time.inc", "time.exc"]].to_csv(ground_truth_file, index=False)
+    data_csv = dataframe[
+        ["Timestamp (s)", "Event Type", "Name", "Process", "Attributes"]
+    ].to_csv(index=False)
+    ground_csv = dataframe[["time.inc", "time.exc"]].to_csv(index=False)
+    return data_csv, ground_csv
+
+
+def generate_fake_test(
+    num_events,
+    num_processes,
+    function_names=["foo", "bar", "baz", "quux", "grault", "garply", "waldo"],
+    num_mpi_events=0,
+):
+    """
+    Top level test generation function. Generates test and ground truth datasets with a
+    minimum of num_events Enter/Leave events per process, of which there are
+    num_processes. Optionally, MPI events can be added.
+    """
+    seed_tree = gen_fake_tree(num_events // 2, function_names)
+    print(num_events // 2, seed_tree.total_nodes)
+    forest = gen_forest(seed_tree, num_processes)
+    add_fake_mpi_events(forest, num_mpi_events)
+    return emit_tree_data(forest)
