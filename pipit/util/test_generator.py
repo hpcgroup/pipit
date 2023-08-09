@@ -352,11 +352,11 @@ def emit_tree_data(trees):
     return data_csv, ground_csv
 
 
-def generate_fake_test(
+def generate_trace(
     num_events,
     num_processes,
     function_names=["foo", "bar", "baz", "quux", "grault", "garply", "waldo"],
-    num_mpi_events=0,
+    num_mpi_pairs=0,
 ):
     """
     Top level test generation function. Generates test and ground truth datasets with a
@@ -364,7 +364,6 @@ def generate_fake_test(
     num_processes. Optionally, MPI events can be added.
     """
     seed_tree = gen_fake_tree(num_events // 2, function_names)
-    print(num_events // 2, seed_tree.total_nodes)
     forest = gen_forest(seed_tree, num_processes)
-    add_fake_mpi_events(forest, num_mpi_events)
+    add_fake_mpi_events(forest, num_mpi_pairs)
     return emit_tree_data(forest)
