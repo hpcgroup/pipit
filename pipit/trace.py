@@ -5,7 +5,8 @@
 
 import numpy as np
 import pandas as pd
-import ast
+from ast import literal_eval
+from io import StringIO
 
 
 class Trace:
@@ -61,6 +62,10 @@ class Trace:
 
     @staticmethod
     def from_csv(filename):
+        # detect if the input is a CSV as a string
+        if "," in filename:
+            # wrapping with StringIO allows pandas to read it
+            filename = StringIO(filename)
         events_dataframe = pd.read_csv(filename, skipinitialspace=True)
 
         # if timestamps are in seconds, convert them to nanoseconds
@@ -78,7 +83,7 @@ class Trace:
         if "Attributes" in events_dataframe.columns:
             # use literal_eval so we're not running a security risk
             events_dataframe["Attributes"] = events_dataframe["Attributes"].apply(
-                ast.literal_eval
+                literal_eval
             )
 
         # make certain columns categorical
