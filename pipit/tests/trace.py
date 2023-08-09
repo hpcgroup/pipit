@@ -183,10 +183,7 @@ def test_time_profile(data_dir, ping_pong_otf2_trace):
     assert np.isclose(norm.loc[61]["MPI_Finalize"], 0.01614835)
 
 
-def test_flat_profile(data_dir, ping_pong_otf2_trace):
-    trace = Trace.from_otf2(str(ping_pong_otf2_trace))
-    trace.calc_exc_metrics()
-
+def generic_test_flat_profile(trace):
     flat_profile = trace.flat_profile("time.exc")
     flat_profile_inc = trace.flat_profile("time.inc")
 
@@ -215,3 +212,9 @@ def test_flat_profile(data_dir, ping_pong_otf2_trace):
     assert np.isnan(evt_profile["Leave"])
     if "Instant" in evt_profile:
         assert np.isnan(evt_profile["Instant"])
+
+
+def test_flat_profile(data_dir, ping_pong_otf2_trace):
+    trace = Trace.from_otf2(str(ping_pong_otf2_trace))
+    trace.calc_exc_metrics()
+    generic_test_flat_profile(trace)
