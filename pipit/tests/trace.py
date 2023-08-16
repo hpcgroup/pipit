@@ -188,6 +188,7 @@ def generic_test_message_histogram(trace):
     # check the length
     assert len(message_histogram) == 40
 
+    # comm_matrix was already subject to test routines earlier
     comm_matrix_count = trace.comm_matrix(output="count")
     total_messages = comm_matrix_count.sum()
 
@@ -213,3 +214,16 @@ def test_message_histogram(ping_pong_otf2_trace):
     trace = Trace.from_otf2(str(ping_pong_otf2_trace))
     trace.calc_exc_metrics(["Timestamp (ns)"])
     generic_test_message_histogram(trace)
+
+    # smallest message in ping-pong was 16384 B
+    # largest message was 2097152 B
+    message_histogram, bin_ranges = trace.message_histogram(bins=40)
+    assert bin_ranges[0] == 16384
+    assert bin_ranges[-1] == 2097152
+
+    # all communications occur in a pair
+    assert np.all(message_histogram % 2 == 0)
+
+    # only the first bin can have more than one pair in it
+    # all the others are either 0 or 2 in ping-pong
+    assert np.max(message_histogram[1:]) == 2
