@@ -82,8 +82,11 @@ class Trace:
         # ensure that the attributes are a dict, not a string
         if "Attributes" in events_dataframe.columns:
             # use literal_eval so we're not running a security risk
+            # don't try to literal_eval a NaN, as well
             events_dataframe["Attributes"] = events_dataframe["Attributes"].apply(
-                literal_eval
+                lambda attr_dict: (
+                    literal_eval(attr_dict) if type(attr_dict) == str else attr_dict
+                )
             )
 
         # make certain columns categorical
