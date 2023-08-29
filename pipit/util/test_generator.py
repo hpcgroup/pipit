@@ -1,7 +1,6 @@
 import random
 import textwrap
 import pandas as pd
-import numpy as np
 
 
 class FakeNode:
@@ -62,7 +61,6 @@ class FakeNode:
         if not self.children:
             return self
         rng = random.random()
-        total = 0
         for child in self.children.values():
             weight = child.total_nodes / self.total_nodes
             if rng < weight:
@@ -272,7 +270,6 @@ def add_fake_mpi_events(trees, num_pairs):
     """
     planned_evts = []
     # choose times for events to happen
-    last_proc = -1
     maxtime = min([t.inc_time for t in trees])
     for i in range(2 * num_pairs):
         planned_evts.append(random.random() * maxtime)
