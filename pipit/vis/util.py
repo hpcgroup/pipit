@@ -4,12 +4,33 @@ from bokeh.plotting import output_notebook
 from bokeh.plotting import show as bk_show
 from bokeh.themes import Theme
 
-from .theme import themes
-
 # Global constants
-notebook_url = "http://localhost:8888"
-theme = "default"
-
+NOTEBOOK_URL = "http://localhost:8888"
+THEME = """
+    attrs:
+        Plot:
+            height: 350
+            width: 700
+            background_fill_color: "#fafafa"
+        Axis:
+            axis_label_text_font_style: "bold"
+            minor_tick_line_color: null
+        Toolbar:
+            autohide: true
+            logo: null
+        HoverTool:
+            point_policy: "follow_mouse"
+        Legend:
+            label_text_font_size: "8.5pt"
+            spacing: 10
+            border_line_color: null
+            glyph_width: 16
+            glyph_height: 16
+        Scatter:
+            size: 9
+        DataRange1d:
+            range_padding: 0.05
+"""
 
 # Helper functions
 def in_notebook():
@@ -39,26 +60,12 @@ def show(p, return_fig=False):
     if return_fig:
         return p
 
-    # Load Gill Sans font from CDN
-    if in_notebook() and theme == "paper":
-        from IPython.display import HTML, display_html
-
-        display_html(
-            HTML(
-                """
-                <style>
-                @import url('https://fonts.cdnfonts.com/css/gill-sans?styles=17575');
-                </style>
-                """
-            )
-        )
-
     # Create a Bokeh app containing the figure
     def bkapp(doc):
         doc.add_root(p)
         doc.theme = Theme(
             json=yaml.load(
-                themes[theme],
+                THEME,
                 Loader=yaml.FullLoader,
             )
         )
@@ -66,7 +73,7 @@ def show(p, return_fig=False):
     if in_notebook():
         # If notebook, show it in output cell
         output_notebook(hide_banner=True)
-        bk_show(bkapp, notebook_url=notebook_url)
+        bk_show(bkapp, notebook_url=NOTEBOOK_URL)
     else:
         # If standalone, start HTTP server and show in browser
         from bokeh.server.server import Server
