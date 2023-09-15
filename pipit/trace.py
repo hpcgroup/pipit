@@ -26,7 +26,7 @@ class Trace:
         self.inc_metrics = []
         self.exc_metrics = []
 
-        from .plotting.util import generate_palette
+        from .vis.util import generate_palette
 
         self.palette = generate_palette(self)
 
