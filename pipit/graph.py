@@ -79,7 +79,7 @@ class Node:
             return 1 + self.parent._calculate_level()
 
     def __eq__(self, obj) -> bool:
-        if type(obj) != Node:
+        if not isinstance(obj, Node):
             return False
         else:
             return self._pipit_nid == obj._pipit_nid
