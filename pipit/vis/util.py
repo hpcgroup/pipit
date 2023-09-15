@@ -32,6 +32,7 @@ THEME = """
             range_padding: 0.05
 """
 
+
 # Helper functions
 def in_notebook():
     """Returns True if we are in notebook environment, False otherwise"""
