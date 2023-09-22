@@ -1188,6 +1188,7 @@ class TraceReader:
         )
 
         # refers to the least common ancestor between common_node and last_node
+        # as in finding the node that is the parent of both common_node and last_node
         common_node: Node = None
 
         while self.file.tell() < end_pointer:
@@ -1199,8 +1200,8 @@ class TraceReader:
                 - self.min_time_stamp
             )
 
-            # Sample calling context id (in experiment.xml)
-            # can use this to get name of function from experiement.xml
+            # Sample calling context id (in meta.db)
+            # can use this to get name of function from meta.db
             # Procedure tab
             context_id = int.from_bytes(
                 self.file.read(4), byteorder=self.byte_order, signed=self.signed
