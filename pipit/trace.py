@@ -40,7 +40,7 @@ class Trace:
         # import this lazily to avoid circular dependencies
         from .readers.hpctoolkit_reader import HPCToolkitReader
 
-        return HPCToolkitReader(dirname).get_trace()
+        return HPCToolkitReader(dirname).read()
 
     @staticmethod
     def from_projections(dirname):

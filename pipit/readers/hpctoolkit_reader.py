@@ -1234,6 +1234,8 @@ class TraceReader:
 
                     self.data["Name"].append(str(context_information["function"]))
                     if context_information["loop_type"]:
+                        # HPCViewer only puts loops in CCT, but not trace view, so
+                        # we use a special Loop Enter/Leave event type
                         self.data["Event Type"].append("Loop Leave")
                     else:
                         self.data["Event Type"].append("Leave")
@@ -1266,6 +1268,8 @@ class TraceReader:
 
                     self.data["Name"].append(str(context_information["function"]))
                     if context_information["loop_type"]:
+                        # HPCViewer only puts loops in CCT, but not trace view, so
+                        # we use a special Loop Enter/Leave event type
                         self.data["Event Type"].append("Loop Enter")
                     else:
                         self.data["Event Type"].append("Enter")
@@ -1323,7 +1327,7 @@ class HPCToolkitReader:
             directory + "/trace.db", self.meta_reader, self.profile_reader
         )
 
-    def get_trace(self) -> pipit.trace.Trace:
+    def read(self) -> pipit.trace.Trace:
         trace_df = pd.DataFrame(self.trace_reader.data)
         # Need to sort df by timestamp then index
         # (since many events occur at the same timestamp)
