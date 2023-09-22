@@ -815,20 +815,20 @@ class ProfileReader:
         self.signed = False
         self.encoding = "ASCII"
 
-        # The meta.db header consists of the common .db header and n sections.
+        # The profile.db header consists of the common .db header and n sections.
         # We're going to do a little set up work, so that's easy to change if
         # any revisions change the orders.
 
         # We're are going to specify 2 maps:
         #   - One dictionary maps the section name to an index
         #       (which follows the order that the sections are seen
-        #        in the meta.db header)
+        #        in the profile.db header)
         #   - The second dictionary maps the section name to a
         #       function that reads the section. Each function is defined
         #       as __read_<section_name>_section(self, section_pointer: int,
         #       section_size: int) -> None
 
-        # Here I'm mapping the section name to it's order in the meta.db header
+        # Here I'm mapping the section name to it's order in the profile.db header
         header_map = {"Profiles Information": 0, "Hierarchical Identifier Tuples": 1}
 
         # Now let's create a function to section map
@@ -850,9 +850,9 @@ class ProfileReader:
             reader_map
         )
 
-        # Now to the actual reading of the meta.db file
+        # Now to the actual reading of the profile.db file
 
-        # reading the meta.db header
+        # reading the profile.db header
         self.__read_common_header()
 
         # now let's read all the sections
@@ -942,7 +942,7 @@ class ProfileReader:
             # Read H.I.T.s
             tuples_list = []
             for i in range(num_tuples):
-                # One of the values listed in the meta.db Identifier Names section. (u8)
+                # One of the values listed in the profile.db Identifier Names section. (u8)
                 kind = int.from_bytes(
                     self.file.read(1), byteorder=self.byte_order, signed=self.signed
                 )
@@ -1028,13 +1028,13 @@ class TraceReader:
         # We're are going to specify 2 maps:
         #   - One dictionary maps the section name to an index
         #       (which follows the order that the sections are seen
-        #        in the meta.db header)
+        #        in the trace.db header)
         #   - The second dictionary maps the section name to a
         #       function that reads the section. Each function is defined
         #       as __read_<section_name>_section(self, section_pointer: int,
         #       section_size: int) -> None
 
-        # Here I'm mapping the section name to it's order in the meta.db header
+        # Here I'm mapping the section name to it's order in the trace.db header
         header_map = {"Context Trace Headers": 0}
 
         # Now let's create a function to section map
@@ -1049,9 +1049,9 @@ class TraceReader:
             reader_map
         )
 
-        # Now to the actual reading of the meta.db file
+        # Now to the actual reading of the trace.db file
 
-        # reading the meta.db header
+        # reading the trace.db header
         self.__read_common_header()
 
         # now let's read all the sections
