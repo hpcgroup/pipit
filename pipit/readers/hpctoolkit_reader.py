@@ -942,7 +942,8 @@ class ProfileReader:
             # Read H.I.T.s
             tuples_list = []
             for i in range(num_tuples):
-                # One of the values listed in the profile.db Identifier Names section. (u8)
+                # One of the values listed in the profile.db
+                # Identifier Names section. (u8)
                 kind = int.from_bytes(
                     self.file.read(1), byteorder=self.byte_order, signed=self.signed
                 )
