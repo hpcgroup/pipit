@@ -52,8 +52,8 @@ def comm_matrix(
 
     # Create bokeh plot
     p = figure(
-        x_axis_label="Sender",
-        y_axis_label="Receiver",
+        x_axis_label="Receiver",
+        y_axis_label="Sender",
         x_range=(-0.5, N - 0.5),
         y_range=(N - 0.5, -0.5),
         x_axis_location="above",
@@ -90,14 +90,14 @@ def comm_matrix(
     hover = p.select(HoverTool)
     hover.tooltips = get_tooltips(
         {
-            "Sender": "Process $x{0.}",
-            "Receiver": "Process $y{0.}",
+            "Sender": "Process $y{0.}",
+            "Receiver": "Process $x{0.}",
             "Bytes": "@image{custom}",
         }
         if output == "size"
         else {
-            "Sender": "Process $x{0.}",
-            "Receiver": "Process $y{0.}",
+            "Sender": "Process $y{0.}",
+            "Receiver": "Process $x{0.}",
             "Count": "@image",
         }
     )
