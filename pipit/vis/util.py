@@ -3,34 +3,7 @@ from bokeh.models import BasicTicker, CustomJSHover, FuncTickFormatter
 from bokeh.plotting import output_notebook
 from bokeh.plotting import show as bk_show
 from bokeh.themes import Theme
-
-# Global constants
-NOTEBOOK_URL = "http://localhost:8888"
-THEME = """
-    attrs:
-        Plot:
-            height: 350
-            width: 700
-            background_fill_color: "#fafafa"
-        Axis:
-            axis_label_text_font_style: "bold"
-            minor_tick_line_color: null
-        Toolbar:
-            autohide: true
-            logo: null
-        HoverTool:
-            point_policy: "follow_mouse"
-        Legend:
-            label_text_font_size: "8.5pt"
-            spacing: 10
-            border_line_color: null
-            glyph_width: 16
-            glyph_height: 16
-        Scatter:
-            size: 9
-        DataRange1d:
-            range_padding: 0.05
-"""
+from pipit import config
 
 
 # Helper functions
@@ -66,7 +39,7 @@ def show(p, return_fig=False):
         doc.add_root(p)
         doc.theme = Theme(
             json=yaml.load(
-                THEME,
+                config["theme"],
                 Loader=yaml.FullLoader,
             )
         )
@@ -74,7 +47,7 @@ def show(p, return_fig=False):
     if in_notebook():
         # If notebook, show it in output cell
         output_notebook(hide_banner=True)
-        bk_show(bkapp, notebook_url=NOTEBOOK_URL)
+        bk_show(bkapp, notebook_url=config["notebook_url"])
     else:
         # If standalone, start HTTP server and show in browser
         from bokeh.server.server import Server
