@@ -5,12 +5,8 @@
 
 from pipit import Trace
 import numpy as np
-import pytest
 
 
-@pytest.mark.xfail(
-    reason="Allow this to fail until new HPCToolkit reader PR is merged."
-)
 def test_events(ping_pong_hpct_trace):
     events_df = Trace.from_hpctoolkit(str(ping_pong_hpct_trace)).events
 
@@ -18,91 +14,85 @@ def test_events(ping_pong_hpct_trace):
     assert set(events_df["Process"]) == {0, 1}
 
     # event types for trace (instant events are program begin/end and mpi send/recv)
-    assert set(events_df["Event Type"]) == set(["Enter", "Leave"])
+    assert set(events_df["Event Type"]) == set(
+        ["Enter", "Leave", "Loop Enter", "Loop Leave"]
+    )
 
-    # 89 Enter events in ping pong trace at process 0
+    # 117 Enter events in ping pong trace at process 0
     assert (
         len(
             events_df.loc[events_df["Process"] == 0].loc[
                 events_df["Event Type"] == "Enter"
             ]
         )
-        == 89
+        == 117
     )
 
-    # 89 Leave events in ping pong trace at process 0
-    assert (
-        len(
-            events_df.loc[events_df["Process"] == 0].loc[
-                events_df["Event Type"] == "Leave"
-            ]
-        )
-        == 89
-    )
-
-    # 60 Enter events in ping pong trace at process 1
+    # 88 Enter events in ping pong trace at process 1
     assert (
         len(
             events_df.loc[events_df["Process"] == 1].loc[
                 events_df["Event Type"] == "Enter"
             ]
         )
-        == 60
+        == 88
     )
 
-    # 60 Leave events in ping pong trace at process 1
-    assert (
-        len(
-            events_df.loc[events_df["Process"] == 1].loc[
-                events_df["Event Type"] == "Leave"
-            ]
-        )
-        == 60
+    # Same amount of Enter and Leave events in ping pong trace at process 1
+    assert len(
+        events_df.loc[events_df["Process"] == 1].loc[events_df["Event Type"] == "Leave"]
+    ) == len(
+        events_df.loc[events_df["Process"] == 1].loc[events_df["Event Type"] == "Enter"]
+    )
+
+    # Same amount of Enter and Leave events in ping pong trace at process 0
+    assert len(
+        events_df.loc[events_df["Process"] == 0].loc[events_df["Event Type"] == "Leave"]
+    ) == len(
+        events_df.loc[events_df["Process"] == 0].loc[events_df["Event Type"] == "Enter"]
     )
 
     # all event names in the trace
-    assert set(events_df["Name"]) == set(
-        [
-            "<unknown procedure> 0xe087 [libpsm2.so.2.2]",
-            "<unknown procedure> 0xd6a5 [libpsm2.so.2.2]",
-            "<unknown procedure> 0x246e7 [libpsm2.so.2.2]",
-            "<program root>",
-            "psm2_mq_irecv2",
-            "<unknown procedure> 0x245c0 [libpsm2.so.2.2]",
-            "<unknown procedure> 0xc91c [libpsm2.so.2.2]",
-            "<unknown procedure> 0xda5d [libpsm2.so.2.2]",
-            "__GI_process_vm_readv",
-            "PMPI_Recv",
-            "main",
-            "psm_progress_wait",
-            "<no activity>",
-            "<unknown procedure> 0x246c7 [libpsm2.so.2.2]",
-            "<unknown procedure> 0x24680 [libpsm2.so.2.2]",
-            "psm_try_complete",
-            "<unknown procedure> 0x64d4 [libpsm2.so.2.2]",
-            "PMPI_Send",
-            "psm2_mq_ipeek2",
-            "<unknown procedure> 0xc850 [libpsm2.so.2.2]",
-            "psm_recv",
-            "MPID_Recv",
-        ]
-    )
+    assert set(events_df["Name"]) == {
+        "<unknown procedure> 0x24680 [libpsm2.so.2.2]",
+        "MPID_Finalize [libmpi.so.12.1.1]",
+        "MPID_Recv [libmpi.so.12.1.1]",
+        "MPI_Finalize",
+        "PMPI_Finalize [libmpi.so.12.1.1]",
+        "PMPI_Recv [libmpi.so.12.1.1]",
+        "PMPI_Send [libmpi.so.12.1.1]",
+        "__GI___munmap [libc-2.17.so]",
+        "__GI___unlink [libc-2.17.so]",
+        "__GI_process_vm_readv [libc-2.17.so]",
+        "loop",
+        "main",
+        "main thread",
+        "psm2_ep_close [libpsm2.so.2.2]",
+        "psm2_mq_ipeek2 [libpsm2.so.2.2]",
+        "psm2_mq_irecv2 [libpsm2.so.2.2]",
+        "psm_dofinalize [libmpi.so.12.1.1]",
+        "psm_progress_wait [libmpi.so.12.1.1]",
+        "psm_recv [libmpi.so.12.1.1]",
+        "psm_try_complete [libmpi.so.12.1.1]",
+        "shm_unlink [librt-2.17.so]",
+        "targ5030 [libpsm2.so.2.2]",
+    }
 
     # Test correct number of MPI Send/Recv events
-    mpi_send_df = events_df.loc[events_df["Name"] == "PMPI_Send"].loc[
+    mpi_send_df = events_df.loc[events_df["Name"].str.contains("PMPI_Send")].loc[
         events_df["Event Type"] == "Enter"
     ]
-    mpi_recv_df = events_df.loc[events_df["Name"] == "PMPI_Recv"].loc[
+    mpi_recv_df = events_df.loc[events_df["Name"].str.contains("PMPI_Recv")].loc[
         events_df["Event Type"] == "Enter"
     ]
 
     # Process 0 has 6 MPI Sends and 5 MPI Recvs
-    assert len(mpi_send_df.loc[events_df["Process"] == 0]) == 6
-    assert len(mpi_recv_df.loc[events_df["Process"] == 0]) == 5
+    assert len(mpi_send_df.loc[events_df["Process"] == 0]) == 7
+    assert len(mpi_recv_df.loc[events_df["Process"] == 0]) == 7
 
     # Process 1 has 5 MPI Sends and 5 MPI Recvs
-    assert len(mpi_send_df.loc[events_df["Process"] == 1]) == 5
-    assert len(mpi_recv_df.loc[events_df["Process"] == 1]) == 5
+    assert len(mpi_send_df.loc[events_df["Process"] == 1]) == 7
+    assert len(mpi_recv_df.loc[events_df["Process"] == 1]) == 7
 
     # Timestamps should be sorted in increasing order
     assert (np.diff(events_df["Timestamp (ns)"]) >= 0).all()
