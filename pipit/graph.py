@@ -79,10 +79,10 @@ class Node:
             return 1 + self.parent._calculate_level()
 
     def __eq__(self, obj) -> bool:
-        if type(obj) != Node:
-            return False
-        else:
+        if isinstance(obj, Node):
             return self._pipit_nid == obj._pipit_nid
+        else:
+            return False
 
 
 class Graph:
