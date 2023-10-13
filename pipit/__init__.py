@@ -4,3 +4,4 @@
 # SPDX-License-Identifier: MIT
 
 from .trace import Trace  # noqa: F401
+from .config import get_config, set_config  # noqa: F401
