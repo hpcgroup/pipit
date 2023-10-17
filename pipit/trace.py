@@ -26,6 +26,14 @@ class Trace:
         self.inc_metrics = []
         self.exc_metrics = []
 
+        # maps dataframe index to array index
+        # use when creating python lists out of dataframe columns
+        self.dfx_to_idx = {
+            dfx: idx
+            for (dfx, idx) in zip(self.events.index, np.arange(len(self.events)))
+        }
+        self.index_set = set(self.events.index)
+
     @staticmethod
     def from_otf2(dirname, num_processes=None):
         """Read an OTF2 trace into a new Trace object."""
@@ -162,11 +170,21 @@ class Trace:
                             del stack[i + 1]
 
                             # Fill in the lists with the matching values if event found
-                            matching_events[enter_df_index] = curr_df_index
-                            matching_events[curr_df_index] = enter_df_index
+                            matching_events[
+                                self.dfx_to_idx[enter_df_index]
+                            ] = curr_df_index
 
-                            matching_times[enter_df_index] = curr_timestamp
-                            matching_times[curr_df_index] = enter_timestamp
+                            matching_events[
+                                self.dfx_to_idx[curr_df_index]
+                            ] = enter_df_index
+
+                            matching_times[
+                                self.dfx_to_idx[enter_df_index]
+                            ] = curr_timestamp
+
+                            matching_times[
+                                self.dfx_to_idx[curr_df_index]
+                            ] = enter_timestamp
                         else:
                             continue
 
@@ -241,17 +259,21 @@ class Trace:
                         if curr_depth > 0:  # if event is a child of some other event
                             parent_df_index = stack[-1]
 
-                            if children[parent_df_index] is None:
+                            if children[self.dfx_to_idx[parent_df_index]] is None:
                                 # create a new list of children for the
                                 # parent if the current event is the first
                                 # child being added
-                                children[parent_df_index] = [curr_df_index]
+                                children[self.dfx_to_idx[parent_df_index]] = [
+                                    curr_df_index
+                                ]
                             else:
-                                children[parent_df_index].append(curr_df_index)
+                                children[self.dfx_to_idx[parent_df_index]].append(
+                                    curr_df_index
+                                )
 
-                            parent[curr_df_index] = parent_df_index
+                            parent[self.dfx_to_idx[curr_df_index]] = parent_df_index
 
-                        depth[curr_df_index] = curr_depth
+                        depth[self.dfx_to_idx[curr_df_index]] = curr_depth
                         curr_depth += 1
 
                         # add enter dataframe index to stack
@@ -341,10 +363,13 @@ class Trace:
 
                 for i in range(len(filtered_df)):
                     curr_parent_idx, curr_children = parent_df_indices[i], children[i]
-                    for child_idx in curr_children:
-                        # subtract each child's inclusive metric from the total
-                        # to calculate the exclusive metric for the parent
-                        exc_values[curr_parent_idx] -= inc_values[child_idx]
+
+                    # Only consider inc times of children that exist
+                    for child_df_idx in curr_children:
+                        if child_df_idx in self.dfx_to_idx:
+                            exc_values[curr_parent_idx] -= inc_values[
+                                self.dfx_to_idx[child_df_idx]
+                            ]
 
                 self.events[metric_col_name] = exc_values
                 self.exc_metrics.append(metric_col_name)
@@ -681,3 +706,106 @@ class Trace:
         df.insert(0, "bin_end", edges[1:])
 
         return df
+
+    def _eval(self, *args, **kwargs):
+        """
+        Evaluates a Filter object and returns a boolean mask.
+
+        Allowed inputs:
+        - Filter object
+        - Arguments used to create a Filter object
+
+        Returns:
+            pd.Series: Boolean mask that indicates whether each event should be included
+                in the filtered Trace.
+        """
+        # Import lazily to avoid circular dependencies
+        from .filter import Filter
+
+        # If input is a Filter object, then evaluate it
+        if len(kwargs) == 0 and isinstance(args[0], Filter):
+            return args[0]._eval(self)
+
+        # Otherwise, create new a Filter object, and then evaluate it
+        return Filter(*args, **kwargs)._eval(self)
+
+    def filter(self, *args, **kwargs):
+        """
+        Returns a new Trace instance containing a filtered subset of the original data.
+
+        Allowed inputs:
+        - Filter object
+        - Arguments used to create a Filter object
+
+        Returns:
+            pipit.Trace: new Trace instance containing filtered subset of the `events`
+            DataFrame.
+        """
+        # Pass arguments to _eval function, which returns a boolean mask
+        bool_mask = self._eval(*args, **kwargs)
+
+        # Apply boolean mask using loc indexing
+        filtered_events = self.events.loc[bool_mask].copy(deep=False)
+
+        # Return a new Trace instance
+        return Trace(self.definitions, filtered_events)
+
+    def slice(self, start=-float("inf"), end=float("inf"), clip_values=True):
+        """
+        Returns a new Trace instance containing only events that occur in a specified
+        time window. The timestamps of `Enter` and `Leave` events are optionally
+        clipped to be within the window.
+
+        Args:
+            start (float): Start of the time window. Defaults to -inf.
+            end (float): End of the time window. Defaults to inf.
+            clip_values (bool): If True, clips timestamp values of `Enter` and `Leave`
+                events to be within the window. Otherwise, does not modify timestamps.
+
+        Returns:
+            pipit.Trace: new Trace instance containing a view of the events DataFrame
+        """
+        from .util import parse_time
+
+        # Parse start and end into float (in nanoseconds)
+        start = parse_time(start)
+        end = parse_time(end)
+
+        # Ensure that events and caller-callees are matched
+        self._match_events()
+        self._match_caller_callee()
+
+        # Determine which events lie within time window
+        # This ensures that if any part of a function occurs in a time range,
+        # then both the Enter and Leave events are included in the filter
+        mask = (
+            (
+                (self.events["Event Type"] == "Instant")
+                & (self.events["Timestamp (ns)"] >= start)
+                & (self.events["Timestamp (ns)"] <= end)
+            )
+            | (
+                (self.events["Event Type"] == "Enter")
+                & (self.events["_matching_timestamp"] >= start)
+                & (self.events["Timestamp (ns)"] <= end)
+            )
+            | (
+                (self.events["Event Type"] == "Leave")
+                & (self.events["Timestamp (ns)"] >= start)
+                & (self.events["_matching_timestamp"] <= end)
+            )
+        )
+        events = self.events.loc[mask].copy(deep=False)
+
+        # Clip timestamps within [start, end] if specified
+        if clip_values:
+            events["Timestamp (ns)"] = events["Timestamp (ns)"].clip(start, end)
+            events["_matching_timestamp"] = events["_matching_timestamp"].clip(
+                start, end
+            )
+
+        # Delete inc/exc metrics, since these are no longer accurate
+        events.drop(columns=self.inc_metrics + self.exc_metrics, inplace=True)
+
+        # Return new Trace instance containing modified events
+        return Trace(self.definitions, events)
