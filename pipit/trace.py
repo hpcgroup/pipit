@@ -5,6 +5,8 @@
 
 import numpy as np
 import pandas as pd
+from ast import literal_eval
+from io import StringIO
 
 
 class Trace:
@@ -60,6 +62,10 @@ class Trace:
 
     @staticmethod
     def from_csv(filename):
+        # detect if the input is a CSV as a string
+        if "," in filename:
+            # wrapping with StringIO allows pandas to read it
+            filename = StringIO(filename)
         events_dataframe = pd.read_csv(filename, skipinitialspace=True)
 
         # if timestamps are in seconds, convert them to nanoseconds
@@ -71,6 +77,17 @@ class Trace:
 
         # ensure that ranks are ints
         events_dataframe = events_dataframe.astype({"Process": "int32"})
+
+        # this next part is needed for fake test reading
+        # ensure that the attributes are a dict, not a string
+        if "Attributes" in events_dataframe.columns:
+            # use literal_eval so we're not running a security risk
+            # don't try to literal_eval a NaN, as well
+            events_dataframe["Attributes"] = events_dataframe["Attributes"].apply(
+                lambda attr_dict: (
+                    literal_eval(attr_dict) if type(attr_dict) == str else attr_dict
+                )
+            )
 
         # make certain columns categorical
         events_dataframe = events_dataframe.astype(

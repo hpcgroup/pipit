@@ -1,0 +1,121 @@
+Timestamp (ns),Event Type,Name,Thread,Process,Attributes
+0.0,Instant,ProgramBegin,0,1,"{'attributes': {'Attribute 2': 26602}, 'program_name': '/g/g92/bhatele1/umd/traces/score-p/ping-pong.otf2', 'program_arguments': []}"
+30083.086937435106,Enter,"int main(int, char**)",0,1,{'region': 'Region 3'}
+40288.33150186851,Enter,MPI_Init,0,1,{'region': 'Region 148'}
+307730.9358165928,Instant,ProgramBegin,0,0,"{'attributes': {'Attribute 2': 26601}, 'program_name': '/g/g92/bhatele1/umd/traces/score-p/ping-pong.otf2', 'program_arguments': []}"
+336979.73374932166,Enter,"int main(int, char**)",0,0,{'region': 'Region 3'}
+346054.77444467926,Enter,MPI_Init,0,0,{'region': 'Region 148'}
+193643138.1741584,Leave,MPI_Init,0,0,
+193643835.4832178,Leave,MPI_Init,0,1,
+193651646.20379105,Enter,MPI_Comm_size,0,0,{'region': 'Region 37'}
+193652714.83827707,Enter,MPI_Comm_size,0,1,{'region': 'Region 37'}
+193653163.00611198,Leave,MPI_Comm_size,0,0,
+193654162.91198432,Leave,MPI_Comm_size,0,1,
+193655654.41835713,Enter,MPI_Comm_rank,0,0,{'region': 'Region 34'}
+193656280.13511068,Enter,MPI_Comm_rank,0,1,{'region': 'Region 34'}
+193656794.167867,Leave,MPI_Comm_rank,0,0,
+193657346.3831865,Leave,MPI_Comm_rank,0,1,
+193668225.07270837,Enter,MPI_Send,0,0,{'region': 'Region 193'}
+193672584.5668554,Instant,MpiSend,0,0,"{'receiver': 1, 'communicator': 'Comm 1', 'msg_tag': 10, 'msg_length': 16384}"
+193677292.95417315,Enter,MPI_Recv,0,1,{'region': 'Region 176'}
+193685930.32723847,Leave,MPI_Send,0,0,
+193687379.3555098,Enter,MPI_Recv,0,0,{'region': 'Region 176'}
+193691633.37032613,Instant,MpiRecv,0,1,"{'sender': 0, 'communicator': 'Comm 1', 'msg_tag': 10, 'msg_length': 16384}"
+193696357.50795117,Leave,MPI_Recv,0,1,
+193698689.50799522,Enter,MPI_Send,0,1,{'region': 'Region 193'}
+193699766.2562759,Instant,MpiSend,0,1,"{'receiver': 0, 'communicator': 'Comm 1', 'msg_tag': 20, 'msg_length': 16384}"
+193713098.65276185,Leave,MPI_Send,0,1,
+193715693.63520956,Instant,MpiRecv,0,0,"{'sender': 1, 'communicator': 'Comm 1', 'msg_tag': 20, 'msg_length': 16384}"
+193718856.106002,Leave,MPI_Recv,0,0,
+193725622.53347322,Enter,MPI_Recv,0,1,{'region': 'Region 176'}
+193743866.6394257,Enter,MPI_Send,0,0,{'region': 'Region 193'}
+193744419.3320272,Instant,MpiSend,0,0,"{'receiver': 1, 'communicator': 'Comm 1', 'msg_tag': 10, 'msg_length': 32768}"
+193764550.13388103,Leave,MPI_Send,0,0,
+193764818.84366918,Instant,MpiRecv,0,1,"{'sender': 0, 'communicator': 'Comm 1', 'msg_tag': 10, 'msg_length': 32768}"
+193764846.04874542,Enter,MPI_Recv,0,0,{'region': 'Region 176'}
+193765093.75812382,Leave,MPI_Recv,0,1,
+193765371.53627068,Enter,MPI_Send,0,1,{'region': 'Region 193'}
+193765578.67667574,Instant,MpiSend,0,1,"{'receiver': 0, 'communicator': 'Comm 1', 'msg_tag': 20, 'msg_length': 32768}"
+193783762.16780922,Leave,MPI_Send,0,1,
+193784228.47236162,Instant,MpiRecv,0,0,"{'sender': 1, 'communicator': 'Comm 1', 'msg_tag': 20, 'msg_length': 32768}"
+193784513.88702112,Leave,MPI_Recv,0,0,
+193810524.32631716,Enter,MPI_Recv,0,1,{'region': 'Region 176'}
+193825567.77891403,Enter,MPI_Send,0,0,{'region': 'Region 193'}
+193825972.51408336,Instant,MpiSend,0,0,"{'receiver': 1, 'communicator': 'Comm 1', 'msg_tag': 10, 'msg_length': 65536}"
+193851129.57309312,Instant,MpiRecv,0,1,"{'sender': 0, 'communicator': 'Comm 1', 'msg_tag': 10, 'msg_length': 65536}"
+193851657.4470286,Leave,MPI_Recv,0,1,
+193852202.5031175,Enter,MPI_Send,0,1,{'region': 'Region 193'}
+193852444.96239346,Instant,MpiSend,0,1,"{'receiver': 0, 'communicator': 'Comm 1', 'msg_tag': 20, 'msg_length': 65536}"
+193854930.16997212,Leave,MPI_Send,0,0,
+193855196.49335006,Enter,MPI_Recv,0,0,{'region': 'Region 176'}
+193889661.9839724,Instant,MpiRecv,0,0,"{'sender': 1, 'communicator': 'Comm 1', 'msg_tag': 20, 'msg_length': 65536}"
+193889774.14525163,Leave,MPI_Send,0,1,
+193889995.12683582,Leave,MPI_Recv,0,0,
+193942036.05127355,Enter,MPI_Send,0,0,{'region': 'Region 193'}
+193942509.51505655,Instant,MpiSend,0,0,"{'receiver': 1, 'communicator': 'Comm 1', 'msg_tag': 10, 'msg_length': 131072}"
+193954523.65854996,Enter,MPI_Recv,0,1,{'region': 'Region 176'}
+193992530.58190393,Instant,MpiRecv,0,1,"{'sender': 0, 'communicator': 'Comm 1', 'msg_tag': 10, 'msg_length': 131072}"
+193993059.4104035,Leave,MPI_Recv,0,1,
+193993445.05429125,Enter,MPI_Send,0,1,{'region': 'Region 193'}
+193993702.78659248,Instant,MpiSend,0,1,"{'receiver': 0, 'communicator': 'Comm 1', 'msg_tag': 20, 'msg_length': 131072}"
+193995956.51238206,Leave,MPI_Send,0,0,
+193996173.19842792,Enter,MPI_Recv,0,0,{'region': 'Region 176'}
+194050007.74876937,Instant,MpiRecv,0,0,"{'sender': 1, 'communicator': 'Comm 1', 'msg_tag': 20, 'msg_length': 131072}"
+194050210.11635402,Leave,MPI_Send,0,1,
+194050442.07542512,Leave,MPI_Recv,0,0,
+194205281.91461667,Enter,MPI_Send,0,0,{'region': 'Region 193'}
+194205705.74106756,Instant,MpiSend,0,0,"{'receiver': 1, 'communicator': 'Comm 1', 'msg_tag': 10, 'msg_length': 262144}"
+194220003.201837,Enter,MPI_Recv,0,1,{'region': 'Region 176'}
+194299518.38958535,Instant,MpiRecv,0,1,"{'sender': 0, 'communicator': 'Comm 1', 'msg_tag': 10, 'msg_length': 262144}"
+194300037.6724441,Leave,MPI_Recv,0,1,
+194300433.81653672,Enter,MPI_Send,0,1,{'region': 'Region 193'}
+194300716.367504,Instant,MpiSend,0,1,"{'receiver': 0, 'communicator': 'Comm 1', 'msg_tag': 20, 'msg_length': 262144}"
+194302812.59022063,Leave,MPI_Send,0,0,
+194303143.8239559,Enter,MPI_Recv,0,0,{'region': 'Region 176'}
+194408743.42971635,Instant,MpiRecv,0,0,"{'sender': 1, 'communicator': 'Comm 1', 'msg_tag': 20, 'msg_length': 262144}"
+194408865.61391842,Leave,MPI_Send,0,1,
+194409224.53001198,Leave,MPI_Recv,0,0,
+194675378.9501026,Enter,MPI_Send,0,0,{'region': 'Region 193'}
+194676157.87439075,Instant,MpiSend,0,0,"{'receiver': 1, 'communicator': 'Comm 1', 'msg_tag': 10, 'msg_length': 524288}"
+194762211.34879553,Enter,MPI_Recv,0,1,{'region': 'Region 176'}
+194907390.04494745,Instant,MpiRecv,0,1,"{'sender': 0, 'communicator': 'Comm 1', 'msg_tag': 10, 'msg_length': 524288}"
+194908311.1992833,Leave,MPI_Recv,0,1,
+194908774.16286144,Enter,MPI_Send,0,1,{'region': 'Region 193'}
+194908999.439984,Instant,MpiSend,0,1,"{'receiver': 0, 'communicator': 'Comm 1', 'msg_tag': 20, 'msg_length': 524288}"
+194911489.42038304,Leave,MPI_Send,0,0,
+194911733.78878716,Enter,MPI_Recv,0,0,{'region': 'Region 176'}
+195131579.44173214,Leave,MPI_Send,0,1,
+195131666.30706328,Instant,MpiRecv,0,0,"{'sender': 1, 'communicator': 'Comm 1', 'msg_tag': 20, 'msg_length': 524288}"
+195132209.45402402,Leave,MPI_Recv,0,0,
+195717989.1556328,Enter,MPI_Send,0,0,{'region': 'Region 193'}
+195718827.2628938,Instant,MpiSend,0,0,"{'receiver': 1, 'communicator': 'Comm 1', 'msg_tag': 10, 'msg_length': 1048576}"
+195859370.11859792,Enter,MPI_Recv,0,1,{'region': 'Region 176'}
+196135679.66863889,Instant,MpiRecv,0,1,"{'sender': 0, 'communicator': 'Comm 1', 'msg_tag': 10, 'msg_length': 1048576}"
+196136540.6854378,Leave,MPI_Recv,0,1,
+196136943.51147896,Enter,MPI_Send,0,1,{'region': 'Region 193'}
+196137242.29003558,Instant,MpiSend,0,1,"{'receiver': 0, 'communicator': 'Comm 1', 'msg_tag': 20, 'msg_length': 1048576}"
+196139793.8398177,Leave,MPI_Send,0,0,
+196140050.61755484,Enter,MPI_Recv,0,0,{'region': 'Region 176'}
+196583827.45770124,Leave,MPI_Send,0,1,
+196583934.36887804,Instant,MpiRecv,0,0,"{'sender': 1, 'communicator': 'Comm 1', 'msg_tag': 20, 'msg_length': 1048576}"
+196584467.97019798,Leave,MPI_Recv,0,0,
+197613248.45135725,Enter,MPI_Send,0,0,{'region': 'Region 193'}
+197614141.9233348,Instant,MpiSend,0,0,"{'receiver': 1, 'communicator': 'Comm 1', 'msg_tag': 10, 'msg_length': 2097152}"
+197951492.98251072,Enter,MPI_Recv,0,1,{'region': 'Region 176'}
+198502088.884028,Instant,MpiRecv,0,1,"{'sender': 0, 'communicator': 'Comm 1', 'msg_tag': 10, 'msg_length': 2097152}"
+198502934.62780163,Leave,MPI_Recv,0,1,
+198503365.13620108,Enter,MPI_Send,0,1,{'region': 'Region 193'}
+198503650.55086058,Instant,MpiSend,0,1,"{'receiver': 0, 'communicator': 'Comm 1', 'msg_tag': 20, 'msg_length': 2097152}"
+198506398.7408429,Leave,MPI_Send,0,0,
+198506691.79201505,Enter,MPI_Recv,0,0,{'region': 'Region 176'}
+199319910.70381415,Leave,MPI_Send,0,1,
+199319973.70504335,Instant,MpiRecv,0,0,"{'sender': 1, 'communicator': 'Comm 1', 'msg_tag': 20, 'msg_length': 2097152}"
+199320512.07918367,Leave,MPI_Recv,0,0,
+199514778.2785141,Enter,MPI_Finalize,0,0,{'region': 'Region 104'}
+199529686.66029385,Enter,MPI_Finalize,0,1,{'region': 'Region 104'}
+199573648.15437022,Leave,MPI_Finalize,0,0,
+199574793.63126454,Leave,MPI_Finalize,0,1,
+199575243.23094556,Leave,"int main(int, char**)",0,0,
+199576798.2158296,Leave,"int main(int, char**)",0,1,
+199603304.5511645,Instant,ProgramEnd,0,0,{'exit_status': -9223372036854775808}
+199604459.57369962,Instant,ProgramEnd,0,1,{'exit_status': -9223372036854775808}
