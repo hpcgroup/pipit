@@ -57,12 +57,12 @@ class Trace:
 
         return NsightReader(filename).read()
 
-    def to_perfetto(self, filename=None):
+    def to_chrome(self, filename=None):
         """Export as Chrome Tracing JSON, which can be opened
         in Perfetto."""
-        from .writers.perfetto_writer import PerfettoWriter
+        from .writers.chrome_writer import ChromeWriter
 
-        return PerfettoWriter(self, filename).write()
+        return ChromeWriter(self, filename).write()
 
     def _match_events(self):
         """Matches corresponding enter/leave events and adds two columns to the

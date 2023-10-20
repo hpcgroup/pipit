@@ -1,8 +1,8 @@
 import pandas as pd
 
 
-class PerfettoWriter:
-    """Exports traces to Chrome Tracing JSON format which can be opened with Perfetto.
+class ChromeWriter:
+    """Exports traces to Chrome Tracing JSON format which can be opened with Chrome Trace Viewer and Perfetto.
 
     See https://docs.google.com/document/d/1CvAClvFfyA5R-PhYUmn5OOQtYMH4h6I0nSsKchNAySU/preview # noqa
     """
