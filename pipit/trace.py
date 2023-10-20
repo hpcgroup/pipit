@@ -22,6 +22,9 @@ class Trace:
         return Trace(events=ddf, definitions=None)
     
     def _match_events(self):
+        if "_matching_event" in self.events.columns:
+            return
+
         def _match_events_partition(df):
             stack = []
             df["_matching_event"] = "N/A"
@@ -39,3 +42,39 @@ class Trace:
             return df
         
         self.events = self.events.map_partitions(_match_events_partition)
+
+    def _match_caller_callee(self):
+        if "_children" in self.events.columns:
+            return
+        
+        if "_matching_event" not in self.events.columns:
+            self._match_events()
+        
+        def _match_caller_callee_partition(df):
+            stack = []
+
+            df["_depth"] = "N/A"
+            df["_children"] = "N/A"
+            df["_parent"] = "N/A"
+
+            eventTypes = df["Event Type"]
+
+            for i, eventType in eventTypes.items():
+                if eventType == "Enter":
+                    if len(stack):
+                        p = stack[-1]
+                        df.at[i, "_parent"] = p
+
+                        if df.at[p, "_children"] == "N/A":
+                            df.at[p, "_children"] = [i]
+                        else:
+                            df.at[p, "_children"].append(i)
+
+                    df.at[i, "_depth"] = len(stack)
+                    stack.append(i)
+                elif eventType == "Leave":
+                    stack.pop()
+
+            return df
+
+        self.events = self.events.map_partitions(_match_caller_callee_partition)
