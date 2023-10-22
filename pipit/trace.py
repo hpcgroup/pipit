@@ -5,6 +5,7 @@
 
 import numpy as np
 import pandas as pd
+from pipit.util.cct import create_cct
 
 
 class Trace:
@@ -13,7 +14,7 @@ class Trace:
     includes one or more dataframes and a calling context tree.
     """
 
-    def __init__(self, definitions, events, cct):
+    def __init__(self, definitions, events, cct=None):
         """Create a new Trace object."""
         self.definitions = definitions
         self.events = events
@@ -27,6 +28,11 @@ class Trace:
         # will store columns names for inc/exc metrics
         self.inc_metrics = []
         self.exc_metrics = []
+
+    def create_cct(self):
+        # adds a column of cct nodes to the events dataframe
+        # and stores the graph object in self.cct
+        self.cct = create_cct(self.events)
 
     @staticmethod
     def from_otf2(dirname, num_processes=None):
