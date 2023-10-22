@@ -245,7 +245,7 @@ class OTF2Reader:
                 if str(loc.type)[13:] == "CPU_THREAD":
                     # don't add metric events as a separate row,
                     # and add their values into columns instead
-                    if type(event) == otf2.events.Metric:
+                    if isinstance(event, otf2.events.Metric):
                         # Since the location is a cpu thread, we know
                         # that the metric event is of type MetricClass,
                         # which has a list of MetricMembers.
