@@ -85,6 +85,11 @@ def test_match_events(data_dir, ping_pong_otf2_trace):
             assert rank_1_matching_indices[i] == rank_1_indices[i - 1]
             assert rank_1_matching_timestamps[i] == rank_1_timestamps[i - 1]
 
+    generic_test_match_events(trace)
+
+
+def generic_test_match_events(trace):
+    df = trace.events
     # Checks that the Matching Indices and Timestamps for the Enter rows are
     # greater than their values
     assert (
