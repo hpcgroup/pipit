@@ -2,12 +2,16 @@ import pandas as pd
 
 
 class ChromeWriter:
-    """Exports traces to Chrome Tracing JSON format which can be opened with Chrome Trace Viewer and Perfetto.
+    """Exports traces to the Chrome Tracing JSON format which can be opened with Chrome
+    Trace Viewer and Perfetto for analysis using these tools.
+
+    This exports to the older Chrome Tracing JSON format which is still supported by
+    Perfetto, and not the newer Perfetto binary format.
 
     See https://docs.google.com/document/d/1CvAClvFfyA5R-PhYUmn5OOQtYMH4h6I0nSsKchNAySU/preview # noqa
     """
 
-    def __init__(self, trace, filename=None):
+    def __init__(self, trace, filename="trace.json"):
         self.trace = trace
         self.filename = filename
 
