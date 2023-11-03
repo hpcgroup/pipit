@@ -283,9 +283,9 @@ class MetaReader:
         Given the pointer to where the file would exists in meta.db,
         returns the index of the file in self.source_files_list.
         """
-        return ( (
+        return (
             load_module_pointer - self.load_modules_pointer
-        ) // self.load_module_size )
+        ) // self.load_module_size
 
     def __read_load_modules_section(
         self, section_pointer: int, section_size: int
@@ -964,21 +964,21 @@ class ProfileReader:
                 )
                 identifier_name = self.meta_reader.get_identifier_name(kind)
                 tuples_map[identifier_name] = physical_id
-            
+
             self.hit_map[hit_pointer] = self.__clean_hit(tuples_map)
 
     def __clean_hit(self, tuples_map: dict) -> dict:
         # add None for information not present
-        if 'Node' not in tuples_map:
-            tuples_map['Node'] = None
-        if 'RANK' not in tuples_map:
-            tuples_map['RANK'] = None
-        if 'THREAD' not in tuples_map:
-            tuples_map['THREAD'] = None
-        if 'CORE' not in tuples_map:
-            tuples_map['CORE'] = None
+        if "Node" not in tuples_map:
+            tuples_map["Node"] = None
+        if "RANK" not in tuples_map:
+            tuples_map["RANK"] = None
+        if "THREAD" not in tuples_map:
+            tuples_map["THREAD"] = None
+        if "CORE" not in tuples_map:
+            tuples_map["CORE"] = None
         return tuples_map
-    
+
     def __read_common_header(self) -> None:
         """
         Reads common .db file header version 4.0
@@ -1255,10 +1255,10 @@ class TraceReader:
                     else:
                         self.data["Event Type"].append("Leave")
                     self.data["Timestamp (ns)"].append(timestamp)
-                    self.data["Process"].append(hit['RANK'])
-                    self.data["Thread"].append(hit['THREAD'])
-                    self.data["Host"].append(hit['NODE'])
-                    self.data['Core'].append(hit['CORE'])
+                    self.data["Process"].append(hit["RANK"])
+                    self.data["Thread"].append(hit["THREAD"])
+                    self.data["Host"].append(hit["NODE"])
+                    self.data["Core"].append(hit["CORE"])
                     self.data["Node"].append(last_node)
                     self.data["Source File Name"].append(context_information["file"])
                     self.data["Source File Line Number"].append(
@@ -1290,10 +1290,10 @@ class TraceReader:
                     else:
                         self.data["Event Type"].append("Enter")
                     self.data["Timestamp (ns)"].append(timestamp)
-                    self.data["Process"].append(hit['RANK'])
-                    self.data["Thread"].append(hit['THREAD'])
-                    self.data["Host"].append(hit['NODE'])
-                    self.data['Core'].append(hit['CORE'])
+                    self.data["Process"].append(hit["RANK"])
+                    self.data["Thread"].append(hit["THREAD"])
+                    self.data["Host"].append(hit["NODE"])
+                    self.data["Core"].append(hit["CORE"])
                     self.data["Node"].append(entry_node)
                     self.data["Source File Name"].append(context_information["file"])
                     self.data["Source File Line Number"].append(
@@ -1326,10 +1326,10 @@ class TraceReader:
                 else:
                     self.data["Event Type"].append("Leave")
                 self.data["Timestamp (ns)"].append(timestamp)
-                self.data["Process"].append(hit['RANK'])
-                self.data["Thread"].append(hit['THREAD'])
-                self.data["Host"].append(hit['NODE'])
-                self.data['Core'].append(hit['CORE'])
+                self.data["Process"].append(hit["RANK"])
+                self.data["Thread"].append(hit["THREAD"])
+                self.data["Host"].append(hit["NODE"])
+                self.data["Core"].append(hit["CORE"])
                 self.data["Node"].append(last_node)
                 self.data["Source File Name"].append(context_information["file"])
                 self.data["Source File Line Number"].append(context_information["line"])
