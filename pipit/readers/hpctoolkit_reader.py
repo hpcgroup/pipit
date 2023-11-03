@@ -940,7 +940,7 @@ class ProfileReader:
 
             # Identifications for an application thread
             # Read H.I.T.s
-            tuples_list = []
+            tuples_map = {}
             for i in range(num_tuples):
                 # One of the values listed in the profile.db
                 # Identifier Names section. (u8)
@@ -964,9 +964,22 @@ class ProfileReader:
                     self.file.read(8), byteorder=self.byte_order, signed=self.signed
                 )
                 identifier_name = self.meta_reader.get_identifier_name(kind)
-                tuples_list.append((identifier_name, physical_id))
-            self.hit_map[hit_pointer] = tuples_list
+                tuples_map[identifier_name] = physical_id
+            
+            self.hit_map[hit_pointer] = self.__clean_hit(tuples_map)
 
+    def __clean_hit(tuples_map: dict) -> dict:
+        # add None for information not present
+        if 'Node' not in tuples_map:
+            tuples_map['Node'] = None
+        if 'RANK' not in tuples_map:
+            tuples_map['RANK'] = None
+        if 'THREAD' not in tuples_map:
+            tuples_map['THREAD'] = None
+        if 'CORE' not in tuples_map:
+            tuples_map['CORE'] = None
+        return tuples_map
+    
     def __read_common_header(self) -> None:
         """
         Reads common .db file header version 4.0
@@ -1144,6 +1157,7 @@ class TraceReader:
             "Name": [],
             "Thread": [],
             "Process": [],
+            "Core": [],
             "Host": [],
             "Node": [],
             "Source File Name": [],
@@ -1166,6 +1180,7 @@ class TraceReader:
             self.file.read(4), byteorder=self.byte_order, signed=self.signed
         )
         hit = self.profile_reader.get_hit_from_profile(profile_index)
+        # print(hit)
 
         # empty space
         self.file.read(4)
@@ -1242,9 +1257,10 @@ class TraceReader:
                     else:
                         self.data["Event Type"].append("Leave")
                     self.data["Timestamp (ns)"].append(timestamp)
-                    self.data["Process"].append(hit[1][1])
-                    self.data["Thread"].append(hit[2][1])
-                    self.data["Host"].append(hit[0][1])
+                    self.data["Process"].append(hit['RANK'])
+                    self.data["Thread"].append(hit['THREAD'])
+                    self.data["Host"].append(hit['NODE'])
+                    self.data['Core'].append(hit['CORE'])
                     self.data["Node"].append(last_node)
                     self.data["Source File Name"].append(context_information["file"])
                     self.data["Source File Line Number"].append(
@@ -1276,9 +1292,11 @@ class TraceReader:
                     else:
                         self.data["Event Type"].append("Enter")
                     self.data["Timestamp (ns)"].append(timestamp)
-                    self.data["Process"].append(hit[1][1])
-                    self.data["Thread"].append(hit[2][1])
-                    self.data["Host"].append(hit[0][1])
+                    self.data["Process"].append(hit['RANK'])
+                    # print('hit', hit)
+                    self.data["Thread"].append(hit['THREAD'])
+                    self.data["Host"].append(hit['NODE'])
+                    self.data['Core'].append(hit['CORE'])
                     self.data["Node"].append(entry_node)
                     self.data["Source File Name"].append(context_information["file"])
                     self.data["Source File Line Number"].append(
@@ -1311,9 +1329,10 @@ class TraceReader:
                 else:
                     self.data["Event Type"].append("Leave")
                 self.data["Timestamp (ns)"].append(timestamp)
-                self.data["Process"].append(hit[1][1])
-                self.data["Thread"].append(hit[2][1])
-                self.data["Host"].append(hit[0][1])
+                self.data["Process"].append(hit['RANK'])
+                self.data["Thread"].append(hit['THREAD'])
+                self.data["Host"].append(hit['NODE'])
+                self.data['Core'].append(hit['CORE'])
                 self.data["Node"].append(last_node)
                 self.data["Source File Name"].append(context_information["file"])
                 self.data["Source File Line Number"].append(context_information["line"])
