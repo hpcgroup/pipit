@@ -440,7 +440,9 @@ class Trace:
 
         return np.histogram(sizes, bins=bins, **kwargs)
 
-    def flat_profile(self, metrics=None, groupby_column="Name", per_process=False):
+    def flat_profile(
+        self, metrics="time.exc", groupby_column="Name", per_process=False
+    ):
         """
         Arguments:
         metrics - a string or list of strings containing the metrics to be aggregated
@@ -451,7 +453,13 @@ class Trace:
         for the grouped by columns.
         """
 
-        metrics = self.inc_metrics + self.exc_metrics if metrics is None else metrics
+        metrics = [metrics] if not isinstance(metrics, list) else metrics
+
+        if "time.inc" in metrics:
+            self.calc_inc_metrics(["Timestamp (ns)"])
+
+        if "time.exc" in metrics:
+            self.calc_exc_metrics(["Timestamp (ns)"])
 
         # This first groups by both the process and the specified groupby
         # column (like name). It then sums up the metrics for each combination
@@ -684,25 +692,29 @@ class Trace:
 
     @staticmethod
     def multirun_analysis(
-        traces=[], metric_column="Timestamp (ns)", groupby_column="Name"
+        traces, func=flat_profile, comparison=None, concat=True, *args, **kwargs
     ):
-        flat_profiles = []
-        for trace in traces:
-            trace.calc_exc_metrics([metric_column])
-            metric_col = (
-                "time.exc"
-                if metric_column == "Timestamp (ns)"
-                else metric_column + ".exc"
-            )
-            flat_profiles.append(
-                trace.flat_profile(metrics=[metric_col], groupby_column=groupby_column)
-            )
+        # apply func to each trace
+        results = [func(t, *args, **kwargs) for t in traces]
 
-        combined_df = pd.concat([fp[metric_col] for fp in flat_profiles], axis=1).T
-        combined_df.index = [len(set(trace.events["Process"])) for trace in traces]
-        combined_df.index.rename("Number of Processes", inplace=True)
+        # use first result as the base for comparison
+        base = results[0]
 
-        function_sums = combined_df.sum()
-        combined_df = combined_df[function_sums.sort_values(ascending=False).index]
+        # apply comparison operation to each result
+        if comparison == "diff":
+            # subtract base from each result
+            results = [r - base for r in results]
 
-        return combined_df
+        elif comparison == "pct_change":
+            # get percent change between each result and base
+            results = [(r - base) / base for r in results]
+
+        elif comparison == "ratio":
+            # calculate ratio of each result to base
+            results = [r / base for r in results]
+
+        # concatenate the results if specified
+        if concat and isinstance(base, pd.DataFrame):
+            results = pd.concat(results, axis=1, keys=np.arange(len(traces)))
+
+        return results
