@@ -592,13 +592,13 @@ class MetaReader:
         # map context for this context
         string_index = self.common_string_index_map[pretty_name_pointer]
         context = {
-            "relation": -1,
-            "lexical_type": -1,
-            "function_index": -1,
-            "source_file_index": -1,
-            "source_file_line": -1,
-            "load_module_index": -1,
-            "load_module_offset": -1,
+            "relation": None,
+            "lexical_type": None,
+            "function_index": None,
+            "source_file_index": None,
+            "source_file_line": None,
+            "load_module_index": None,
+            "load_module_offset": None,
             "string_index": string_index,
         }
         # context = {"string_index": string_index}
@@ -968,7 +968,7 @@ class ProfileReader:
             
             self.hit_map[hit_pointer] = self.__clean_hit(tuples_map)
 
-    def __clean_hit(tuples_map: dict) -> dict:
+    def __clean_hit(self, tuples_map: dict) -> dict:
         # add None for information not present
         if 'Node' not in tuples_map:
             tuples_map['Node'] = None
