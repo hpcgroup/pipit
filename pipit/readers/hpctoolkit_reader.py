@@ -161,6 +161,8 @@ class MetaReader:
             function_string = "<unkown function>"
 
         if load_module_index is not None:
+            print(load_module_index)
+            print(len(self.load_modules_list))
             load_module = self.load_modules_list[load_module_index]
             module_string = self.common_strings[load_module["string_index"]]
         if source_file_index is not None:
@@ -283,9 +285,9 @@ class MetaReader:
         Given the pointer to where the file would exists in meta.db,
         returns the index of the file in self.source_files_list.
         """
-        return (
+        return ( (
             load_module_pointer - self.load_modules_pointer
-        ) // self.load_module_size
+        ) // self.load_module_size )
 
     def __read_load_modules_section(
         self, section_pointer: int, section_size: int
@@ -444,6 +446,7 @@ class MetaReader:
                 ]
             if modules_pointer != 0:
                 load_module_index = self.__get_load_modules_index(modules_pointer)
+                print('load_module_index', load_module_index)
                 # currently ignoring offset -- no idea how that's used
             if file_pointer != 0:
                 source_file_index = self.__get_source_file_index(file_pointer)
@@ -705,12 +708,14 @@ class MetaReader:
             #   flex[2]: u32 line: Associated source line in pFile
             if flags & 2 != 0:
                 sub_flex_1 = int.from_bytes(
+                    # flex[8:16], byteorder=self.byte_order, signed=self.signed
                     flex[0:8], byteorder=self.byte_order, signed=self.signed
                 )
                 sub_flex_2 = int.from_bytes(
+                    # flex[16:20], byteorder=self.byte_order, signed=self.signed
                     flex[8:10], byteorder=self.byte_order, signed=self.signed
                 )
-                flex = flex[10:]
+                flex = flex[16:]
                 source_file_index = self.__get_source_file_index(sub_flex_1)
                 source_file_line = sub_flex_2
 
@@ -719,13 +724,16 @@ class MetaReader:
             #   flex[4]: u64 offset: Associated byte offset in *pModule
             if flags & 4 != 0:
                 sub_flex_1 = int.from_bytes(
+                    # flex[24:32], byteorder=self.byte_order, signed=self.signed
                     flex[0:8], byteorder=self.byte_order, signed=self.signed
                 )
                 sub_flex_2 = int.from_bytes(
+                    # flex[32:40], byteorder=self.byte_order, signed=self.signed
                     flex[8:16], byteorder=self.byte_order, signed=self.signed
                 )
                 flex = flex[16:]
                 load_module_index = self.__get_load_modules_index(sub_flex_1)
+                print('load_module_index flex', load_module_index)
                 load_module_offset = sub_flex_2
 
             # Now we take a look at the relationship and type of the context
