@@ -692,7 +692,7 @@ class Trace:
 
     @staticmethod
     def multirun_analysis(
-        traces, func=flat_profile, comparison=None, concat=True, *args, **kwargs
+        traces, metric_column="Timestamp (ns)", groupby_column="Name"
     ):
         flat_profiles = []
         for trace in traces:
