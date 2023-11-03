@@ -10,7 +10,7 @@ import pipit.trace
 class NsightReader:
     """Reader for Nsight trace files"""
 
-    def __init__(self, file_name, create_cct=True) -> None:
+    def __init__(self, file_name, create_cct=False) -> None:
         self.file_name = file_name
         self.df = None
         self.create_cct = create_cct

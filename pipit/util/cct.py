@@ -104,6 +104,7 @@ def create_cct(events):
                 # Update functions stack and current depth
                 functions_stack.pop()
                 curr_depth -= 1
+                
 
     # Update the Trace with the generated cct
     events["Graph_Node"] = graph_nodes
