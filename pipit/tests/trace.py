@@ -48,17 +48,17 @@ def test_comm_over_time(data_dir, ping_pong_otf2_trace):
     assert hist[4] == 8 * 2
 
 
-def test_comm_summary(data_dir, ping_pong_otf2_trace):
+def test_comm_by_process(data_dir, ping_pong_otf2_trace):
     ping_pong = Trace.from_otf2(str(ping_pong_otf2_trace))
 
-    sizes = ping_pong.comm_summary()
+    sizes = ping_pong.comm_by_process()
 
     assert sizes.loc[0]["Sent"] == 4177920
     assert sizes.loc[0]["Received"] == 4177920
     assert sizes.loc[1]["Sent"] == 4177920
     assert sizes.loc[1]["Received"] == 4177920
 
-    counts = ping_pong.comm_summary(output="count")
+    counts = ping_pong.comm_by_process(output="count")
 
     assert counts.loc[0]["Sent"] == 8
     assert counts.loc[0]["Received"] == 8

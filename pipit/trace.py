@@ -490,7 +490,7 @@ class Trace:
             **kwargs
         )
 
-    def comm_summary(self, output="size"):
+    def comm_by_process(self, output="size"):
         """Returns total communication volume per process.
 
         Returns:
