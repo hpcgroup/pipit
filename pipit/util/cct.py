@@ -95,16 +95,20 @@ def create_cct(events):
                 graph_nodes[curr_df_index] = curr_node
                 curr_depth += 1
             else:
-                """
-                Pop node from top of stack once you
-                encounter the Leave event for a function
-                """
-                nodes_stack.pop()
+                # we want to iterate through the stack in reverse order
+                # until we find the corresponding "Enter" Event
+                enter_name, j = None, len(functions_stack) - 1
+                while enter_name != function_name and j > -1:
+                    enter_name = functions_stack[j]
+                    j -= 1
 
-                # Update functions stack and current depth
-                functions_stack.pop()
-                curr_depth -= 1
-                
+                if enter_name == function_name:
+                    # update stacks and current depth
+                    del functions_stack[j + 1]
+                    del nodes_stack[j + 1]
+                    curr_depth -= 1
+                else:
+                    continue
 
     # Update the Trace with the generated cct
     events["Graph_Node"] = graph_nodes

@@ -224,7 +224,9 @@ class STSReader:
 
 
 class ProjectionsReader:
-    def __init__(self, projections_directory: str, num_processes=None, create_cct=False) -> None:
+    def __init__(
+        self, projections_directory: str, num_processes=None, create_cct=False
+    ) -> None:
         if not os.path.isdir(projections_directory):
             raise ValueError("Not a valid directory.")
 
