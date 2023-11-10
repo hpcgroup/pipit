@@ -1,5 +1,6 @@
 import pipit as pp
 
+
 def test_get_option():
     # assert that default values are returned
     assert pp.get_option("log_level") == "INFO"
@@ -12,6 +13,7 @@ def test_get_option():
         pass
     else:
         assert False
+
 
 def test_set_option():
     # assert that valid values are set
