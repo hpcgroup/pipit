@@ -12,7 +12,7 @@ class Trace:
     """A trace dataset is read into an object of this type, which includes one
     or more dataframes.
     """
-    def __init__(self, events, definitions):
+    def __init__(self, definitions, events):
         self.definitions = definitions
         self.events = events
 
@@ -20,6 +20,13 @@ class Trace:
     def from_parquet(filename):
         ddf = dd.read_parquet(filename)
         return Trace(events=ddf, definitions=None)
+    
+    @staticmethod
+    def from_otf2(filename):
+        from pipit.readers.otf2_reader import OTF2Reader
+        trace = OTF2Reader(filename).read()
+        trace.events = dd.from_pandas(trace.events, npartitions=1)
+        return trace
     
     def _match_events(self):
         if "_matching_event" in self.events.columns:
