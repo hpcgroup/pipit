@@ -17,7 +17,7 @@ class ChromeWriter:
 
     def write(self):
         events = self.trace.events
-        
+
         # Assign the fields as expected by the Chrome Tracing JSON format
         # Let's create a new dataframe to avoid modifying the original
         df = pd.DataFrame()
