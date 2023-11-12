@@ -72,7 +72,7 @@ class Trace:
 
         # if timestamps are in seconds, convert them to nanoseconds
         if "Timestamp (s)" in events_dataframe.columns:
-            events_dataframe["Timestamp (s)"] *= 10**9
+            events_dataframe["Timestamp (s)"] *= 10 ** 9
             events_dataframe.rename(
                 columns={"Timestamp (s)": "Timestamp (ns)"}, inplace=True
             )
@@ -804,12 +804,17 @@ class Trace:
         return combined_df
 
     def detect_pattern(
-        self, start_event, iterations=None, window_size=None, process=0, metric="time.exc"
+        self,
+        start_event,
+        iterations=None,
+        window_size=None,
+        process=0,
+        metric="time.exc",
     ):
         import stumpy
 
-        # count the number of enter events to 
-        # determine the number of iterations if it's not 
+        # count the number of enter events to
+        # determine the number of iterations if it's not
         # given by the user.
         if iterations is None:
             iterations = len(
@@ -820,8 +825,8 @@ class Trace:
                 ]
             )
 
-        # get the first enter and last leave of 
-        # the given event. we will only investigate 
+        # get the first enter and last leave of
+        # the given event. we will only investigate
         # this portion of the data.
         first_loop_enter = self.events[
             (self.events["Name"] == start_event)
@@ -836,7 +841,7 @@ class Trace:
         ].index[-1]
 
         df = self.events.iloc[first_loop_enter + 1 : last_loop_leave]
-        filtered_df = df.loc[(df[metric].notnull()) & (df["Process"] == process)] 
+        filtered_df = df.loc[(df[metric].notnull()) & (df["Process"] == process)]
         y = filtered_df[metric].values[:]
 
         if window_size is None:
@@ -845,11 +850,11 @@ class Trace:
         matrix_profile = stumpy.stump(y, window_size)
         dists, indices = stumpy.motifs(y, matrix_profile[:, 0], max_matches=iterations)
 
-        # Gets the corresponding portion from the original 
+        # Gets the corresponding portion from the original
         # dataframe for each pattern.
         patterns = []
         for idx in indices[0]:
-            end_idx = idx+window_size
+            end_idx = idx + window_size
 
             match_original = self.events.loc[
                 self.events["Timestamp (ns)"].isin(
