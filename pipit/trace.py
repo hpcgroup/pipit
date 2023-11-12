@@ -72,7 +72,7 @@ class Trace:
 
         # if timestamps are in seconds, convert them to nanoseconds
         if "Timestamp (s)" in events_dataframe.columns:
-            events_dataframe["Timestamp (s)"] *= 10 ** 9
+            events_dataframe["Timestamp (s)"] *= 10**9
             events_dataframe.rename(
                 columns={"Timestamp (s)": "Timestamp (ns)"}, inplace=True
             )
