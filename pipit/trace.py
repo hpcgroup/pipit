@@ -814,11 +814,11 @@ class Trace:
         import stumpy
 
         enter_events = self.events[
-                    (self.events["Name"] == start_event)
-                    & (self.events["Event Type"] == "Enter")
-                    & (self.events["Process"] == process)
-                ]
-        
+            (self.events["Name"] == start_event)
+            & (self.events["Event Type"] == "Enter")
+            & (self.events["Process"] == process)
+        ]
+
         leave_events = self.events[
             (self.events["Name"] == start_event)
             & (self.events["Event Type"] == "Leave")
@@ -836,7 +836,6 @@ class Trace:
         # this portion of the data.
         first_loop_enter = enter_events.index[0]
         last_loop_leave = leave_events.index[-1]
-
 
         df = self.events.iloc[first_loop_enter + 1 : last_loop_leave]
         filtered_df = df.loc[(df[metric].notnull()) & (df["Process"] == process)]
