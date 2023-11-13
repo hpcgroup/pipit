@@ -28,60 +28,82 @@ class Trace:
         trace.events = dd.from_pandas(trace.events, npartitions=1)
         return trace
     
-    def _match_events(self):
-        if "_matching_event" in self.events.columns:
-            return
-
-        def _match_events_partition(df):
-            stack = []
-            df["_matching_event"] = "N/A"
-
-            eventTypes = df["Event Type"]
-
-            for i, eventType in eventTypes.items():
-                if eventType == "Enter":
-                    stack.append(i)
-                elif eventType == "Leave":
-                    m = stack.pop()
-                    df.at[m, "_matching_event"] = i
-                    df.at[i, "_matching_event"] = m
-
-            return df
+    # def _match_events(self):
+    #     if "_matching_event" in self.events.columns:
+    #         return
         
-        self.events = self.events.map_partitions(_match_events_partition)
+    #     def _match_events_region(df):
+    #         stack = []
+    #         df["_matching_event"] = "N/A"
 
-    def _match_caller_callee(self):
-        if "_children" in self.events.columns:
-            return
+    #         eventTypes = df["Event Type"]
+
+    #         for i, eventType in eventTypes.items():
+    #             if eventType == "Enter":
+    #                 stack.append(i)
+    #             elif eventType == "Leave":
+    #                 m = stack.pop()
+    #                 df.at[m, "_matching_event"] = i
+    #                 df.at[i, "_matching_event"] = m
+
+    #         return df
         
-        if "_matching_event" not in self.events.columns:
-            self._match_events()
+    #     self.events = self.events.group
+
+    # def _match_events(self):
+    #     if "_matching_event" in self.events.columns:
+    #         return
+
+    #     def _match_events_partition(df):
+    #         stack = []
+    #         df["_matching_event"] = "N/A"
+
+    #         eventTypes = df["Event Type"]
+
+    #         for i, eventType in eventTypes.items():
+    #             if eventType == "Enter":
+    #                 stack.append(i)
+    #             elif eventType == "Leave":
+    #                 m = stack.pop()
+    #                 df.at[m, "_matching_event"] = i
+    #                 df.at[i, "_matching_event"] = m
+
+    #         return df
         
-        def _match_caller_callee_partition(df):
-            stack = []
+    #     self.events = self.events.map_partitions(_match_events_partition)
 
-            df["_depth"] = "N/A"
-            df["_children"] = "N/A"
-            df["_parent"] = "N/A"
+    # def _match_caller_callee(self):
+    #     if "_children" in self.events.columns:
+    #         return
+        
+    #     if "_matching_event" not in self.events.columns:
+    #         self._match_events()
+        
+    #     def _match_caller_callee_partition(df):
+    #         stack = []
 
-            eventTypes = df["Event Type"]
+    #         df["_depth"] = "N/A"
+    #         df["_children"] = "N/A"
+    #         df["_parent"] = "N/A"
 
-            for i, eventType in eventTypes.items():
-                if eventType == "Enter":
-                    if len(stack):
-                        p = stack[-1]
-                        df.at[i, "_parent"] = p
+    #         eventTypes = df["Event Type"]
 
-                        if df.at[p, "_children"] == "N/A":
-                            df.at[p, "_children"] = [i]
-                        else:
-                            df.at[p, "_children"].append(i)
+    #         for i, eventType in eventTypes.items():
+    #             if eventType == "Enter":
+    #                 if len(stack):
+    #                     p = stack[-1]
+    #                     df.at[i, "_parent"] = p
 
-                    df.at[i, "_depth"] = len(stack)
-                    stack.append(i)
-                elif eventType == "Leave":
-                    stack.pop()
+    #                     if df.at[p, "_children"] == "N/A":
+    #                         df.at[p, "_children"] = [i]
+    #                     else:
+    #                         df.at[p, "_children"].append(i)
 
-            return df
+    #                 df.at[i, "_depth"] = len(stack)
+    #                 stack.append(i)
+    #             elif eventType == "Leave":
+    #                 stack.pop()
 
-        self.events = self.events.map_partitions(_match_caller_callee_partition)
+    #         return df
+
+    #     self.events = self.events.map_partitions(_match_caller_callee_partition)
