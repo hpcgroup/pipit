@@ -838,7 +838,7 @@ class Trace:
         last_loop_leave = leave_events.index[-1]
 
 
-        df = self.events.iloc[first_loop_enter + 1: last_loop_leave]
+        df = self.events.iloc[first_loop_enter + 1 : last_loop_leave]
         filtered_df = df.loc[(df[metric].notnull()) & (df["Process"] == process)]
         y = filtered_df[metric].values[:]
 
