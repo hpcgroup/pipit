@@ -686,6 +686,19 @@ class Trace:
     def multirun_analysis(
         traces, metric_column="Timestamp (ns)", groupby_column="Name"
     ):
+        """
+        Arguments:
+        traces - list of pipit traces
+        metric_column - the column of the metric to be aggregated over
+        groupby_column - the column that will be grouped by before aggregation
+
+        Returns:
+        A Pandas DataFrame indexed by the number of processes in the traces, the
+        columns are the groups of the groupby_column, and the entries of the DataFrame
+        are the aggregated metrics corresponding to the respective trace and group
+        """
+
+        # for each trace, collect a flat profile
         flat_profiles = []
         for trace in traces:
             trace.calc_exc_metrics([metric_column])
@@ -698,10 +711,12 @@ class Trace:
                 trace.flat_profile(metrics=[metric_col], groupby_column=groupby_column)
             )
 
+        # combine these flat profiles and index them by number of processes
         combined_df = pd.concat([fp[metric_col] for fp in flat_profiles], axis=1).T
         combined_df.index = [len(set(trace.events["Process"])) for trace in traces]
         combined_df.index.rename("Number of Processes", inplace=True)
 
+        # sort the columns/groups in descending order of the aggregated metric values
         function_sums = combined_df.sum()
         combined_df = combined_df[function_sums.sort_values(ascending=False).index]
 
