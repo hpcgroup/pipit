@@ -813,34 +813,32 @@ class Trace:
     ):
         import stumpy
 
-        # count the number of enter events to
-        # determine the number of iterations if it's not
-        # given by the user.
-        if iterations is None:
-            iterations = len(
-                self.events[
+        enter_events = self.events[
                     (self.events["Name"] == start_event)
                     & (self.events["Event Type"] == "Enter")
                     & (self.events["Process"] == process)
                 ]
-            )
+        
+        leave_events = self.events[
+            (self.events["Name"] == start_event)
+            & (self.events["Event Type"] == "Leave")
+            & (self.events["Process"] == process)
+        ]
+
+        # count the number of enter events to
+        # determine the number of iterations if it's not
+        # given by the user.
+        if iterations is None:
+            iterations = len(enter_events)
 
         # get the first enter and last leave of
         # the given event. we will only investigate
         # this portion of the data.
-        first_loop_enter = self.events[
-            (self.events["Name"] == start_event)
-            & (self.events["Event Type"] == "Enter")
-            & (self.events["Process"] == process)
-        ].index[0]
+        first_loop_enter = enter_events.index[0]
+        last_loop_leave = leave_events.index[-1]
 
-        last_loop_leave = self.events[
-            (self.events["Name"] == start_event)
-            & (self.events["Event Type"] == "Leave")
-            & (self.events["Process"] == process)
-        ].index[-1]
 
-        df = self.events.iloc[first_loop_enter + 1 : last_loop_leave]
+        df = self.events.iloc[first_loop_enter + 1: last_loop_leave]
         filtered_df = df.loc[(df[metric].notnull()) & (df["Process"] == process)]
         y = filtered_df[metric].values[:]
 
