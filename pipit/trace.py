@@ -41,15 +41,4 @@ class Trace:
         return self.events.head().collect()._repr_html_()
     
     def _match_events():
-        """
-        
-        In a Polars dataframe containing trace events, the "Event Type" column
-        can be either "Enter", "Leave", or "Instant".
-
-        This function creates a new column, called _matching_event, which
-        matches the indices of "Enter" and "Leave" events. For "Instant" events
-        this column will be null.
-
-        """
-        # stack = []
         pass
