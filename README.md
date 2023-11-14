@@ -1,4 +1,4 @@
-# Pipit
+# <img src="https://raw.githubusercontent.com/hpcgroup/pipit/develop/logo.png" height="64" valign="middle" alt="pipit"/>
 
 [![Build Status](https://github.com/hpcgroup/pipit/actions/workflows/unit-tests.yaml/badge.svg)](https://github.com/hpcgroup/pipit/actions)
 [![docs](https://readthedocs.org/projects/pipit/badge/?version=latest)](https://pipit.readthedocs.io/en/latest/?badge=latest)
