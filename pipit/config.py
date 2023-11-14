@@ -1,3 +1,9 @@
+# Copyright 2023 Parallel Software and Systems Group, University of Maryland.
+# See the top-level LICENSE file for details.
+#
+# SPDX-License-Identifier: MIT
+
+
 # Validator to check if the value entered is of type bool
 def bool_validator(key, value):
     if type(value) is not bool:
