@@ -454,24 +454,27 @@ class Trace:
 
         return np.histogram(sizes, bins=bins, **kwargs)
 
-    def comm_over_time(self, output="size", kind="send", bins=50, **kwargs):
+    def comm_over_time(self, output="bytes", message_type="send", bins=50, **kwargs):
         """Returns histogram of communication volume over time.
 
         Args:
-            output (str, optional). Whether to measure volume by "count" or "size".
-                Defaults to "size".
-            kind (str, optional): Whether to compute for "send" or "receive". Defaults
-                to "send".
-            bins (int, optional): Number of bins in the histogram. Defaults to 50.
+            output (str, optional). Whether to measure volume by "count" or
+            "bytes". Defaults to "bytes".
+
+            message_type (str, optional): Whether to compute for sends or
+            receives. Defaults to "send".
+
+            bins (int, optional): Number of bins in the histogram. Defaults to
+            50.
 
         Returns:
-            hist: Volume in each time interval
+            hist: Volume in bytes or number of messages in each time interval
             edges: Edges of time intervals
         """
         # Filter by send or receive events
         events = self.events[
             self.events["Name"].isin(
-                ["MpiSend", "MpiIsend"] if kind == "send" else ["MpiRecv", "MpiIrecv"]
+                ["MpiSend", "MpiIsend"] if message_type == "send" else ["MpiRecv", "MpiIrecv"]
             )
         ]
 
@@ -491,11 +494,12 @@ class Trace:
         )
 
     def comm_by_process(self, output="size"):
-        """Returns total communication volume per process.
+        """Returns total communication volume in bytes of number of messagsper
+           process.
 
         Returns:
-            pd.DataFrame: DataFrame containing total communication volume sent and
-                received in each process
+            pd.DataFrame: DataFrame containing total communication volume or
+            number of messags sent and received by each process.
         """
         comm_matrix = self.comm_matrix(output=output)
 

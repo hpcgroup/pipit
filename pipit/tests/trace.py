@@ -35,13 +35,13 @@ def test_comm_matrix(data_dir, ping_pong_otf2_trace):
 def test_comm_over_time(data_dir, ping_pong_otf2_trace):
     ping_pong = Trace.from_otf2(str(ping_pong_otf2_trace))
 
-    hist, edges = ping_pong.comm_over_time(output="size", kind="send", bins=5)
+    hist, edges = ping_pong.comm_over_time(output="bytes", message_type="send", bins=5)
 
     assert len(edges) == 6
     assert all(hist[0:3] == 0)
     assert hist[4] == 4177920 * 2
 
-    hist, edges = ping_pong.comm_over_time(output="counts", kind="receive", bins=5)
+    hist, edges = ping_pong.comm_over_time(output="count", message_type="receive", bins=5)
 
     assert len(edges) == 6
     assert all(hist[0:3] == 0)
