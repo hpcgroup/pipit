@@ -32,6 +32,42 @@ def test_comm_matrix(data_dir, ping_pong_otf2_trace):
     assert count_comm_matrix[0][1] == count_comm_matrix[1][0] == 8
 
 
+def test_comm_over_time(data_dir, ping_pong_otf2_trace):
+    ping_pong = Trace.from_otf2(str(ping_pong_otf2_trace))
+
+    hist, edges = ping_pong.comm_over_time(output="size", message_type="send", bins=5)
+
+    assert len(edges) == 6
+    assert all(hist[0:3] == 0)
+    assert hist[4] == 4177920 * 2
+
+    hist, edges = ping_pong.comm_over_time(
+        output="count", message_type="receive", bins=5
+    )
+
+    assert len(edges) == 6
+    assert all(hist[0:3] == 0)
+    assert hist[4] == 8 * 2
+
+
+def test_comm_by_process(data_dir, ping_pong_otf2_trace):
+    ping_pong = Trace.from_otf2(str(ping_pong_otf2_trace))
+
+    sizes = ping_pong.comm_by_process()
+
+    assert sizes.loc[0]["Sent"] == 4177920
+    assert sizes.loc[0]["Received"] == 4177920
+    assert sizes.loc[1]["Sent"] == 4177920
+    assert sizes.loc[1]["Received"] == 4177920
+
+    counts = ping_pong.comm_by_process(output="count")
+
+    assert counts.loc[0]["Sent"] == 8
+    assert counts.loc[0]["Received"] == 8
+    assert counts.loc[1]["Sent"] == 8
+    assert counts.loc[1]["Received"] == 8
+
+
 def test_match_events(data_dir, ping_pong_otf2_trace):
     trace = Trace.from_otf2(str(ping_pong_otf2_trace))
     trace._match_events()
