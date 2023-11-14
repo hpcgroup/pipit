@@ -96,6 +96,13 @@ class Trace:
 
         return Trace(None, events_dataframe)
 
+    def to_chrome(self, filename=None):
+        """Export as Chrome Tracing JSON, which can be opened
+        in Perfetto."""
+        from .writers.chrome_writer import ChromeWriter
+
+        return ChromeWriter(self, filename).write()
+
     def _match_events(self):
         """Matches corresponding enter/leave events and adds two columns to the
         dataframe: _matching_event and _matching_timestamp
