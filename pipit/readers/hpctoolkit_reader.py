@@ -161,8 +161,6 @@ class MetaReader:
             function_string = "<unkown function>"
 
         if load_module_index is not None:
-            print(load_module_index)
-            print(len(self.load_modules_list))
             load_module = self.load_modules_list[load_module_index]
             module_string = self.common_strings[load_module["string_index"]]
         if source_file_index is not None:
@@ -446,7 +444,6 @@ class MetaReader:
                 ]
             if modules_pointer != 0:
                 load_module_index = self.__get_load_modules_index(modules_pointer)
-                print('load_module_index', load_module_index)
                 # currently ignoring offset -- no idea how that's used
             if file_pointer != 0:
                 source_file_index = self.__get_source_file_index(file_pointer)
@@ -708,11 +705,9 @@ class MetaReader:
             #   flex[2]: u32 line: Associated source line in pFile
             if flags & 2 != 0:
                 sub_flex_1 = int.from_bytes(
-                    # flex[8:16], byteorder=self.byte_order, signed=self.signed
                     flex[0:8], byteorder=self.byte_order, signed=self.signed
                 )
                 sub_flex_2 = int.from_bytes(
-                    # flex[16:20], byteorder=self.byte_order, signed=self.signed
                     flex[8:10], byteorder=self.byte_order, signed=self.signed
                 )
                 flex = flex[16:]
@@ -724,16 +719,13 @@ class MetaReader:
             #   flex[4]: u64 offset: Associated byte offset in *pModule
             if flags & 4 != 0:
                 sub_flex_1 = int.from_bytes(
-                    # flex[24:32], byteorder=self.byte_order, signed=self.signed
                     flex[0:8], byteorder=self.byte_order, signed=self.signed
                 )
                 sub_flex_2 = int.from_bytes(
-                    # flex[32:40], byteorder=self.byte_order, signed=self.signed
                     flex[8:16], byteorder=self.byte_order, signed=self.signed
                 )
                 flex = flex[16:]
                 load_module_index = self.__get_load_modules_index(sub_flex_1)
-                print('load_module_index flex', load_module_index)
                 load_module_offset = sub_flex_2
 
             # Now we take a look at the relationship and type of the context
@@ -937,7 +929,6 @@ class ProfileReader:
             # hit pointer
             hit_pointer = self.file.tell()
 
-            # print((self.file.tell() - section_pointer))
             # Number of identifications in this tuple (u16)
             num_tuples = int.from_bytes(
                 self.file.read(2), byteorder=self.byte_order, signed=self.signed
@@ -1188,7 +1179,6 @@ class TraceReader:
             self.file.read(4), byteorder=self.byte_order, signed=self.signed
         )
         hit = self.profile_reader.get_hit_from_profile(profile_index)
-        # print(hit)
 
         # empty space
         self.file.read(4)
@@ -1301,7 +1291,6 @@ class TraceReader:
                         self.data["Event Type"].append("Enter")
                     self.data["Timestamp (ns)"].append(timestamp)
                     self.data["Process"].append(hit['RANK'])
-                    # print('hit', hit)
                     self.data["Thread"].append(hit['THREAD'])
                     self.data["Host"].append(hit['NODE'])
                     self.data['Core'].append(hit['CORE'])
@@ -1385,5 +1374,5 @@ class HPCToolkitReader:
 
         # cct is needed to create trace in hpctoolkit,
         # so always return it as part of the trace
-        self.trace_df = trace_df
-        return pipit.trace.Trace(None, trace_df, self.meta_reader.cct)
+        self.trace_df = trace_df.dropna(axis=1, how='all')
+        return pipit.trace.Trace(None, self.trace_df, self.meta_reader.cct)
