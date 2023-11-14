@@ -592,13 +592,13 @@ class MetaReader:
         # map context for this context
         string_index = self.common_string_index_map[pretty_name_pointer]
         context = {
-            "relation": -1,
-            "lexical_type": -1,
-            "function_index": -1,
-            "source_file_index": -1,
-            "source_file_line": -1,
-            "load_module_index": -1,
-            "load_module_offset": -1,
+            "relation": None,
+            "lexical_type": None,
+            "function_index": None,
+            "source_file_index": None,
+            "source_file_line": None,
+            "load_module_index": None,
+            "load_module_offset": None,
             "string_index": string_index,
         }
         # context = {"string_index": string_index}
@@ -710,7 +710,7 @@ class MetaReader:
                 sub_flex_2 = int.from_bytes(
                     flex[8:10], byteorder=self.byte_order, signed=self.signed
                 )
-                flex = flex[10:]
+                flex = flex[16:]
                 source_file_index = self.__get_source_file_index(sub_flex_1)
                 source_file_line = sub_flex_2
 
@@ -929,7 +929,6 @@ class ProfileReader:
             # hit pointer
             hit_pointer = self.file.tell()
 
-            # print((self.file.tell() - section_pointer))
             # Number of identifications in this tuple (u16)
             num_tuples = int.from_bytes(
                 self.file.read(2), byteorder=self.byte_order, signed=self.signed
@@ -940,7 +939,7 @@ class ProfileReader:
 
             # Identifications for an application thread
             # Read H.I.T.s
-            tuples_list = []
+            tuples_map = {}
             for i in range(num_tuples):
                 # One of the values listed in the profile.db
                 # Identifier Names section. (u8)
@@ -964,8 +963,21 @@ class ProfileReader:
                     self.file.read(8), byteorder=self.byte_order, signed=self.signed
                 )
                 identifier_name = self.meta_reader.get_identifier_name(kind)
-                tuples_list.append((identifier_name, physical_id))
-            self.hit_map[hit_pointer] = tuples_list
+                tuples_map[identifier_name] = physical_id
+
+            self.hit_map[hit_pointer] = self.__clean_hit(tuples_map)
+
+    def __clean_hit(self, tuples_map: dict) -> dict:
+        # add None for information not present
+        if "Node" not in tuples_map:
+            tuples_map["Node"] = None
+        if "RANK" not in tuples_map:
+            tuples_map["RANK"] = None
+        if "THREAD" not in tuples_map:
+            tuples_map["THREAD"] = None
+        if "CORE" not in tuples_map:
+            tuples_map["CORE"] = None
+        return tuples_map
 
     def __read_common_header(self) -> None:
         """
@@ -1144,6 +1156,7 @@ class TraceReader:
             "Name": [],
             "Thread": [],
             "Process": [],
+            "Core": [],
             "Host": [],
             "Node": [],
             "Source File Name": [],
@@ -1242,9 +1255,10 @@ class TraceReader:
                     else:
                         self.data["Event Type"].append("Leave")
                     self.data["Timestamp (ns)"].append(timestamp)
-                    self.data["Process"].append(hit[1][1])
-                    self.data["Thread"].append(hit[2][1])
-                    self.data["Host"].append(hit[0][1])
+                    self.data["Process"].append(hit["RANK"])
+                    self.data["Thread"].append(hit["THREAD"])
+                    self.data["Host"].append(hit["NODE"])
+                    self.data["Core"].append(hit["CORE"])
                     self.data["Node"].append(last_node)
                     self.data["Source File Name"].append(context_information["file"])
                     self.data["Source File Line Number"].append(
@@ -1276,9 +1290,10 @@ class TraceReader:
                     else:
                         self.data["Event Type"].append("Enter")
                     self.data["Timestamp (ns)"].append(timestamp)
-                    self.data["Process"].append(hit[1][1])
-                    self.data["Thread"].append(hit[2][1])
-                    self.data["Host"].append(hit[0][1])
+                    self.data["Process"].append(hit["RANK"])
+                    self.data["Thread"].append(hit["THREAD"])
+                    self.data["Host"].append(hit["NODE"])
+                    self.data["Core"].append(hit["CORE"])
                     self.data["Node"].append(entry_node)
                     self.data["Source File Name"].append(context_information["file"])
                     self.data["Source File Line Number"].append(
@@ -1311,9 +1326,10 @@ class TraceReader:
                 else:
                     self.data["Event Type"].append("Leave")
                 self.data["Timestamp (ns)"].append(timestamp)
-                self.data["Process"].append(hit[1][1])
-                self.data["Thread"].append(hit[2][1])
-                self.data["Host"].append(hit[0][1])
+                self.data["Process"].append(hit["RANK"])
+                self.data["Thread"].append(hit["THREAD"])
+                self.data["Host"].append(hit["NODE"])
+                self.data["Core"].append(hit["CORE"])
                 self.data["Node"].append(last_node)
                 self.data["Source File Name"].append(context_information["file"])
                 self.data["Source File Line Number"].append(context_information["line"])
@@ -1358,5 +1374,5 @@ class HPCToolkitReader:
 
         # cct is needed to create trace in hpctoolkit,
         # so always return it as part of the trace
-        self.trace_df = trace_df
-        return pipit.trace.Trace(None, trace_df, self.meta_reader.cct)
+        self.trace_df = trace_df.dropna(axis=1, how="all")
+        return pipit.trace.Trace(None, self.trace_df, self.meta_reader.cct)
