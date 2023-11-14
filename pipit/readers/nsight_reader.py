@@ -10,9 +10,10 @@ import pipit.trace
 class NsightReader:
     """Reader for Nsight trace files"""
 
-    def __init__(self, file_name) -> None:
+    def __init__(self, file_name, create_cct=False) -> None:
         self.file_name = file_name
         self.df = None
+        self.create_cct = create_cct
 
     def read(self):
         """
@@ -103,4 +104,8 @@ class NsightReader:
         # Applying the column list to the dataframe to rearrange
         self.df = self.df.loc[:, cols]
 
-        return pipit.trace.Trace(None, self.df)
+        trace = pipit.trace.Trace(None, self.df)
+        if self.create_cct:
+            trace.create_cct()
+
+        return trace

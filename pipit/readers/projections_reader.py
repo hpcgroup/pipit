@@ -3,7 +3,6 @@
 #
 # SPDX-License-Identifier: MIT
 
-
 import os
 import gzip
 import pipit.trace
@@ -225,7 +224,9 @@ class STSReader:
 
 
 class ProjectionsReader:
-    def __init__(self, projections_directory: str, num_processes=None) -> None:
+    def __init__(
+        self, projections_directory: str, num_processes=None, create_cct=False
+    ) -> None:
         if not os.path.isdir(projections_directory):
             raise ValueError("Not a valid directory.")
 
@@ -269,6 +270,8 @@ class ProjectionsReader:
             self.num_processes = num_cpus
         else:
             self.num_processes = num_processes
+
+        self.create_cct = create_cct
 
     # Returns an empty dict, used for reading log file into dataframe
     @staticmethod
@@ -317,7 +320,11 @@ class ProjectionsReader:
             ["Timestamp (ns)", "Event Type", "Name", "Process", "Attributes"]
         ]
 
-        return pipit.trace.Trace(None, trace_df)
+        trace = pipit.trace.Trace(None, trace_df)
+        if self.create_cct:
+            trace.create_cct()
+
+        return trace
 
     def _read_log_file(self, rank_size) -> pd.DataFrame:
         # has information needed in sts file

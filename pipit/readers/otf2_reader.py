@@ -13,9 +13,10 @@ import pipit.trace
 class OTF2Reader:
     """Reader for OTF2 trace files"""
 
-    def __init__(self, dir_name, num_processes=None):
+    def __init__(self, dir_name, num_processes=None, create_cct=False):
         self.dir_name = dir_name  # directory of otf2 file being read
         self.file_name = self.dir_name + "/traces.otf2"
+        self.create_cct = create_cct
 
         num_cpus = mp.cpu_count()
         if num_processes is None or num_processes < 1 or num_processes > num_cpus:
@@ -516,4 +517,8 @@ class OTF2Reader:
 
         self.events = self.read_events()  # events
 
-        return pipit.trace.Trace(self.definitions, self.events)
+        trace = pipit.trace.Trace(self.definitions, self.events)
+        if self.create_cct:
+            trace.create_cct()
+
+        return trace

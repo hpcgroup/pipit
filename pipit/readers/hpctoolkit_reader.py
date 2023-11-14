@@ -1356,5 +1356,7 @@ class HPCToolkitReader:
             }
         )
 
+        # cct is needed to create trace in hpctoolkit,
+        # so always return it as part of the trace
         self.trace_df = trace_df
-        return pipit.trace.Trace(None, trace_df)
+        return pipit.trace.Trace(None, trace_df, self.meta_reader.cct)

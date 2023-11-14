@@ -5,17 +5,20 @@
 
 import numpy as np
 import pandas as pd
+from pipit.util.cct import create_cct
 
 
 class Trace:
-    """A trace dataset is read into an object of this type, which includes one
-    or more dataframes.
+    """
+    A trace dataset is read into an object of this type, which
+    includes one or more dataframes and a calling context tree.
     """
 
-    def __init__(self, definitions, events):
+    def __init__(self, definitions, events, cct=None):
         """Create a new Trace object."""
         self.definitions = definitions
         self.events = events
+        self.cct = cct
 
         # list of numeric columns which we can calculate inc/exc metrics with
         self.numeric_cols = list(
@@ -26,13 +29,18 @@ class Trace:
         self.inc_metrics = []
         self.exc_metrics = []
 
+    def create_cct(self):
+        # adds a column of cct nodes to the events dataframe
+        # and stores the graph object in self.cct
+        self.cct = create_cct(self.events)
+
     @staticmethod
-    def from_otf2(dirname, num_processes=None):
+    def from_otf2(dirname, num_processes=None, create_cct=False):
         """Read an OTF2 trace into a new Trace object."""
         # import this lazily to avoid circular dependencies
         from .readers.otf2_reader import OTF2Reader
 
-        return OTF2Reader(dirname, num_processes).read()
+        return OTF2Reader(dirname, num_processes, create_cct).read()
 
     @staticmethod
     def from_hpctoolkit(dirname):
@@ -43,20 +51,20 @@ class Trace:
         return HPCToolkitReader(dirname).read()
 
     @staticmethod
-    def from_projections(dirname, num_processes=None):
+    def from_projections(dirname, num_processes=None, create_cct=False):
         """Read a Projections trace into a new Trace object."""
         # import this lazily to avoid circular dependencies
         from .readers.projections_reader import ProjectionsReader
 
-        return ProjectionsReader(dirname, num_processes).read()
+        return ProjectionsReader(dirname, num_processes, create_cct).read()
 
     @staticmethod
-    def from_nsight(filename):
+    def from_nsight(filename, create_cct=False):
         """Read an Nsight trace into a new Trace object."""
         # import this lazily to avoid circular dependencies
         from .readers.nsight_reader import NsightReader
 
-        return NsightReader(filename).read()
+        return NsightReader(filename, create_cct).read()
 
     @staticmethod
     def from_csv(filename):
@@ -354,7 +362,6 @@ class Trace:
         Communication Matrix for Peer-to-Peer (P2P) MPI messages
 
         Arguments:
-
         1) output -
         string to choose whether the communication volume should be measured
         by bytes transferred between two processes or the number of messages
