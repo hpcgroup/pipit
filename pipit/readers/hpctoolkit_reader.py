@@ -1374,5 +1374,5 @@ class HPCToolkitReader:
 
         # cct is needed to create trace in hpctoolkit,
         # so always return it as part of the trace
-        self.trace_df = trace_df.dropna(axis=1, how='all')
+        self.trace_df = trace_df.dropna(axis=1, how="all")
         return pipit.trace.Trace(None, self.trace_df, self.meta_reader.cct)
