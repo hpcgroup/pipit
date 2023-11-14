@@ -474,7 +474,9 @@ class Trace:
         # Filter by send or receive events
         events = self.events[
             self.events["Name"].isin(
-                ["MpiSend", "MpiIsend"] if message_type == "send" else ["MpiRecv", "MpiIrecv"]
+                ["MpiSend", "MpiIsend"]
+                if message_type == "send"
+                else ["MpiRecv", "MpiIrecv"]
             )
         ]
 
@@ -512,7 +514,6 @@ class Trace:
     def flat_profile(
         self, metrics="time.exc", groupby_column="Name", per_process=False
     ):
-
         """
         Arguments:
         metrics - a string or list of strings containing the metrics to be aggregated

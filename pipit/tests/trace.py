@@ -35,7 +35,9 @@ def test_comm_matrix(data_dir, ping_pong_otf2_trace):
 def test_comm_over_time(data_dir, ping_pong_otf2_trace):
     ping_pong = Trace.from_otf2(str(ping_pong_otf2_trace))
 
-    hist, edges = ping_pong.comm_over_time(output="size", message_type="send", bins=5)
+    hist, edges = ping_pong.comm_over_time(
+        output="size", message_type="send", bins=5
+    )
 
     assert len(edges) == 6
     assert all(hist[0:3] == 0)
