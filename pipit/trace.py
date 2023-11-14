@@ -454,12 +454,12 @@ class Trace:
 
         return np.histogram(sizes, bins=bins, **kwargs)
 
-    def comm_over_time(self, output="bytes", message_type="send", bins=50, **kwargs):
+    def comm_over_time(self, output="size", message_type="send", bins=50, **kwargs):
         """Returns histogram of communication volume over time.
 
         Args:
-            output (str, optional). Whether to measure volume by "count" or
-            "bytes". Defaults to "bytes".
+            output (str, optional). Whether to calculate communication by "count" or
+            "size". Defaults to "size".
 
             message_type (str, optional): Whether to compute for sends or
             receives. Defaults to "send".
@@ -468,7 +468,7 @@ class Trace:
             50.
 
         Returns:
-            hist: Volume in bytes or number of messages in each time interval
+            hist: Volume in size or number of messages in each time interval
             edges: Edges of time intervals
         """
         # Filter by send or receive events
@@ -494,7 +494,7 @@ class Trace:
         )
 
     def comm_by_process(self, output="size"):
-        """Returns total communication volume in bytes of number of messagsper
+        """Returns total communication volume in size or number of messages per
            process.
 
         Returns:
