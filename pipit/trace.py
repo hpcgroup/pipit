@@ -447,7 +447,9 @@ class Trace:
 
         return np.histogram(sizes, bins=bins, **kwargs)
 
-    def flat_profile(self, metrics=None, groupby_column="Name", per_process=False):
+    def flat_profile(
+        self, metrics="time.exc", groupby_column="Name", per_process=False
+    ):
         """
         Arguments:
         metrics - a string or list of strings containing the metrics to be aggregated
@@ -458,7 +460,15 @@ class Trace:
         for the grouped by columns.
         """
 
-        metrics = self.inc_metrics + self.exc_metrics if metrics is None else metrics
+        metrics = [metrics] if not isinstance(metrics, list) else metrics
+
+        # calculate inclusive time if needed
+        if "time.inc" in metrics:
+            self.calc_inc_metrics(["Timestamp (ns)"])
+
+        # calculate exclusive time if needed
+        if "time.exc" in metrics:
+            self.calc_exc_metrics(["Timestamp (ns)"])
 
         # This first groups by both the process and the specified groupby
         # column (like name). It then sums up the metrics for each combination
@@ -688,3 +698,43 @@ class Trace:
         df.insert(0, "bin_end", edges[1:])
 
         return df
+
+    @staticmethod
+    def multirun_analysis(
+        traces, metric_column="Timestamp (ns)", groupby_column="Name"
+    ):
+        """
+        Arguments:
+        traces - list of pipit traces
+        metric_column - the column of the metric to be aggregated over
+        groupby_column - the column that will be grouped by before aggregation
+
+        Returns:
+        A Pandas DataFrame indexed by the number of processes in the traces, the
+        columns are the groups of the groupby_column, and the entries of the DataFrame
+        are the aggregated metrics corresponding to the respective trace and group
+        """
+
+        # for each trace, collect a flat profile
+        flat_profiles = []
+        for trace in traces:
+            trace.calc_exc_metrics([metric_column])
+            metric_col = (
+                "time.exc"
+                if metric_column == "Timestamp (ns)"
+                else metric_column + ".exc"
+            )
+            flat_profiles.append(
+                trace.flat_profile(metrics=[metric_col], groupby_column=groupby_column)
+            )
+
+        # combine these flat profiles and index them by number of processes
+        combined_df = pd.concat([fp[metric_col] for fp in flat_profiles], axis=1).T
+        combined_df.index = [len(set(trace.events["Process"])) for trace in traces]
+        combined_df.index.rename("Number of Processes", inplace=True)
+
+        # sort the columns/groups in descending order of the aggregated metric values
+        function_sums = combined_df.sum()
+        combined_df = combined_df[function_sums.sort_values(ascending=False).index]
+
+        return combined_df
