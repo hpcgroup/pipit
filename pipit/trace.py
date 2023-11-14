@@ -440,7 +440,9 @@ class Trace:
 
         return np.histogram(sizes, bins=bins, **kwargs)
 
-    def flat_profile(self, metrics=None, groupby_column="Name", per_process=False):
+    def flat_profile(
+        self, metrics="time.exc", groupby_column="Name", per_process=False
+    ):
         """
         Arguments:
         metrics - a string or list of strings containing the metrics to be aggregated
@@ -451,7 +453,15 @@ class Trace:
         for the grouped by columns.
         """
 
-        metrics = self.inc_metrics + self.exc_metrics if metrics is None else metrics
+        metrics = [metrics] if not isinstance(metrics, list) else metrics
+
+        # calculate inclusive time if needed
+        if "time.inc" in metrics:
+            self.calc_inc_metrics(["Timestamp (ns)"])
+
+        # calculate exclusive time if needed
+        if "time.exc" in metrics:
+            self.calc_exc_metrics(["Timestamp (ns)"])
 
         # This first groups by both the process and the specified groupby
         # column (like name). It then sums up the metrics for each combination
