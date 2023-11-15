@@ -8,6 +8,7 @@
 from pygments.styles.default import DefaultStyle
 from pygments.token import Generic
 
+
 # modifications to the default style
 class PipitStyle(DefaultStyle):
     styles = DefaultStyle.styles.copy()
