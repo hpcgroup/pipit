@@ -18,7 +18,7 @@ setup(
         "License :: OSI Approved :: MIT License",
     ],
     keywords="distributed computing, parallel computing, GPU traces",
-    packages=[ "pipit", "pipit.readers", "pipit.tests", "pipit.util", "pipit.writers" ],
+    packages=["pipit", "pipit.readers", "pipit.tests", "pipit.util", "pipit.writers"],
     install_requires=[
         "numpy",
         "otf2",
