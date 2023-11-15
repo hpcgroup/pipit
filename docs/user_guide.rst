@@ -8,16 +8,16 @@ User Guide
 **********
 
 Data Structures in Pipit
-=============
+========================
 
 Reading in a Dataset
-=============
+====================
 
 Trace Operations
-=============
+================
 
 Extracting Calling Relationships
-------------------
+--------------------------------
 
 Raw traces are organized in the form of enter, leave or instant events and
 their timestamps. We need to traverse and manipulate the DataFrame in the Trace
@@ -68,7 +68,7 @@ An example of the resulting 3 new columns added by trace._match_caller_callee() 
 
 
 Analyzing Overall Performance
-------------------
+-----------------------------
 
 Below is a list of descriptions of API functions that help analyze the time spent in different parts of the code.
 
@@ -127,7 +127,7 @@ The default values for all parameters, trace.flat_profile(), results in a DataFr
 **time_profile:**
 
 Analyzing Communication Performance
-------------------
+-----------------------------------
 
 Below is a list of descriptions of API functions that help analyze communication patterns.
 
@@ -153,7 +153,7 @@ will result in a 2D array like the following image as an example:
 **comm_over_time:**
 
 Identifying Performance Issues
-------------------
+------------------------------
 
 Here are some advanced operations that attempt to simplify the
 identification of performance issues.
@@ -169,11 +169,11 @@ identification of performance issues.
 **multi_run_analysis:**
 
 Data Reduction
-------------------
+--------------
 
 Pipit also supports filtering the DataFrame by different parameters to reduce the amount of data to analyze at a time. A user might be interested in analyzing the traces for a subset of processes or for a time period smaller than the entire execution.
 
 **filter:**
 
 Visualizing the Data
-=============
+====================
