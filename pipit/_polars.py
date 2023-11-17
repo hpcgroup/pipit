@@ -20,7 +20,7 @@ def __repr__(self):
 
     # Add the first 3 rows
     for row in rows[:5]:
-        row_str = '┆' + '┆'.join(f' {item:>{width}} ' for item, width in zip(row, max_widths)) + '┆'
+        row_str = '┆' + '┆'.join(f' {str(item):>{width}} ' for item, width in zip(row, max_widths)) + '┆'
         result.append(row_str)
 
     # Add ellipses in the middle
@@ -29,7 +29,7 @@ def __repr__(self):
 
     # Add the last 3 rows
     for row in rows[-5:]:
-        row_str = '┆' + '┆'.join(f' {item:>{width}} ' for item, width in zip(row, max_widths)) + '┆'
+        row_str = '┆' + '┆'.join(f' {str(item):>{width}} ' for item, width in zip(row, max_widths)) + '┆'
         result.append(row_str)
 
     result.append('└' + '┴'.join('─' * (width + 2) for width in max_widths) + '┘')
@@ -61,7 +61,7 @@ def _repr_html_(self):
     for row in rows[:5]:
         result.append('<tr>')
         for item in row:
-            result.append(f'<td>{item}</td>')
+            result.append(f'<td>{str(item)}</td>')
         result.append('</tr>')
 
     # Add ellipses in the middle
@@ -74,7 +74,7 @@ def _repr_html_(self):
     for row in rows[-5:]:
         result.append('<tr>')
         for item in row:
-            result.append(f'<td>{item}</td>')
+            result.append(f'<td>{str(item)}</td>')
         result.append('</tr>')
 
     result.append('</tbody></table>')

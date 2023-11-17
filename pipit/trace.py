@@ -39,9 +39,6 @@ class Trace:
         trace.events = pl.from_pandas(trace.events.reset_index()).lazy()
         return trace
 
-    def _repr_html_(self):
-        return self.events.head().collect()._repr_html_()
-
     def _match_events(self):
         """Add a column to the events dataframe that contains the index of the
         matching event for each event. This is used to calculate the duration
@@ -75,3 +72,5 @@ class Trace:
             .otherwise(pl.col("index").shift(1).over(["Process", "Thread", "depth"]))
             .alias("_matching_event")
         )
+
+        self.events = self.events.collect(streaming=True).lazy()
