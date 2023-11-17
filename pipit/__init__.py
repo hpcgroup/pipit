@@ -4,3 +4,4 @@
 # SPDX-License-Identifier: MIT
 
 from .trace import Trace  # noqa: F401
+from ._polars import *  # noqa: F401, F403

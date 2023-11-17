@@ -47,6 +47,8 @@ class Trace:
         matching event for each event. This is used to calculate the duration
         of each event.
         """
+        if "_matching_event" in self.events.columns:
+            return
 
         # Calculate the depth of each event by counting the number of
         # "Enter" events minus the number of "Leave" events that have
