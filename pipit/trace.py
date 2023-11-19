@@ -39,6 +39,21 @@ class Trace:
         trace.events = pl.from_pandas(trace.events.reset_index()).lazy()
         return trace
 
+    def find_unmatched(self):
+        group_cols = ["Process", "Thread", "Name"]
+
+        enter_events_cumsum = (pl.col("Event Type") == "Enter").cumsum().over(group_cols)
+        leave_events_cumsum = (pl.col("Event Type") == "Leave").cumsum().over(group_cols)
+
+        enter_events_sum = (pl.col("Event Type") == "Enter").sum().over(group_cols)
+        leave_events_sum = (pl.col("Event Type") == "Leave").sum().over(group_cols)
+
+        condition1 = leave_events_cumsum > enter_events_cumsum
+        condition2 = (leave_events_cumsum == enter_events_cumsum) & (pl.col("Event Type") == "Enter")
+        condition3 = enter_events_sum != leave_events_sum
+
+        return self.events.filter(condition1 | condition2 | condition3)
+
     def _match_events(self):
         """Add a column to the events dataframe that contains the index of the
         matching event for each event. This is used to calculate the duration
