@@ -116,5 +116,175 @@ for row in cudaapi_rows:
     print(row)
 print(len(cudaapi_rows))
 
+def cuda_callchains():
+    # Check if the 'name' column already exists in the table
+    cursor.execute("PRAGMA table_info(CUPTI_ACTIVITY_KIND_RUNTIME)")
+    columns = cursor.fetchall()
+
+    name_column_exists = any(column[1] == "name" for column in columns)
+
+    if not name_column_exists:
+        # Add the 'name' column
+        cuda_callchains_query1 = """
+        ALTER TABLE CUPTI_ACTIVITY_KIND_RUNTIME ADD COLUMN name TEXT;
+        """
+        cursor.execute(cuda_callchains_query1)
+
+    cuda_callchains_query_update1 = """
+    UPDATE CUPTI_ACTIVITY_KIND_RUNTIME SET name = (SELECT value FROM StringIds
+    WHERE CUPTI_ACTIVITY_KIND_RUNTIME.nameId = StringIds.id);
+    """
+    cursor.execute(cuda_callchains_query_update1)
+
+    cuda_callchains_query2 = """
+    ALTER TABLE CUDA_CALLCHAINS ADD COLUMN symbolName TEXT;
+    """
+    cursor.execute(cuda_callchains_query2)
+
+    cuda_callchains_query_update2 = """
+    UPDATE CUDA_CALLCHAINS SET symbolName = (SELECT value FROM StringIds
+    WHERE symbol = StringIds.id);
+    """
+    cursor.execute(cuda_callchains_query_update2)
+
+    cuda_callchains_query3 = """
+    SELECT globalTid % 0x1000000 AS TID,
+    start, end, name, callchainId, stackDepth, symbolName
+    FROM CUDA_CALLCHAINS
+    JOIN CUPTI_ACTIVITY_KIND_RUNTIME
+    ON callchainId == CUDA_CALLCHAINS.id
+    ORDER BY callchainId, stackDepth;
+    """
+
+    """
+    SELECT
+        *
+    FROM
+        CUDA_CALLCHAINS as cc
+    JOIN
+        StringIds AS rname
+        ON cc.symbol = rname.id
+    """
+
+    cursor.execute(cuda_callchains_query3)
+    cuda_callchain_rows = cursor.fetchall()
+    cuda_callchain_names = list(map(lambda x: x[0], cursor.description))
+    print(cuda_callchain_names)
+
+    for row in cuda_callchain_rows:
+        print(row)
+
+
+def sampling_callchains():
+    cursor.execute("PRAGMA table_info(SAMPLING_CALLCHAINS)")
+    columns = cursor.fetchall()
+    symbolName_column_exists = any(column[1] == "symbolName" for column in columns)
+
+    if not symbolName_column_exists:
+        # Add the 'symbolName' column
+        bottomup_alter1 = """
+        ALTER TABLE SAMPLING_CALLCHAINS ADD COLUMN symbolName TEXT;
+        """
+        cursor.execute(bottomup_alter1)
+
+    bottomup_update1 = """
+    UPDATE SAMPLING_CALLCHAINS SET symbolName = (SELECT value FROM StringIds WHERE
+    symbol = StringIds.id);
+    """
+    cursor.execute(bottomup_update1)
+
+    bottomup_alter2 = """
+    ALTER TABLE SAMPLING_CALLCHAINS ADD COLUMN moduleName TEXT;
+    """
+    cursor.execute(bottomup_alter2)
+
+    bottomup_update2 = """
+    UPDATE SAMPLING_CALLCHAINS SET moduleName = (SELECT value FROM StringIds WHERE
+    module = StringIds.id);
+    """
+    cursor.execute(bottomup_update2)
+
+    bottomup_select = """
+    SELECT symbolName, moduleName, stackDepth, ROUND(100.0 * sum(cpuCycles) /
+    (SELECT SUM(cpuCycles) FROM COMPOSITE_EVENTS), 2) AS selfTimePercentage
+    FROM SAMPLING_CALLCHAINS
+    LEFT JOIN COMPOSITE_EVENTS ON SAMPLING_CALLCHAINS.id == COMPOSITE_EVENTS.id
+    WHERE stackDepth == 0
+    GROUP BY symbol, module
+    ORDER BY selfTimePercentage DESC
+    """
+    cursor.execute(bottomup_select)
+    # cursor.execute("SELECT * FROM SAMPLING_CALLCHAINS")
+    bottomup_rows = cursor.fetchall()
+    bottomup_names = list(map(lambda x: x[0], cursor.description))
+    print(bottomup_names)
+
+    for row in bottomup_rows:
+        print(row)
+
+
+def cuda_callchains_memcpy():
+    # Check if the 'name' column already exists in the table
+    cursor.execute("PRAGMA table_info(CUPTI_ACTIVITY_KIND_MEMCPY)")
+    columns = cursor.fetchall()
+
+    name_column_exists = any(column[1] == "name" for column in columns)
+
+    if not name_column_exists:
+        # Add the 'name' column
+        cuda_callchains_query1 = """
+        ALTER TABLE CUPTI_ACTIVITY_KIND_MEMCPY ADD COLUMN name TEXT;
+        """
+        cursor.execute(cuda_callchains_query1)
+
+    cuda_callchains_query_update1 = """
+    UPDATE CUPTI_ACTIVITY_KIND_MEMCPY SET name = (SELECT value FROM StringIds
+    WHERE CUPTI_ACTIVITY_KIND_MEMCPY.nameId = StringIds.id);
+    """
+    cursor.execute(cuda_callchains_query_update1)
+
+    cuda_callchains_query2 = """
+    ALTER TABLE CUDA_CALLCHAINS ADD COLUMN symbolName TEXT;
+    """
+    cursor.execute(cuda_callchains_query2)
+
+    cuda_callchains_query_update2 = """
+    UPDATE CUDA_CALLCHAINS SET symbolName = (SELECT value FROM StringIds
+    WHERE symbol = StringIds.id);
+    """
+    cursor.execute(cuda_callchains_query_update2)
+
+    cuda_callchains_query3 = """
+    SELECT globalTid % 0x1000000 AS TID,
+    start, end, name, callchainId, stackDepth, symbolName
+    FROM CUDA_CALLCHAINS
+    JOIN CUPTI_ACTIVITY_KIND_MEMCPY
+    ON callchainId == CUDA_CALLCHAINS.id
+    ORDER BY callchainId, stackDepth;
+    """
+
+    """
+    SELECT
+        *
+    FROM
+        CUDA_CALLCHAINS as cc
+    JOIN
+        StringIds AS rname
+        ON cc.symbol = rname.id
+    """
+
+    cursor.execute(cuda_callchains_query3)
+    cuda_callchain_rows = cursor.fetchall()
+    cuda_callchain_names = list(map(lambda x: x[0], cursor.description))
+    print(cuda_callchain_names)
+
+    for row in cuda_callchain_rows:
+        print(row)
+
+
+cuda_callchains()
+# cuda_callchains_memcpy()
+sampling_callchains()
+
 cursor.close()
 conn.close()
