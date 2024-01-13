@@ -65,6 +65,14 @@ class Trace:
         from .readers.nsight_reader import NsightReader
 
         return NsightReader(filename, create_cct).read()
+    
+    @staticmethod
+    def from_pytorch(dir_name, create_cct=False):
+        """Read an PyTorch trace (perfetto json format) into a new Trace object."""
+        # import this lazily to avoid circular dependencies
+        from .readers.pytorch_reader import PytorchReader
+
+        return PytorchReader(dir_name, create_cct).read()
 
     @staticmethod
     def from_csv(filename):
