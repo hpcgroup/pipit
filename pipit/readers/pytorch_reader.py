@@ -12,8 +12,8 @@ class PytorchReader:
         self.create_cct = create_cct
 
     def read(self):
+        dfs = []
         for curr_rank_file in self.files:
-            dfs = []
             with(open(self.dir_name + "/" + curr_rank_file, 'r')) as file:
                 data = json.load(file)
                 df = pd.DataFrame(data["traceEvents"])
