@@ -268,14 +268,23 @@ class Partition_DAG:
             index = self.df[self.df['Partition ID'] == node.partition_id].index[0]
             self.df.at[index, 'Distance'] = dist
 
+            # print("Now calculating distance for child nodes...")
+
             # calculating distance for child nodes
             for child_id in node.get_children():
+                print("processing ", child_id)
                 child_node = self.partition_map[child_id]
                 # print('child node', child_node)
                 calc_distance_helper(child_node)
 
-        for root in self.roots:
-            calc_distance_helper(root)
+        print("There are ", len(self.roots), " roots in here")
+
+        roots = list(self.roots)
+
+        for i in range(len(roots)):
+            print("Root number ", i)
+            calc_distance_helper(roots[i])
+
 
     def create_leaps(self) -> None:
         # creates leap partitions

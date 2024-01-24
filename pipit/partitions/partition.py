@@ -2,7 +2,7 @@ from .event import Event
 from typing import Set, List, Dict
 
 class Partition:
-    def __init__(self, partition_id, event_list : list[Event]):
+    def __init__(self, partition_id, event_list):
         self.partition_id: int = partition_id
         #self.event_list = event_list
         self.event_dict = {}
