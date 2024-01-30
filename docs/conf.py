@@ -26,7 +26,7 @@ sys.path.insert(0, os.path.abspath("../pipit"))
 # -- Project information -----------------------------------------------------
 
 project = "pipit"
-copyright = "2022-2023, Parallel Software and Systems Group, University of Maryland"
+copyright = "2022-2024, Parallel Software and Systems Group, University of Maryland"
 author = "Abhinav Bhatele"
 
 # The full version, including alpha/beta/rc tags

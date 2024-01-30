@@ -303,7 +303,7 @@ In this guide, you have learned the basics of the Pipit library. The workflow ca
    For advanced Python users, especially those familiar with Pandas and NumPy, Pipit 
    exposes the ``events`` DataFrame for custom analysis.
 
-This guide serves to privde a gendle introduction to Pipit without providing an exhaustive list of its API
+This guide serves to privde a gentle introduction to Pipit without providing an exhaustive list of its API
 functions and features. We highly recommend exploring example notebooks and referring to the Pipit API documentation
 for a comprehensive understanding of the library's capabilities.
 
