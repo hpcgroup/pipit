@@ -7,10 +7,10 @@
 User Guide
 **********
 
-This guide will get you started working with Pipit as quickly as possible. Pipit can be used in a Python
-shell or file, but we highly recommend using it within a Jupyter notebook.
+This guide is designed to help you get started with Pipit as quickly as possible. 
+While Pipit can be used in a Python shell or file, we highly recommend using it within a Jupyter notebook for the best experience.
 
-Assuming that you have installed Pipit, let's begin by importing it.
+Assuming that you have installed Pipit, you can import it into your Python environment:
 
 .. code-block:: python
 
@@ -46,41 +46,26 @@ Let's examine how Pipit has parsed events in the ``ping-pong-otf2`` dataset:
 The trace events are parsed into a Pandas DataFrame, where each row represents an event
 and each column represents an attribute of that event.
 
-Standard Columns
+Understanding the DataFrame Columns
 ================
 
-Let's break down the columns above to get an understanding of what they mean:
+The ``events`` DataFrame includes the following columns:
 
-**Timestamp (ns)** represents the timestamp, in nanoseconds, at which the event occured.
+- **Timestamp (ns)**: The timestamp of the event in nanoseconds.
+- **Event Type**: The type of the event. This can be one of three values:
 
-**Event Type** represents the nature of that event, and is one of three values:
+  - **Enter**: Indicates the start of a region of code (usually a function invocation).
+  - **Leave**: Indicates the end of a region of code (usually a function return).
+  - **Instant**: This event is instantaneous, typically an MPI communication event (like "send" or "receive").
+  
+- **Name**: A descriptive identifier for the event. For Enter and Leave events, this is usually the name of the function.
+- **Thread**: The thread in which the event occurred.
+- **Process**: The process in which the event occurred. For MPI programs, this represents the MPI rank.
+- **Attributes**: Additional information or metadata about the event. For Instant events associated with MPI communication, this may contain the size of the message being sent or received.
 
-* **Enter**: This event indicates that the program has started execution of a region of code (usually when a function is invoked)
-* **Leave**: This event indicates that the program has ended execution of a region of code (usually when a function returns)
-* **Instant**: This event is instantaneous, and is typically an MPI communication event (like "send" or "receive")
-
-Therefore, a function invocation is represented by a pair of Enter and Leave events.
-
-**Name** represents a descriptive identifier associated with the event. For Enter and Leave events, this is usually the name of the
-function.
-
-**Thread** represents the thread in which the event occured, and **Process** represents the process in which the event occured.
-Depending on the program, measurement tool, and trace format, these may correspond to different hardware resources.
-For traces of MPI programs, Process represents the MPI rank.
-
-**Attributes** represents additional information or metadata of that event. For instance, for Instant events
-associated with MPI communication, this may contain the size of the message being sent or received.
-
-Pipit can read and parse a variety of trace formats into this DataFrame representation. Currently, it supports
-the following formats:
-
-* `HPCToolkit <http://hpctoolkit.org/index.html>`_
-* OTF2
-* Nsight
-* Projections
-
-However, by writing a custom reader that parses event data into the above columns, Pipit can 
-easily be extended to accomodate any format.
+Pipit supports a variety of trace formats, including HPCToolkit, OTF2, Nsight, and Projections.
+You can also write a custom reader to parse event data into the above columns, allowing Pipit
+to accommodate any format.
 
 
 Trace Operations
@@ -89,10 +74,9 @@ Trace Operations
 Extracting Calling Relationships
 --------------------------------
 
-Let's say we would like to calculate the duration of a function call.
-A function invocation consists of an Enter event (when the function starts executing),
-and a Leave event (when the function returns), so it's useful to
-match these two events with one another:
+Suppose we want to determine how long a function call takes. A function call involves two events: the Enter event marks the start of the
+function's execution, and the Leave event indicates when the function completes and returns.
+Therefore, it is useful to match these two events with each other:
 
 .. code-block:: python
 
@@ -107,19 +91,22 @@ and **_matching_timestamp**, which represent the index and timestamp of the
 corresponding Leave event (for Enter events), and the corresponding Enter event
 (for Leave events).
 
-This makes calculating the time spent for each function invocation (that is,
-for each Enter/Exit event) as simple as:
+This simplifies the calculation of the time spent for each function call:
 
-**total time = |_matching_timestamp - Timestamp (ns)|**
+.. math::
 
-What if, instead of the total time spent in a function call, we want to
-calculate the *exclusive* time spent in a function? That is, we would like
-to subtract the time spent in all children function calls?
+   \text{time spent} = \left| \text{matching\_timestamp} - \text{Timestamp (ns)} \right|
 
-**exclusive time = time spent - ∑ time spent in children**
+Suppose instead, we want to calculate the *exclusive* time spent in a function call
+(also called "self" time)? That is, we would like to subtract the time spent in 
+all nested (child) function calls:
 
-For such a calculation, we need to know the child events associated with
-each event:
+.. math::
+
+   \text{exclusive time} = \text{time spent} - \sum \text{time spent in children}
+
+For this, we need to know the child functions associated with 
+each function call:
 
 .. code-block:: python
 
@@ -137,7 +124,7 @@ further calculations.
 Analyzing Overall Performance
 -----------------------------
 
-Now that we have read in trace data and done some fundamental pre-processing on the events,
+Now that we have read in trace data and completed some essential preprocessing on the events,
 we are ready to perform analysis.
 
 
@@ -151,9 +138,9 @@ we are ready to perform analysis.
    :width: 700
 
 We add yet another column to the DataFrame: **time.inc**. As discussed above, this column contains
-the *inclusive* (or total) time spent on a particular function invocation. While a function invocation
+the *inclusive* (or total) time spent on a particular function call. While a function call
 is represented by an Enter row and a Leave row, we only store this value on the Enter row to avoid
-taking up extra space. Instead of doing this calculation discussed above, Pipit has done it for us.
+taking up extra space. Instead of manually doing this calculation, Pipit has done it for us.
 
 .. note::
    Pipit computes the inclusive time using the same formula mentioned above,
@@ -172,16 +159,16 @@ Similarly, we can compute the *exclusive* (also known as "self") time spent on e
    :width: 700
 
 Again, our DataFrame is populated with a new column, **time.exc**, representing this value. Pipit
-has subtracted the times taken by all children functions to calculate the exclusive time.
+has subtracted the times taken by all children functions to calculate the exclusive time. In fact,
+Pipit uses the _children column calculated previously to do so.
 
 .. note::
    If you are familiar with Pandas, try doing ``trace.events.sort_values("time.exc", ascending=False)``.
    This will return a copy of the ``events`` DataFrame, sorted from the longest function execution
    to the shortest, letting you quickly see which function calls are taking the most time.
 
-Finally, let's take a look at the trace's *flat profile*. A flat profile is an aggregation 
-of some metrics, usually by function name. For instance, we can easily see the *total* inclusive
-and exclusive times taken by each unique function:
+Finally, let's take a look at the trace's *flat profile*. A flat profile aggregates metrics, typically by function name.
+For instance, we can easily see the *total* inclusive and exclusive times for each distinct function:
 
 .. code-block:: python
 
@@ -190,7 +177,7 @@ and exclusive times taken by each unique function:
 .. image:: images/flat_profile.png
    :width: 200
 
-We can also break this down per process:
+We can also break this information down on a per-process basis:
 
 .. code-block:: python
 
@@ -202,22 +189,21 @@ We can also break this down per process:
 
 
 .. note::
-   Notice how in the past two examples, we don't call ``trace.events`` at the end. This is because
-   the ``flat_profile`` function *returns* a DataFrame containing the flat profile. In the previous
-   examples, ``calc_inc_metrics`` and ``calc_exc_metrics`` don't return anything -- they perform
-   computations and store it in the ``events`` DataFrame.
+   Notice how in the past two examples, we don't invoke ``trace.events`` at the end. This is because
+   the ``flat_profile`` function returns a DataFrame containing the flat profile. In contrast,
+   functions like  ``calc_inc_metrics`` and ``calc_exc_metrics`` don't return anything; they perform
+   computations and store the results in the ``events`` DataFrame.
 
 
 Analyzing Communication Performance
 -----------------------------------
 
-While Pipit has plenty of other useful functions for analyzing compute performance,
-the other major source of bottleneck in HPC applications is communication performance.
-Pipit provides useful API functions to help us understand how communication
-bottlenecks may impact our application.
+While Pipit offers numerous functions for analyzing compute performance,
+another significant bottleneck in HPC applications is communication performance. Pipit provides
+useful API functions to help us understand how communication bottlenecks might impact our application.
 
-The *communication matrix* of an application is a 2D array containing
-the volume of exchanged between pairs of processes. When MPI communication data is present
+The *communication matrix* of an application is a 2D array representing
+the volume of data exchanged between pairs of processes. If MPI communication data is present
 in the trace, Pipit can compute and output the communication matrix:
 
 .. code-block:: python
@@ -227,17 +213,17 @@ in the trace, Pipit can compute and output the communication matrix:
 .. image:: images/comm_matrix.png
    :width: 200
 
-In this matrix, the first dimension is the *sending* process, and the second dimension
-is the *receiving* process. Therefore, we can get the number of bytes that process *a*
-sends to process *b* like so:
+In this matrix, the first dimension corresponds to the sending process, and the second dimension
+represents the receiving process. We can determine the number of bytes process *a* sends to process *b*
+with the following syntax:
 
 .. code-block:: python
 
   cm = trace.comm_matrix()
   cm[a][b]
 
-Additionally, it may be helpful to find the *total* number of bytes sent by
-each process to identify communication imbalance. 
+Additionally, it may be helpful to find the total number of bytes sent and received by
+each process to identify communication imbalances. 
 
 .. code-block:: python
 
@@ -276,10 +262,11 @@ each process to identify communication imbalance.
 Visualizing the Data
 ====================
 
-While Pipit has been primarily designed for programmatic analysis, it also includes
-a basic visual interface to complement the API functions. 
+While Pipit is mainly designed for programmatic analysis, it also includes a simple
+visual interface to complement the API functions.
 
-A natural visualization for event traces is a timeline, also known as a gantt chart:
+A common and straightforward visualization for event traces is a timeline, also known as a Gantt chart.
+In this view, events are laid out in chronological order:
 
 .. code-block:: python
 
@@ -316,11 +303,11 @@ In this guide, you have learned the basics of the Pipit library. The workflow ca
    For advanced Python users, especially those familiar with Pandas and NumPy, Pipit 
    exposes the ``events`` DataFrame for custom analysis.
 
-This guide serves to provide a gentle introduction to Pipit, and not enumerate all of its
-API functions and features. We would highly recommend checking out example notebooks as well as
-the Pipit API docs to see the full functionality of the library.
+This guide serves to privde a gendle introduction to Pipit without providing an exhaustive list of its API
+functions and features. We highly recommend exploring example notebooks and referring to the Pipit API documentation
+for a comprehensive understanding of the library's capabilities.
 
-Pipit can be used to perform automated analysis, via Python scripts, as well 
-as exploratory analysis, by means of Jupyter notebooks. Since performance bottlenecks
-are not typically known ahead of time, we highly recommend using Pipit within a Jupyter notebook
-to interactively understand your performance data and gain valuable insights.
+Pipit can be used to perform automated analysis through Python scripts, as well 
+as exploratory analysis via Jupyter notebooks. Since performance bottlenecks
+are not typically not known ahead of time, we highly recommend using Pipit within a Jupyter notebook.
+This allows for interactive exploration of performance data, facilitating a deeper understanding and providing valuable insights.

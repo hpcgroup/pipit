@@ -18,8 +18,8 @@
 import os
 import sys
 
-import style
-import pkg_resources
+# import style
+# import pkg_resources
 
 sys.path.insert(0, os.path.abspath("../pipit"))
 
