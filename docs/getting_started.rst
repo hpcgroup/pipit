@@ -13,7 +13,7 @@ Introduction
 Pipit is an open-source Python library for analyzing parallel execution traces.
 It supports various trace formats, including OTF2, HPCToolkit, and Nsight, and
 implements several operations for in-depth exploration and analysis of trace
-data. Built on top of Pandas, Pipit is highly scalable and extensible for
+data. Built on top of Pandas, Pipit is fast and extensible for
 custom analysis needs.
 
 Compared to other tools, Pipit offers the following benefits:
@@ -39,43 +39,46 @@ Prerequisites
 =============
 
 Pipit has the following minimum requirements, which must be installed before
-pipit is run:
+Pipit is run:
 
 #. Python 3 (>3.5)
 #. numpy
 #. otf2
 #. pandas
 
-Pipit is available on `GitHub <https://github.com/hpcgroup/pipit>`_
+.. Pipit is available on `GitHub <https://github.com/hpcgroup/pipit>`_
 
 
 Installation
 ============
 
-You can install using pip:
+To install a Pipit release, you can use pip:
 
 .. code-block:: console
 
   $ pip install pipit
 
-Alternatively, You can get pipit from its `GitHub repository
-<https://github.com/hpcgroup/pipit>`_ using this command:
+Alternatively, you can get the latest development version
+of Pipit from its `GitHub repository
+<https://github.com/hpcgroup/pipit>`_:
 
 .. code-block:: console
 
   $ git clone https://github.com/hpcgroup/pipit.git
+  $ cd pipit
+  $ pip install -r requirements.txt
 
-and
+If you install Pipit this way, make sure to add the Pipit directory 
+to your ``PYTHONPATH`` in order for Python to locate the package:
 
-Install and Build Pipit
------------------------
+.. code-block:: console
 
-
+  $ export PYTHONPATH=${PYTHONPATH}:<path-to-pipit-directory>
 
 Check Installation
 ------------------
 
-Once pipit is installed, you should be able to import it into the Python interpreter and use it in interactive mode:
+Once Pipit is installed, you should be able to import it into the Python interpreter and use it in interactive mode:
 
 .. code-block:: console
 
@@ -93,13 +96,16 @@ messages:
   >>> import pipit
   >>>
 
+If you get a ``ModuleNotFoundError``, this means that Python cannot locate your Pipit installation.
+To fix this, ensure that you're using the ``pip`` that's associated with your ``python`` interpreter,
+and/or that the Pipit directory is in your ``PYTHONPATH``.
 
-Supported data formats
-======================
+.. Supported data formats
+.. ======================
 
-Currently, pipit supports the following data formats as input:
+.. Currently, Pipit supports the following data formats as input:
 
-* `HPCToolkit <http://hpctoolkit.org/index.html>`_ trace
-* OTF2
-* Nsight
-* Projections
+.. * `HPCToolkit <http://hpctoolkit.org/index.html>`_ trace
+.. * OTF2
+.. * Nsight
+.. * Projections
