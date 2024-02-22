@@ -1,92 +1,120 @@
-from abc import 
+from abc import ABC, abstractmethod
 
 # This is based on HoloViews Dataset
 # contains everything from query/core.py and query/initial.py
 # https://holoviews.org/reference_manual/holoviews.core.data.html#holoviews.core.data.Dataset
-class Dataset:
-    def add_dimension(dimension, dim_val, dim_index):
+
+class TraceData(ABC):
+    """Abstract base class representing a trace dataset."""
+
+    @abstractmethod
+    def add_attribute(self, attribute, value, index):
         pass
 
-    def aggregate(dimensions, function, spreadfn):
+    @abstractmethod
+    def apply(self, func):
         pass
 
-    def apply(funcs):
+    @abstractmethod
+    def array(self, attributes):
         pass
 
-    def array(dimensions):
+    @abstractmethod
+    def clone(self):
         pass
 
-    def clone():
+    @abstractmethod
+    def columns(self, attributes):
         pass
 
-    def columns(dimensions):
+    @abstractmethod
+    def attribute_values(self, attribute, expanded=True):
         pass
 
-    def dimension_values(dimension, expanded=True):
+    @abstractmethod
+    def attributes(self, selection):
         pass
 
-    def dimensions(selection):
+    @abstractmethod
+    def flush(self):
         pass
 
-    def flush():
+    @abstractmethod
+    def get_attribute(self, attribute):
         pass
 
-    def get_dimension(dimension):
+    @abstractmethod
+    def get_attribute_index(self, attribute):
         pass
 
-    def get_dimension_index(dimension):
+    @abstractmethod
+    def get_attribute_type(self, attribute):
         pass
 
-    def get_dimension_type(dimension):
+    @abstractmethod
+    def groupby(self, attributes, container_type):
         pass
 
-    def groupby(dimensions, container_type):
+    @abstractmethod
+    def head(self, n):
         pass
 
-    def head(n):
+    @abstractmethod
+    def hist(self, attribute, num_bins, bin_range):
         pass
 
-    def hist(dimension, num_bins, bin_range):
+    @abstractmethod
+    def max(self, attributes):
         pass
 
-    def max(dimensions):
+    @abstractmethod
+    def mean(self, attributes):
         pass
 
-    def mean(dimensions):
+    @abstractmethod
+    def min(self, attributes):
         pass
 
-    def min(dimensions):
+    @abstractmethod
+    def ndloc(self, *args):
         pass
 
-    def ndloc(*args):
+    @abstractmethod
+    def options(self, *args):
         pass
 
-    def options(*args):
+    @abstractmethod
+    def persist(self):
         pass
 
-    def persist():
+    @abstractmethod
+    def push(self, event):
         pass
 
-    def push(event):
+    @abstractmethod
+    def range(self, attribute):
         pass
 
-    def range(dimension):
+    @abstractmethod
+    def reduce(self, attributes, function, spreadfn):
         pass
 
-    def reduce(dimensions, function, spreadfn):
+    @abstractmethod
+    def select(self, selection_expr):
         pass
 
-    def select(selection_expr):
+    @abstractmethod
+    def sort(self, by, reverse):
         pass
 
-    def sort(by, reverse):
+    @abstractmethod
+    def sum(self, attributes):
         pass
 
-    def sum(dimensions):
+    @abstractmethod
+    def tail(self, n):
         pass
 
-    def tail(n):
-        pass
-
-    def __len__():
+    @abstractmethod
+    def __len__(self):
         pass
