@@ -14,6 +14,10 @@ class Trace:
     includes one or more dataframes and a calling context tree.
     """
 
+    # def filter(self):
+    #     df = self.events.filter(..)
+    #     return Trace(df)
+
     def __init__(self, definitions, events, cct=None):
         """Create a new Trace object."""
         self.definitions = definitions
