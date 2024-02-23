@@ -7,8 +7,9 @@ BUFFER_SIZE = 200
 
 
 class PandasDataset(TraceDataset):
-    def __init__(self, data=pd.DataFrame()):
+    def __init__(self, data=pd.DataFrame(), streams=None):
         self.data = data
+        self.streams = streams
         self.buffer = []
         self.backend = "pandas"
 
@@ -38,10 +39,14 @@ class PandasDataset(TraceDataset):
                     )
                 )
             else:
-                print(tabulate(self.data, headers="keys", tablefmt="psql"))
+                print(
+                    tabulate(
+                        self.data, headers="keys", tablefmt="psql", showindex=False
+                    )
+                )
 
-        print(f":TraceDataset ({len(self.data)} events)")
+        print(self.__str__())
 
     def filter(self, condition: str) -> TraceDataset:
         filtered_data = self.data.query(condition)
-        return PandasDataset(filtered_data)
+        return PandasDataset(filtered_data, streams=self.streams)

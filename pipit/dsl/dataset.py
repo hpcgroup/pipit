@@ -3,11 +3,22 @@ from abc import ABC, abstractmethod
 from pipit.dsl.event import Event
 
 
+class LocIndexer(ABC):
+    def __getitem__(self, key):
+        pass
+
+
 # This is the final one
 class TraceDataset(ABC):
     @abstractmethod
-    def __init__(self, data):
+    def __init__(self, streams=None, data=None):
+        """
+        streams are a list of execution locations that are being traced.
+        streams can be nested, for example:
+        ["process"], [("process", "thread")], [("process", "thread"), "gpu"]
+        """
         self.data = data
+        self.streams = streams
         self.backend = None
 
     @abstractmethod
@@ -31,10 +42,14 @@ class TraceDataset(ABC):
         pass
 
     def __str__(self) -> str:
-        return f":TraceDataset ({len(self)} events)"
+        return f":TraceDataset   {self.streams}   ({len(self.data)} events)"
 
     def __repr__(self):
         return str(self)
+
+    @property
+    def loc(self):
+        return self.data.loc
 
     # @abstractmethod
     # def apply(self, f):
@@ -49,19 +64,7 @@ class TraceDataset(ABC):
     #     pass
 
     # @abstractmethod
-    # def count(self):
-    #     pass
-
-    # @abstractmethod
     # def distinct(self):
-    #     pass
-
-    # @abstractmethod
-    # def filter(self, f):
-    #     pass
-
-    # @abstractmethod
-    # def flush(self):
     #     pass
 
     # @abstractmethod
@@ -93,10 +96,6 @@ class TraceDataset(ABC):
     #     pass
 
     # @abstractmethod
-    # def push(self, event):
-    #     pass
-
-    # @abstractmethod
     # def reduce(self, col, f):
     #     pass
 
@@ -125,10 +124,12 @@ class TraceDataset(ABC):
     #     pass
 
 
-def create_dataset() -> TraceDataset:
+def create_dataset(backend=None, *args, **kwargs) -> TraceDataset:
     from pipit.util.config import get_option
 
-    if get_option("backend") == "pandas":
+    backend = backend or get_option("backend")
+
+    if backend == "pandas":
         from pipit.dsl._pandas import PandasDataset
 
-        return PandasDataset()
+        return PandasDataset(*args, **kwargs)
