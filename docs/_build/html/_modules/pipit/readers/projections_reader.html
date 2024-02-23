@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>pipit.readers.projections_reader &mdash; pipit 0.1.0 documentation</title>
+      <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
+        <script src="../../../_static/doctools.js"></script>
+        <script src="../../../_static/sphinx_highlight.js"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html">
+            
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Docs</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../getting_started.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user_guide.html">User Guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Developer Docs</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../developer_guide.html">Developer Guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Docs</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../source/pipit.html">Pipit API Docs</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">pipit</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">pipit.readers.projections_reader</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for pipit.readers.projections_reader</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Copyright 2022-2023 Parallel Software and Systems Group, University of</span>
+<span class="c1"># Maryland. See the top-level LICENSE file for details.</span>
+<span class="c1">#</span>
+<span class="c1"># SPDX-License-Identifier: MIT</span>
+
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">gzip</span>
+<span class="kn">import</span> <span class="nn">pipit.trace</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+<span class="kn">import</span> <span class="nn">multiprocessing</span> <span class="k">as</span> <span class="nn">mp</span>
+
+
+<div class="viewcode-block" id="ProjectionsConstants"><a class="viewcode-back" href="../../../source/pipit.readers.html#pipit.readers.projections_reader.ProjectionsConstants">[docs]</a><span class="k">class</span> <span class="nc">ProjectionsConstants</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Projection constants are copied over from projections -- used to</span>
+<span class="sd">    determine type of line in log files</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c1"># Message Creation po</span>
+    <span class="n">CREATION</span> <span class="o">=</span> <span class="mi">1</span>
+
+    <span class="n">BEGIN_PROCESSING</span> <span class="o">=</span> <span class="mi">2</span>
+    <span class="n">END_PROCESSING</span> <span class="o">=</span> <span class="mi">3</span>
+    <span class="n">ENQUEUE</span> <span class="o">=</span> <span class="mi">4</span>
+    <span class="n">DEQUEUE</span> <span class="o">=</span> <span class="mi">5</span>
+    <span class="n">BEGIN_COMPUTATION</span> <span class="o">=</span> <span class="mi">6</span>
+    <span class="n">END_COMPUTATION</span> <span class="o">=</span> <span class="mi">7</span>
+
+    <span class="n">BEGIN_INTERRUPT</span> <span class="o">=</span> <span class="mi">8</span>
+    <span class="n">END_INTERRUPT</span> <span class="o">=</span> <span class="mi">9</span>
+    <span class="n">MESSAGE_RECV</span> <span class="o">=</span> <span class="mi">10</span>
+    <span class="n">BEGIN_TRACE</span> <span class="o">=</span> <span class="mi">11</span>
+    <span class="n">END_TRACE</span> <span class="o">=</span> <span class="mi">12</span>
+    <span class="n">USER_EVENT</span> <span class="o">=</span> <span class="mi">13</span>
+    <span class="n">BEGIN_IDLE</span> <span class="o">=</span> <span class="mi">14</span>
+    <span class="n">END_IDLE</span> <span class="o">=</span> <span class="mi">15</span>
+    <span class="n">BEGIN_PACK</span> <span class="o">=</span> <span class="mi">16</span>
+    <span class="n">END_PACK</span> <span class="o">=</span> <span class="mi">17</span>
+    <span class="n">BEGIN_UNPACK</span> <span class="o">=</span> <span class="mi">18</span>
+    <span class="n">END_UNPACK</span> <span class="o">=</span> <span class="mi">19</span>
+    <span class="n">CREATION_BCAST</span> <span class="o">=</span> <span class="mi">20</span>
+
+    <span class="n">CREATION_MULTICAST</span> <span class="o">=</span> <span class="mi">21</span>
+
+    <span class="c1"># A record for a user supplied integer value, likely a timestep</span>
+    <span class="n">USER_SUPPLIED</span> <span class="o">=</span> <span class="mi">26</span>
+
+    <span class="c1"># A record for the memory usage</span>
+    <span class="n">MEMORY_USAGE</span> <span class="o">=</span> <span class="mi">27</span>
+
+    <span class="c1"># A record for a user supplied string</span>
+    <span class="n">USER_SUPPLIED_NOTE</span> <span class="o">=</span> <span class="mi">28</span>
+    <span class="n">USER_SUPPLIED_BRACKETED_NOTE</span> <span class="o">=</span> <span class="mi">29</span>
+
+    <span class="n">BEGIN_USER_EVENT_PAIR</span> <span class="o">=</span> <span class="mi">98</span>
+    <span class="n">END_USER_EVENT_PAIR</span> <span class="o">=</span> <span class="mi">99</span>
+    <span class="n">USER_EVENT_PAIR</span> <span class="o">=</span> <span class="mi">100</span>
+    <span class="n">USER_STAT</span> <span class="o">=</span> <span class="mi">32</span>
+    <span class="c1"># *** USER category ***</span>
+    <span class="n">NEW_CHARE_MSG</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="c1"># NEW_CHARE_NO_BALANCE_MSG = 1;</span>
+    <span class="n">FOR_CHARE_MSG</span> <span class="o">=</span> <span class="mi">2</span>
+    <span class="n">BOC_INIT_MSG</span> <span class="o">=</span> <span class="mi">3</span>
+    <span class="c1"># BOC_MSG                  = 4;</span>
+    <span class="c1"># TERMINATE_TO_ZERO        = 5;  # never used ??</span>
+    <span class="c1"># TERMINATE_SYS            = 6;  # never used ??</span>
+    <span class="c1"># INIT_COUNT_MSG           = 7;</span>
+    <span class="c1"># READ_VAR_MSG             = 8;</span>
+    <span class="c1"># READ_MSG_MSG             = 9;</span>
+    <span class="c1"># BROADCAST_BOC_MSG        = 10;</span>
+    <span class="c1"># DYNAMIC_BOC_INIT_MSG     = 11;</span>
+
+    <span class="c1"># *** IMMEDIATE category ***</span>
+    <span class="n">LDB_MSG</span> <span class="o">=</span> <span class="mi">12</span>
+    <span class="c1"># VID_SEND_OVER_MSG        = 13;</span>
+    <span class="n">QD_BOC_MSG</span> <span class="o">=</span> <span class="mi">14</span>
+    <span class="n">QD_BROADCAST_BOC_MSG</span> <span class="o">=</span> <span class="mi">15</span></div>
+    <span class="c1"># IMM_BOC_MSG              = 16;</span>
+    <span class="c1"># IMM_BROADCAST_BOC_MSG    = 17;</span>
+    <span class="c1"># INIT_BARRIER_PHASE_1     = 18;</span>
+    <span class="c1"># INIT_BARRIER_PHASE_2     = 19;</span>
+
+
+<div class="viewcode-block" id="STSReader"><a class="viewcode-back" href="../../../source/pipit.readers.html#pipit.readers.projections_reader.STSReader">[docs]</a><span class="k">class</span> <span class="nc">STSReader</span><span class="p">:</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">file_location</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sts_file</span> <span class="o">=</span> <span class="nb">open</span><span class="p">(</span><span class="n">file_location</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span>  <span class="c1"># self.chares = {}</span>
+
+        <span class="c1"># In &#39;self.entries&#39;, each entry stores (entry_name: str, chare_id: int)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">entries</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="c1"># Stores user event names: {user_event_id: user event name}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">user_events</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="c1"># Stores user stat names: {user_event_id: user stat name}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">user_stats</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">read_sts_file</span><span class="p">()</span>
+
+    <span class="c1"># to get name of entry print &lt;name of chare + :: + name of entry&gt;&gt;</span>
+<div class="viewcode-block" id="STSReader.get_entry_name"><a class="viewcode-back" href="../../../source/pipit.readers.html#pipit.readers.projections_reader.STSReader.get_entry_name">[docs]</a>    <span class="k">def</span> <span class="nf">get_entry_name</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">entry_id</span><span class="p">):</span>
+        <span class="c1"># self.entries[entry_id][1] is the chare_id (index for self.chares)</span>
+        <span class="k">if</span> <span class="n">entry_id</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">entries</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s2">&quot;&quot;</span>
+        <span class="n">entry_name</span><span class="p">,</span> <span class="n">chare_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">entries</span><span class="p">[</span><span class="n">entry_id</span><span class="p">]</span>
+        <span class="n">ret_val</span> <span class="o">=</span> <span class="n">entry_name</span>
+        <span class="k">if</span> <span class="n">chare_id</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">chares</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">chares</span><span class="p">[</span><span class="n">chare_id</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="s2">&quot;::&quot;</span> <span class="o">+</span> <span class="n">ret_val</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">ret_val</span></div>
+
+    <span class="c1"># To get the dimension of an entry</span>
+<div class="viewcode-block" id="STSReader.get_dimension"><a class="viewcode-back" href="../../../source/pipit.readers.html#pipit.readers.projections_reader.STSReader.get_dimension">[docs]</a>    <span class="k">def</span> <span class="nf">get_dimension</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">entry_id</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">chares</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">entries</span><span class="p">[</span><span class="n">entry_id</span><span class="p">][</span><span class="mi">1</span><span class="p">]][</span><span class="mi">1</span><span class="p">]</span></div>
+
+    <span class="c1"># Gets the user event name from the user_event_id</span>
+<div class="viewcode-block" id="STSReader.get_user_event"><a class="viewcode-back" href="../../../source/pipit.readers.html#pipit.readers.projections_reader.STSReader.get_user_event">[docs]</a>    <span class="k">def</span> <span class="nf">get_user_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">user_event_id</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">user_events</span><span class="p">[</span><span class="n">user_event_id</span><span class="p">]</span></div>
+
+    <span class="c1"># Gets the name of the user stat from the user_event_id</span>
+<div class="viewcode-block" id="STSReader.get_user_stat"><a class="viewcode-back" href="../../../source/pipit.readers.html#pipit.readers.projections_reader.STSReader.get_user_stat">[docs]</a>    <span class="k">def</span> <span class="nf">get_user_stat</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">user_event_id</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">user_stats</span><span class="p">[</span><span class="n">user_event_id</span><span class="p">]</span></div>
+
+    <span class="c1"># unsure what this is used for, but necessary to read PROCESSING</span>
+<div class="viewcode-block" id="STSReader.get_num_perf_counts"><a class="viewcode-back" href="../../../source/pipit.readers.html#pipit.readers.projections_reader.STSReader.get_num_perf_counts">[docs]</a>    <span class="k">def</span> <span class="nf">get_num_perf_counts</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;papi_event_names&quot;</span><span class="p">):</span>
+            <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">papi_event_names</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="mi">0</span></div>
+        <span class="c1"># self.entries[entry_id][1] is the chare_id (index for self.chares)</span>
+
+    <span class="c1"># Gets event name from event_id</span>
+<div class="viewcode-block" id="STSReader.get_event_name"><a class="viewcode-back" href="../../../source/pipit.readers.html#pipit.readers.projections_reader.STSReader.get_event_name">[docs]</a>    <span class="k">def</span> <span class="nf">get_event_name</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event_id</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">user_events</span><span class="p">[</span><span class="n">event_id</span><span class="p">]</span></div>
+
+<div class="viewcode-block" id="STSReader.read_sts_file"><a class="viewcode-back" href="../../../source/pipit.readers.html#pipit.readers.projections_reader.STSReader.read_sts_file">[docs]</a>    <span class="k">def</span> <span class="nf">read_sts_file</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">sts_file</span><span class="p">:</span>
+            <span class="n">line_arr</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">()</span>
+
+            <span class="c1"># Note: I&#39;m disregarding TOTAL_STATS and TOTAL_EVENTS, because</span>
+            <span class="c1">#   projections reader disregards them</span>
+
+            <span class="c1"># Note: currently not reading/storing VERSION, MACHINE, SMPMODE,</span>
+            <span class="c1">#   COMMANDLINE, CHARMVERSION, USERNAME, HOSTNAME</span>
+
+            <span class="c1"># create chares array</span>
+            <span class="c1"># In &#39;self.chares&#39;, each entry stores (chare_name: str, dimension: int)</span>
+            <span class="k">if</span> <span class="n">line_arr</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;TOTAL_CHARES&quot;</span><span class="p">:</span>
+                <span class="n">total_chares</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">chares</span> <span class="o">=</span> <span class="p">[</span><span class="kc">None</span><span class="p">]</span> <span class="o">*</span> <span class="n">total_chares</span>
+
+            <span class="k">elif</span> <span class="n">line_arr</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;TOTAL_EPS&quot;</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">num_eps</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+
+            <span class="c1"># get num processors</span>
+            <span class="k">elif</span> <span class="n">line_arr</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;PROCESSORS&quot;</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">num_pes</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+
+            <span class="c1"># create message array</span>
+            <span class="k">elif</span> <span class="n">line_arr</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;TOTAL_MSGS&quot;</span><span class="p">:</span>
+                <span class="n">total_messages</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">message_table</span> <span class="o">=</span> <span class="p">[</span><span class="kc">None</span><span class="p">]</span> <span class="o">*</span> <span class="n">total_messages</span>
+            <span class="k">elif</span> <span class="n">line_arr</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;TIMESTAMP&quot;</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">timestamp_string</span> <span class="o">=</span> <span class="n">line_arr</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+
+            <span class="c1"># Add to self.chares</span>
+            <span class="k">elif</span> <span class="n">line_arr</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;CHARE&quot;</span><span class="p">:</span>
+                <span class="nb">id</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+                <span class="n">name</span> <span class="o">=</span> <span class="n">line_arr</span><span class="p">[</span><span class="mi">2</span><span class="p">][</span><span class="mi">1</span> <span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span>
+                <span class="n">dimensions</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">3</span><span class="p">])</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">chares</span><span class="p">[</span><span class="nb">id</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">dimensions</span><span class="p">)</span>
+                <span class="c1"># print(int(line_arr[1]), line_arr[2][1:len(line_arr[2]) - 1])</span>
+
+            <span class="c1"># add to self.entries</span>
+            <span class="k">elif</span> <span class="n">line_arr</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;ENTRY&quot;</span><span class="p">:</span>
+                <span class="c1"># Need to concat entry_name</span>
+                <span class="k">while</span> <span class="ow">not</span> <span class="n">line_arr</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s1">&#39;&quot;&#39;</span><span class="p">):</span>
+                    <span class="n">line_arr</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span> <span class="o">=</span> <span class="n">line_arr</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span> <span class="o">+</span> <span class="s2">&quot; &quot;</span> <span class="o">+</span> <span class="n">line_arr</span><span class="p">[</span><span class="mi">4</span><span class="p">]</span>
+                    <span class="k">del</span> <span class="n">line_arr</span><span class="p">[</span><span class="mi">4</span><span class="p">]</span>
+
+                <span class="nb">id</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span>
+                <span class="n">entry_name</span> <span class="o">=</span> <span class="n">line_arr</span><span class="p">[</span><span class="mi">3</span><span class="p">][</span><span class="mi">1</span> <span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">3</span><span class="p">])</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span>
+                <span class="n">chare_id</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">4</span><span class="p">])</span>
+                <span class="c1"># name = self.chares[chare_id][0] + &#39;::&#39; + entry_name</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">entries</span><span class="p">[</span><span class="nb">id</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">entry_name</span><span class="p">,</span> <span class="n">chare_id</span><span class="p">)</span>
+
+            <span class="c1"># Add to message_table</span>
+            <span class="c1"># Need clarification on this, as message_table is never referenced in</span>
+            <span class="c1"># projections</span>
+            <span class="k">elif</span> <span class="n">line_arr</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;MESSAGE&quot;</span><span class="p">:</span>
+                <span class="nb">id</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+                <span class="n">message_size</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">message_table</span><span class="p">[</span><span class="nb">id</span><span class="p">]</span> <span class="o">=</span> <span class="n">message_size</span>
+
+            <span class="c1"># Read/store event</span>
+            <span class="k">elif</span> <span class="n">line_arr</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;EVENT&quot;</span><span class="p">:</span>
+                <span class="nb">id</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+                <span class="n">event_name</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+                <span class="c1"># rest of line is the event name</span>
+                <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">line_arr</span><span class="p">)):</span>
+                    <span class="n">event_name</span> <span class="o">=</span> <span class="n">event_name</span> <span class="o">+</span> <span class="n">line_arr</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">+</span> <span class="s2">&quot; &quot;</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">user_events</span><span class="p">[</span><span class="nb">id</span><span class="p">]</span> <span class="o">=</span> <span class="n">event_name</span>
+
+            <span class="c1"># Read/store user stat</span>
+            <span class="k">elif</span> <span class="n">line_arr</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;STAT&quot;</span><span class="p">:</span>
+                <span class="nb">id</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+                <span class="n">event_name</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+                <span class="c1"># rest of line is the stat</span>
+                <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">line_arr</span><span class="p">)):</span>
+                    <span class="n">event_name</span> <span class="o">=</span> <span class="n">event_name</span> <span class="o">+</span> <span class="n">line_arr</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">+</span> <span class="s2">&quot; &quot;</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">user_stats</span><span class="p">[</span><span class="nb">id</span><span class="p">]</span> <span class="o">=</span> <span class="n">event_name</span>
+
+            <span class="c1"># create papi array</span>
+            <span class="k">elif</span> <span class="n">line_arr</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;TOTAL_PAPI_EVENTS&quot;</span><span class="p">:</span>
+                <span class="n">num_papi_events</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">papi_event_names</span> <span class="o">=</span> <span class="p">[</span><span class="kc">None</span><span class="p">]</span> <span class="o">*</span> <span class="n">num_papi_events</span>
+
+            <span class="c1"># Unsure of what these are for</span>
+            <span class="k">elif</span> <span class="n">line_arr</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;PAPI_EVENT&quot;</span><span class="p">:</span>
+                <span class="nb">id</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+                <span class="n">papi_event</span> <span class="o">=</span> <span class="n">line_arr</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">papi_event_names</span><span class="p">[</span><span class="nb">id</span><span class="p">]</span> <span class="o">=</span> <span class="n">papi_event</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">sts_file</span><span class="o">.</span><span class="n">close</span><span class="p">()</span></div></div>
+
+
+<div class="viewcode-block" id="ProjectionsReader"><a class="viewcode-back" href="../../../source/pipit.readers.html#pipit.readers.projections_reader.ProjectionsReader">[docs]</a><span class="k">class</span> <span class="nc">ProjectionsReader</span><span class="p">:</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">projections_directory</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">num_processes</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">create_cct</span><span class="o">=</span><span class="kc">False</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">projections_directory</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Not a valid directory.&quot;</span><span class="p">)</span>
+
+        <span class="c1"># iterate through files in the directory to find sts file</span>
+        <span class="n">directory_contents</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">listdir</span><span class="p">(</span><span class="n">projections_directory</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">file</span> <span class="ow">in</span> <span class="n">directory_contents</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">file</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;.sts&quot;</span><span class="p">):</span>
+                <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;executable_location&quot;</span><span class="p">):</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                        <span class="s2">&quot;Invalid directory for projections - multiple sts files found.&quot;</span>
+                    <span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">executable_name</span> <span class="o">=</span> <span class="n">file</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="o">-</span><span class="mi">4</span><span class="p">]</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">executable_location</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+                        <span class="n">projections_directory</span><span class="p">,</span> <span class="n">executable_name</span>
+                    <span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;executable_location&quot;</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Invalid directory for projections - no sts files found.&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">num_pes</span> <span class="o">=</span> <span class="n">STSReader</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">executable_location</span> <span class="o">+</span> <span class="s2">&quot;.sts&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">num_pes</span>
+
+        <span class="c1"># make sure all the log files exist</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_pes</span><span class="p">):</span>
+            <span class="n">log_file</span> <span class="o">=</span> <span class="n">executable_name</span> <span class="o">+</span> <span class="s2">&quot;.&quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="o">+</span> <span class="s2">&quot;.log.gz&quot;</span>
+            <span class="k">if</span> <span class="n">log_file</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">directory_contents</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="p">(</span>
+                        <span class="s2">&quot;Invalid directory for projections - the sts file states that&quot;</span>
+                        <span class="s2">&quot;there are &quot;</span>
+                    <span class="p">)</span>
+                    <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
+                    <span class="o">+</span> <span class="s2">&quot; PEs, but log file &quot;</span>
+                    <span class="o">+</span> <span class="n">log_file</span>
+                    <span class="o">+</span> <span class="s2">&quot; is missing.&quot;</span>
+                <span class="p">)</span>
+
+        <span class="n">num_cpus</span> <span class="o">=</span> <span class="n">mp</span><span class="o">.</span><span class="n">cpu_count</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">num_processes</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">num_processes</span> <span class="o">&lt;</span> <span class="mi">1</span> <span class="ow">or</span> <span class="n">num_processes</span> <span class="o">&gt;</span> <span class="n">num_cpus</span><span class="p">:</span>
+            <span class="c1"># uses all processes to parallelize reading by default</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">num_processes</span> <span class="o">=</span> <span class="n">num_cpus</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">num_processes</span> <span class="o">=</span> <span class="n">num_processes</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">create_cct</span> <span class="o">=</span> <span class="n">create_cct</span>
+
+    <span class="c1"># Returns an empty dict, used for reading log file into dataframe</span>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_create_empty_dict</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s2">&quot;Name&quot;</span><span class="p">:</span> <span class="p">[],</span>
+            <span class="s2">&quot;Event Type&quot;</span><span class="p">:</span> <span class="p">[],</span>
+            <span class="s2">&quot;Timestamp (ns)&quot;</span><span class="p">:</span> <span class="p">[],</span>
+            <span class="s2">&quot;Process&quot;</span><span class="p">:</span> <span class="p">[],</span>
+            <span class="s2">&quot;Attributes&quot;</span><span class="p">:</span> <span class="p">[],</span>
+        <span class="p">}</span>
+
+<div class="viewcode-block" id="ProjectionsReader.read"><a class="viewcode-back" href="../../../source/pipit.readers.html#pipit.readers.projections_reader.ProjectionsReader.read">[docs]</a>    <span class="k">def</span> <span class="nf">read</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_pes</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_processes</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_pes</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">num_processes</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_pes</span>
+
+        <span class="n">pool_size</span><span class="p">,</span> <span class="n">pool</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_processes</span><span class="p">,</span> <span class="n">mp</span><span class="o">.</span><span class="n">Pool</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_processes</span><span class="p">)</span>
+
+        <span class="c1"># Read each log file and store as list of dataframes</span>
+        <span class="n">dataframes_list</span> <span class="o">=</span> <span class="n">pool</span><span class="o">.</span><span class="n">map</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_read_log_file</span><span class="p">,</span> <span class="p">[(</span><span class="n">rank</span><span class="p">,</span> <span class="n">pool_size</span><span class="p">)</span> <span class="k">for</span> <span class="n">rank</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">pool_size</span><span class="p">)]</span>
+        <span class="p">)</span>
+
+        <span class="n">pool</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+
+        <span class="c1"># Concatenate the dataframes list into dataframe containing entire trace</span>
+        <span class="n">trace_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">(</span><span class="n">dataframes_list</span><span class="p">,</span> <span class="n">ignore_index</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">trace_df</span><span class="o">.</span><span class="n">sort_values</span><span class="p">(</span>
+            <span class="n">by</span><span class="o">=</span><span class="s2">&quot;Timestamp (ns)&quot;</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">ascending</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ignore_index</span><span class="o">=</span><span class="kc">True</span>
+        <span class="p">)</span>
+
+        <span class="c1"># categorical for memory savings</span>
+        <span class="n">trace_df</span> <span class="o">=</span> <span class="n">trace_df</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span>
+            <span class="p">{</span>
+                <span class="s2">&quot;Name&quot;</span><span class="p">:</span> <span class="s2">&quot;category&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;Event Type&quot;</span><span class="p">:</span> <span class="s2">&quot;category&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;Process&quot;</span><span class="p">:</span> <span class="s2">&quot;category&quot;</span><span class="p">,</span>
+            <span class="p">}</span>
+        <span class="p">)</span>
+
+        <span class="c1"># re-order columns</span>
+        <span class="n">trace_df</span> <span class="o">=</span> <span class="n">trace_df</span><span class="p">[</span>
+            <span class="p">[</span><span class="s2">&quot;Timestamp (ns)&quot;</span><span class="p">,</span> <span class="s2">&quot;Event Type&quot;</span><span class="p">,</span> <span class="s2">&quot;Name&quot;</span><span class="p">,</span> <span class="s2">&quot;Process&quot;</span><span class="p">,</span> <span class="s2">&quot;Attributes&quot;</span><span class="p">]</span>
+        <span class="p">]</span>
+
+        <span class="n">trace</span> <span class="o">=</span> <span class="n">pipit</span><span class="o">.</span><span class="n">trace</span><span class="o">.</span><span class="n">Trace</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="n">trace_df</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_cct</span><span class="p">:</span>
+            <span class="n">trace</span><span class="o">.</span><span class="n">create_cct</span><span class="p">()</span>
+
+        <span class="k">return</span> <span class="n">trace</span></div>
+
+    <span class="k">def</span> <span class="nf">_read_log_file</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rank_size</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+        <span class="c1"># has information needed in sts file</span>
+        <span class="n">sts_reader</span> <span class="o">=</span> <span class="n">STSReader</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">executable_location</span> <span class="o">+</span> <span class="s2">&quot;.sts&quot;</span><span class="p">)</span>
+
+        <span class="n">rank</span><span class="p">,</span> <span class="n">size</span> <span class="o">=</span> <span class="n">rank_size</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">rank_size</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">per_process</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_pes</span> <span class="o">//</span> <span class="n">size</span><span class="p">)</span>
+        <span class="n">remainder</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_pes</span> <span class="o">%</span> <span class="n">size</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">rank</span> <span class="o">&lt;</span> <span class="n">remainder</span><span class="p">:</span>
+            <span class="n">begin_int</span> <span class="o">=</span> <span class="n">rank</span> <span class="o">*</span> <span class="p">(</span><span class="n">per_process</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+            <span class="n">end_int</span> <span class="o">=</span> <span class="p">(</span><span class="n">rank</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">per_process</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">begin_int</span> <span class="o">=</span> <span class="p">(</span><span class="n">rank</span> <span class="o">*</span> <span class="n">per_process</span><span class="p">)</span> <span class="o">+</span> <span class="n">remainder</span>
+            <span class="n">end_int</span> <span class="o">=</span> <span class="p">((</span><span class="n">rank</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="n">per_process</span><span class="p">)</span> <span class="o">+</span> <span class="n">remainder</span>
+
+        <span class="n">dfs</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">pe_num</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">begin_int</span><span class="p">,</span> <span class="n">end_int</span><span class="p">,</span> <span class="mi">1</span><span class="p">):</span>
+            <span class="c1"># create an empty dict to append to</span>
+            <span class="n">data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_empty_dict</span><span class="p">()</span>
+
+            <span class="c1"># opening the log file we need to read</span>
+            <span class="n">log_file</span> <span class="o">=</span> <span class="n">gzip</span><span class="o">.</span><span class="n">open</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">executable_location</span> <span class="o">+</span> <span class="s2">&quot;.&quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">pe_num</span><span class="p">)</span> <span class="o">+</span> <span class="s2">&quot;.log.gz&quot;</span><span class="p">,</span> <span class="s2">&quot;rt&quot;</span>
+            <span class="p">)</span>
+
+            <span class="c1"># Basing read on projections log reader and log entry viewer</span>
+            <span class="c1"># Iterated through every line in the file and adds to dict</span>
+            <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">log_file</span><span class="p">:</span>
+                <span class="n">line_arr</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">()</span>
+
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">line_arr</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">isnumeric</span><span class="p">():</span>
+                    <span class="k">pass</span>
+
+                <span class="k">elif</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">==</span> <span class="n">ProjectionsConstants</span><span class="o">.</span><span class="n">BEGIN_IDLE</span><span class="p">:</span>
+                    <span class="n">time</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="o">*</span> <span class="mi">1000</span>
+                    <span class="n">pe</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span>
+
+                    <span class="n">details</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;From PE&quot;</span><span class="p">:</span> <span class="n">pe</span><span class="p">}</span>
+
+                    <span class="n">_add_to_trace_dict</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="s2">&quot;Idle&quot;</span><span class="p">,</span> <span class="s2">&quot;Enter&quot;</span><span class="p">,</span> <span class="n">time</span><span class="p">,</span> <span class="n">pe_num</span><span class="p">,</span> <span class="n">details</span><span class="p">)</span>
+
+                <span class="k">elif</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">==</span> <span class="n">ProjectionsConstants</span><span class="o">.</span><span class="n">END_IDLE</span><span class="p">:</span>
+                    <span class="n">time</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="o">*</span> <span class="mi">1000</span>
+                    <span class="n">pe</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span>
+
+                    <span class="n">details</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;From PE&quot;</span><span class="p">:</span> <span class="n">pe</span><span class="p">}</span>
+
+                    <span class="n">_add_to_trace_dict</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="s2">&quot;Idle&quot;</span><span class="p">,</span> <span class="s2">&quot;Leave&quot;</span><span class="p">,</span> <span class="n">time</span><span class="p">,</span> <span class="n">pe_num</span><span class="p">,</span> <span class="n">details</span><span class="p">)</span>
+
+                <span class="c1"># Pack message to be sent</span>
+                <span class="k">elif</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">==</span> <span class="n">ProjectionsConstants</span><span class="o">.</span><span class="n">BEGIN_PACK</span><span class="p">:</span>
+                    <span class="n">time</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="o">*</span> <span class="mi">1000</span>
+                    <span class="n">pe</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span>
+
+                    <span class="n">details</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;From PE&quot;</span><span class="p">:</span> <span class="n">pe</span><span class="p">}</span>
+
+                    <span class="n">_add_to_trace_dict</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="s2">&quot;Pack&quot;</span><span class="p">,</span> <span class="s2">&quot;Enter&quot;</span><span class="p">,</span> <span class="n">time</span><span class="p">,</span> <span class="n">pe_num</span><span class="p">,</span> <span class="n">details</span><span class="p">)</span>
+
+                <span class="k">elif</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">==</span> <span class="n">ProjectionsConstants</span><span class="o">.</span><span class="n">END_PACK</span><span class="p">:</span>
+                    <span class="n">time</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="o">*</span> <span class="mi">1000</span>
+                    <span class="n">pe</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span>
+
+                    <span class="n">details</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;From PE&quot;</span><span class="p">:</span> <span class="n">pe</span><span class="p">}</span>
+
+                    <span class="n">_add_to_trace_dict</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="s2">&quot;Pack&quot;</span><span class="p">,</span> <span class="s2">&quot;Leave&quot;</span><span class="p">,</span> <span class="n">time</span><span class="p">,</span> <span class="n">pe_num</span><span class="p">,</span> <span class="n">details</span><span class="p">)</span>
+
+                <span class="c1"># Unpacking a received message</span>
+                <span class="k">elif</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">==</span> <span class="n">ProjectionsConstants</span><span class="o">.</span><span class="n">BEGIN_UNPACK</span><span class="p">:</span>
+                    <span class="n">time</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="o">*</span> <span class="mi">1000</span>
+                    <span class="n">pe</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span>
+
+                    <span class="n">details</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;From PE&quot;</span><span class="p">:</span> <span class="n">pe</span><span class="p">}</span>
+
+                    <span class="n">_add_to_trace_dict</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="s2">&quot;Unpack&quot;</span><span class="p">,</span> <span class="s2">&quot;Enter&quot;</span><span class="p">,</span> <span class="n">time</span><span class="p">,</span> <span class="n">pe_num</span><span class="p">,</span> <span class="n">details</span><span class="p">)</span>
+
+                <span class="k">elif</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">==</span> <span class="n">ProjectionsConstants</span><span class="o">.</span><span class="n">END_UNPACK</span><span class="p">:</span>
+                    <span class="n">time</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="o">*</span> <span class="mi">1000</span>
+                    <span class="n">pe</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span>
+
+                    <span class="n">details</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;From PE&quot;</span><span class="p">:</span> <span class="n">pe</span><span class="p">}</span>
+
+                    <span class="n">_add_to_trace_dict</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="s2">&quot;Unpack&quot;</span><span class="p">,</span> <span class="s2">&quot;Leave&quot;</span><span class="p">,</span> <span class="n">time</span><span class="p">,</span> <span class="n">pe_num</span><span class="p">,</span> <span class="n">details</span><span class="p">)</span>
+
+                <span class="k">elif</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">==</span> <span class="n">ProjectionsConstants</span><span class="o">.</span><span class="n">USER_SUPPLIED</span><span class="p">:</span>
+                    <span class="n">user_supplied</span> <span class="o">=</span> <span class="n">line_arr</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+                    <span class="n">details</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;User Supplied&quot;</span><span class="p">:</span> <span class="n">user_supplied</span><span class="p">}</span>
+
+                    <span class="n">_add_to_trace_dict</span><span class="p">(</span>
+                        <span class="n">data</span><span class="p">,</span> <span class="s2">&quot;User Supplied&quot;</span><span class="p">,</span> <span class="s2">&quot;Instant&quot;</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">pe_num</span><span class="p">,</span> <span class="n">details</span>
+                    <span class="p">)</span>
+
+                <span class="k">elif</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">==</span> <span class="n">ProjectionsConstants</span><span class="o">.</span><span class="n">USER_SUPPLIED_NOTE</span><span class="p">:</span>
+                    <span class="n">time</span> <span class="o">=</span> <span class="n">line_arr</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="mi">1000</span>
+                    <span class="n">note</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+                    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">line_arr</span><span class="p">)):</span>
+                        <span class="n">note</span> <span class="o">=</span> <span class="n">note</span> <span class="o">+</span> <span class="n">line_arr</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">+</span> <span class="s2">&quot; &quot;</span>
+
+                    <span class="n">details</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;Note&quot;</span><span class="p">:</span> <span class="n">note</span><span class="p">}</span>
+
+                    <span class="n">_add_to_trace_dict</span><span class="p">(</span>
+                        <span class="n">data</span><span class="p">,</span> <span class="s2">&quot;User Supplied Note&quot;</span><span class="p">,</span> <span class="s2">&quot;Instant&quot;</span><span class="p">,</span> <span class="n">time</span><span class="p">,</span> <span class="n">pe_num</span><span class="p">,</span> <span class="n">details</span>
+                    <span class="p">)</span>
+
+                <span class="c1"># Not sure if this should be instant or enter/leave</span>
+                <span class="k">elif</span> <span class="p">(</span>
+                    <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+                    <span class="o">==</span> <span class="n">ProjectionsConstants</span><span class="o">.</span><span class="n">USER_SUPPLIED_BRACKETED_NOTE</span>
+                <span class="p">):</span>
+                    <span class="n">time</span> <span class="o">=</span> <span class="n">line_arr</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="mi">1000</span>
+                    <span class="n">end_time</span> <span class="o">=</span> <span class="n">line_arr</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">*</span> <span class="mi">1000</span>
+                    <span class="n">user_event_id</span> <span class="o">=</span> <span class="n">line_arr</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span>
+                    <span class="n">note</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+                    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">line_arr</span><span class="p">)):</span>
+                        <span class="n">note</span> <span class="o">=</span> <span class="n">note</span> <span class="o">+</span> <span class="n">line_arr</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">+</span> <span class="s2">&quot; &quot;</span>
+                    <span class="n">note</span> <span class="o">=</span> <span class="n">note</span> <span class="o">+</span> <span class="s1">&#39;&quot;&#39;</span>
+
+                    <span class="n">details</span> <span class="o">=</span> <span class="p">{</span>
+                        <span class="s2">&quot;Event ID&quot;</span><span class="p">:</span> <span class="n">user_event_id</span><span class="p">,</span>
+                        <span class="s2">&quot;Event Name&quot;</span><span class="p">:</span> <span class="n">sts_reader</span><span class="o">.</span><span class="n">get_event_name</span><span class="p">(</span><span class="n">user_event_id</span><span class="p">),</span>
+                        <span class="s2">&quot;Note&quot;</span><span class="p">:</span> <span class="n">note</span><span class="p">,</span>
+                    <span class="p">}</span>
+
+                    <span class="n">_add_to_trace_dict</span><span class="p">(</span>
+                        <span class="n">data</span><span class="p">,</span>
+                        <span class="s2">&quot;User Supplied Bracketed Note&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;Enter&quot;</span><span class="p">,</span>
+                        <span class="n">time</span><span class="p">,</span>
+                        <span class="n">pe_num</span><span class="p">,</span>
+                        <span class="n">details</span><span class="p">,</span>
+                    <span class="p">)</span>
+
+                    <span class="n">_add_to_trace_dict</span><span class="p">(</span>
+                        <span class="n">data</span><span class="p">,</span>
+                        <span class="s2">&quot;User Supplied Bracketed Note&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;Leave&quot;</span><span class="p">,</span>
+                        <span class="n">end_time</span><span class="p">,</span>
+                        <span class="n">pe_num</span><span class="p">,</span>
+                        <span class="n">details</span><span class="p">,</span>
+                    <span class="p">)</span>
+
+                <span class="c1"># Memory Usage at timestamp</span>
+                <span class="k">elif</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">==</span> <span class="n">ProjectionsConstants</span><span class="o">.</span><span class="n">MEMORY_USAGE</span><span class="p">:</span>
+                    <span class="n">memory_usage</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+                    <span class="n">time</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span> <span class="o">*</span> <span class="mi">1000</span>
+
+                    <span class="n">details</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;Memory Usage&quot;</span><span class="p">:</span> <span class="n">memory_usage</span><span class="p">}</span>
+
+                    <span class="n">_add_to_trace_dict</span><span class="p">(</span>
+                        <span class="n">data</span><span class="p">,</span> <span class="s2">&quot;Memory Usage&quot;</span><span class="p">,</span> <span class="s2">&quot;Instant&quot;</span><span class="p">,</span> <span class="n">time</span><span class="p">,</span> <span class="n">pe_num</span><span class="p">,</span> <span class="n">details</span>
+                    <span class="p">)</span>
+
+                <span class="c1"># New chare create message being sent</span>
+                <span class="k">elif</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">==</span> <span class="n">ProjectionsConstants</span><span class="o">.</span><span class="n">CREATION</span><span class="p">:</span>
+                    <span class="n">mtype</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+                    <span class="n">entry</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span>
+                    <span class="n">time</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">3</span><span class="p">])</span> <span class="o">*</span> <span class="mi">1000</span>
+                    <span class="n">event</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">4</span><span class="p">])</span>
+                    <span class="n">pe</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">5</span><span class="p">])</span>
+                    <span class="n">msglen</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">6</span><span class="p">])</span>
+                    <span class="n">send_time</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">7</span><span class="p">])</span> <span class="o">*</span> <span class="mi">1000</span>
+
+                    <span class="n">details</span> <span class="o">=</span> <span class="p">{</span>
+                        <span class="s2">&quot;From PE&quot;</span><span class="p">:</span> <span class="n">pe</span><span class="p">,</span>
+                        <span class="s2">&quot;MType&quot;</span><span class="p">:</span> <span class="n">mtype</span><span class="p">,</span>
+                        <span class="s2">&quot;Entry Type&quot;</span><span class="p">:</span> <span class="s2">&quot;Create&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;Message Length&quot;</span><span class="p">:</span> <span class="n">msglen</span><span class="p">,</span>
+                        <span class="s2">&quot;Event ID&quot;</span><span class="p">:</span> <span class="n">event</span><span class="p">,</span>
+                        <span class="s2">&quot;Send Time&quot;</span><span class="p">:</span> <span class="n">send_time</span><span class="p">,</span>
+                    <span class="p">}</span>
+
+                    <span class="n">_add_to_trace_dict</span><span class="p">(</span>
+                        <span class="n">data</span><span class="p">,</span>
+                        <span class="n">sts_reader</span><span class="o">.</span><span class="n">get_entry_name</span><span class="p">(</span><span class="n">entry</span><span class="p">),</span>
+                        <span class="s2">&quot;Instant&quot;</span><span class="p">,</span>
+                        <span class="n">time</span><span class="p">,</span>
+                        <span class="n">pe_num</span><span class="p">,</span>
+                        <span class="n">details</span><span class="p">,</span>
+                    <span class="p">)</span>
+
+                <span class="k">elif</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">==</span> <span class="n">ProjectionsConstants</span><span class="o">.</span><span class="n">CREATION_MULTICAST</span><span class="p">:</span>
+                    <span class="n">mtype</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+                    <span class="n">entry</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span>
+                    <span class="n">time</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">3</span><span class="p">])</span> <span class="o">*</span> <span class="mi">1000</span>
+                    <span class="n">event</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">4</span><span class="p">])</span>
+                    <span class="n">pe</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">5</span><span class="p">])</span>
+                    <span class="n">msglen</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">6</span><span class="p">])</span>
+                    <span class="n">send_time</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">7</span><span class="p">])</span> <span class="o">*</span> <span class="mi">1000</span>
+                    <span class="n">numPEs</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">8</span><span class="p">])</span>
+                    <span class="n">destPEs</span> <span class="o">=</span> <span class="p">[]</span>
+                    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">numPEs</span><span class="p">):</span>
+                        <span class="n">destPEs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">9</span> <span class="o">+</span> <span class="n">i</span><span class="p">]))</span>
+
+                    <span class="n">details</span> <span class="o">=</span> <span class="p">{</span>
+                        <span class="s2">&quot;From PE&quot;</span><span class="p">:</span> <span class="n">pe</span><span class="p">,</span>
+                        <span class="s2">&quot;Message Type&quot;</span><span class="p">:</span> <span class="n">mtype</span><span class="p">,</span>
+                        <span class="s2">&quot;Entry Type&quot;</span><span class="p">:</span> <span class="s2">&quot;Multicast&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;Message Length&quot;</span><span class="p">:</span> <span class="n">msglen</span><span class="p">,</span>
+                        <span class="s2">&quot;Event ID&quot;</span><span class="p">:</span> <span class="n">event</span><span class="p">,</span>
+                        <span class="s2">&quot;Send Time&quot;</span><span class="p">:</span> <span class="n">send_time</span><span class="p">,</span>
+                        <span class="s2">&quot;Destinatopn PEs&quot;</span><span class="p">:</span> <span class="n">destPEs</span><span class="p">,</span>
+                    <span class="p">}</span>
+
+                    <span class="n">_add_to_trace_dict</span><span class="p">(</span>
+                        <span class="n">data</span><span class="p">,</span>
+                        <span class="n">sts_reader</span><span class="o">.</span><span class="n">get_entry_name</span><span class="p">(</span><span class="n">entry</span><span class="p">),</span>
+                        <span class="s2">&quot;Instant&quot;</span><span class="p">,</span>
+                        <span class="n">time</span><span class="p">,</span>
+                        <span class="n">pe_num</span><span class="p">,</span>
+                        <span class="s2">&quot;To &quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">numPEs</span><span class="p">)</span> <span class="o">+</span> <span class="s2">&quot;processors&quot;</span><span class="p">,</span>
+                    <span class="p">)</span>
+
+                <span class="c1"># Processing of chare (i.e. execution) ?</span>
+                <span class="k">elif</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">==</span> <span class="n">ProjectionsConstants</span><span class="o">.</span><span class="n">BEGIN_PROCESSING</span><span class="p">:</span>
+                    <span class="n">mtype</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+                    <span class="n">entry</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span>
+                    <span class="n">time</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">3</span><span class="p">])</span> <span class="o">*</span> <span class="mi">1000</span>
+                    <span class="n">event</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">4</span><span class="p">])</span>
+                    <span class="n">pe</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">5</span><span class="p">])</span>
+                    <span class="n">msglen</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">6</span><span class="p">])</span>
+                    <span class="n">recv_time</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">7</span><span class="p">])</span>
+                    <span class="n">dimensions</span> <span class="o">=</span> <span class="n">sts_reader</span><span class="o">.</span><span class="n">get_dimension</span><span class="p">(</span><span class="n">entry</span><span class="p">)</span>
+                    <span class="nb">id</span> <span class="o">=</span> <span class="p">[]</span>
+                    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">8</span> <span class="o">+</span> <span class="n">dimensions</span><span class="p">):</span>
+                        <span class="nb">id</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="n">i</span><span class="p">]))</span>
+                    <span class="n">cpu_start_time</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">8</span> <span class="o">+</span> <span class="n">dimensions</span><span class="p">])</span>
+
+                    <span class="n">num_perf_counts</span> <span class="o">=</span> <span class="n">sts_reader</span><span class="o">.</span><span class="n">get_num_perf_counts</span><span class="p">()</span>
+                    <span class="n">perf_counts</span> <span class="o">=</span> <span class="p">[]</span>
+                    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">9</span> <span class="o">+</span> <span class="n">dimensions</span><span class="p">,</span> <span class="mi">9</span> <span class="o">+</span> <span class="n">dimensions</span> <span class="o">+</span> <span class="n">num_perf_counts</span><span class="p">):</span>
+                        <span class="n">perf_counts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="n">i</span><span class="p">]))</span>
+
+                    <span class="n">details</span> <span class="o">=</span> <span class="p">{</span>
+                        <span class="s2">&quot;From PE&quot;</span><span class="p">:</span> <span class="n">pe</span><span class="p">,</span>
+                        <span class="s2">&quot;Message Type&quot;</span><span class="p">:</span> <span class="n">mtype</span><span class="p">,</span>
+                        <span class="s2">&quot;Entry Type&quot;</span><span class="p">:</span> <span class="s2">&quot;Processing&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;Event ID&quot;</span><span class="p">:</span> <span class="n">event</span><span class="p">,</span>
+                        <span class="s2">&quot;Message Length&quot;</span><span class="p">:</span> <span class="n">msglen</span><span class="p">,</span>
+                        <span class="s2">&quot;Recieve Time&quot;</span><span class="p">:</span> <span class="n">recv_time</span><span class="p">,</span>
+                        <span class="s2">&quot;ID List&quot;</span><span class="p">:</span> <span class="nb">id</span><span class="p">,</span>
+                        <span class="s2">&quot;CPU Start Time&quot;</span><span class="p">:</span> <span class="n">cpu_start_time</span><span class="p">,</span>
+                        <span class="s2">&quot;perf counts list&quot;</span><span class="p">:</span> <span class="n">perf_counts</span><span class="p">,</span>
+                    <span class="p">}</span>
+
+                    <span class="n">_add_to_trace_dict</span><span class="p">(</span>
+                        <span class="n">data</span><span class="p">,</span>
+                        <span class="n">sts_reader</span><span class="o">.</span><span class="n">get_entry_name</span><span class="p">(</span><span class="n">entry</span><span class="p">),</span>
+                        <span class="s2">&quot;Enter&quot;</span><span class="p">,</span>
+                        <span class="n">time</span><span class="p">,</span>
+                        <span class="n">pe_num</span><span class="p">,</span>
+                        <span class="n">details</span><span class="p">,</span>
+                    <span class="p">)</span>
+
+                <span class="k">elif</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">==</span> <span class="n">ProjectionsConstants</span><span class="o">.</span><span class="n">END_PROCESSING</span><span class="p">:</span>
+                    <span class="n">mtype</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+                    <span class="n">entry</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span>
+                    <span class="n">time</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">3</span><span class="p">])</span> <span class="o">*</span> <span class="mi">1000</span>
+                    <span class="n">event</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">4</span><span class="p">])</span>
+                    <span class="n">pe</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">5</span><span class="p">])</span>
+                    <span class="n">msglen</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">6</span><span class="p">])</span>
+                    <span class="n">cpu_end_time</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">7</span><span class="p">])</span>
+                    <span class="n">num_perf_counts</span> <span class="o">=</span> <span class="n">sts_reader</span><span class="o">.</span><span class="n">get_num_perf_counts</span><span class="p">()</span>
+                    <span class="n">perf_counts</span> <span class="o">=</span> <span class="p">[]</span>
+                    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_perf_counts</span><span class="p">):</span>
+                        <span class="n">perf_counts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">8</span> <span class="o">+</span> <span class="n">i</span><span class="p">]))</span>
+
+                    <span class="n">details</span> <span class="o">=</span> <span class="p">{</span>
+                        <span class="s2">&quot;From PE&quot;</span><span class="p">:</span> <span class="n">pe</span><span class="p">,</span>
+                        <span class="s2">&quot;Message Type&quot;</span><span class="p">:</span> <span class="n">mtype</span><span class="p">,</span>
+                        <span class="s2">&quot;Entry Name&quot;</span><span class="p">:</span> <span class="s2">&quot;Processing&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;Event ID&quot;</span><span class="p">:</span> <span class="n">event</span><span class="p">,</span>
+                        <span class="s2">&quot;Message Length&quot;</span><span class="p">:</span> <span class="n">msglen</span><span class="p">,</span>
+                        <span class="s2">&quot;CPU End Time&quot;</span><span class="p">:</span> <span class="n">cpu_end_time</span><span class="p">,</span>
+                        <span class="s2">&quot;perf counts list&quot;</span><span class="p">:</span> <span class="n">perf_counts</span><span class="p">,</span>
+                    <span class="p">}</span>
+
+                    <span class="n">_add_to_trace_dict</span><span class="p">(</span>
+                        <span class="n">data</span><span class="p">,</span>
+                        <span class="n">sts_reader</span><span class="o">.</span><span class="n">get_entry_name</span><span class="p">(</span><span class="n">entry</span><span class="p">),</span>
+                        <span class="s2">&quot;Leave&quot;</span><span class="p">,</span>
+                        <span class="n">time</span><span class="p">,</span>
+                        <span class="n">pe_num</span><span class="p">,</span>
+                        <span class="kc">None</span><span class="p">,</span>
+                    <span class="p">)</span>
+
+                <span class="c1"># For selective tracing - when trace is called inside code</span>
+                <span class="k">elif</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">==</span> <span class="n">ProjectionsConstants</span><span class="o">.</span><span class="n">BEGIN_TRACE</span><span class="p">:</span>
+                    <span class="n">time</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="o">*</span> <span class="mi">1000</span>
+
+                    <span class="n">_add_to_trace_dict</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="s2">&quot;Trace&quot;</span><span class="p">,</span> <span class="s2">&quot;Enter&quot;</span><span class="p">,</span> <span class="n">time</span><span class="p">,</span> <span class="n">pe_num</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+
+                <span class="k">elif</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">==</span> <span class="n">ProjectionsConstants</span><span class="o">.</span><span class="n">END_TRACE</span><span class="p">:</span>
+                    <span class="n">time</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="o">*</span> <span class="mi">1000</span>
+
+                    <span class="n">_add_to_trace_dict</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="s2">&quot;Trace&quot;</span><span class="p">,</span> <span class="s2">&quot;Leave&quot;</span><span class="p">,</span> <span class="n">time</span><span class="p">,</span> <span class="n">pe_num</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+
+                <span class="c1"># Message Receive ?</span>
+                <span class="k">elif</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">==</span> <span class="n">ProjectionsConstants</span><span class="o">.</span><span class="n">MESSAGE_RECV</span><span class="p">:</span>
+                    <span class="n">mtype</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+                    <span class="n">time</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span> <span class="o">*</span> <span class="mi">1000</span>
+                    <span class="n">event</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">3</span><span class="p">])</span>
+                    <span class="n">pe</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">4</span><span class="p">])</span>
+                    <span class="n">message_length</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">5</span><span class="p">])</span>
+
+                    <span class="n">details</span> <span class="o">=</span> <span class="p">{</span>
+                        <span class="s2">&quot;From PE&quot;</span><span class="p">:</span> <span class="n">pe</span><span class="p">,</span>
+                        <span class="s2">&quot;Message Type&quot;</span><span class="p">:</span> <span class="n">mtype</span><span class="p">,</span>
+                        <span class="s2">&quot;Event ID&quot;</span><span class="p">:</span> <span class="n">event</span><span class="p">,</span>
+                        <span class="s2">&quot;Message Length&quot;</span><span class="p">:</span> <span class="n">message_length</span><span class="p">,</span>
+                    <span class="p">}</span>
+
+                    <span class="n">_add_to_trace_dict</span><span class="p">(</span>
+                        <span class="n">data</span><span class="p">,</span> <span class="s2">&quot;Message Receive&quot;</span><span class="p">,</span> <span class="s2">&quot;Instant&quot;</span><span class="p">,</span> <span class="n">time</span><span class="p">,</span> <span class="n">pe_num</span><span class="p">,</span> <span class="n">details</span>
+                    <span class="p">)</span>
+
+                <span class="c1"># queueing creation ?</span>
+                <span class="k">elif</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">==</span> <span class="n">ProjectionsConstants</span><span class="o">.</span><span class="n">ENQUEUE</span><span class="p">:</span>
+                    <span class="n">mtype</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+                    <span class="n">time</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span> <span class="o">*</span> <span class="mi">1000</span>
+                    <span class="n">event</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">3</span><span class="p">])</span>
+                    <span class="n">pe</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">4</span><span class="p">])</span>
+
+                    <span class="n">details</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;From PE&quot;</span><span class="p">:</span> <span class="n">pe</span><span class="p">,</span> <span class="s2">&quot;Message Type&quot;</span><span class="p">:</span> <span class="n">mtype</span><span class="p">,</span> <span class="s2">&quot;Event ID&quot;</span><span class="p">:</span> <span class="n">event</span><span class="p">}</span>
+
+                    <span class="n">_add_to_trace_dict</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="s2">&quot;Enque&quot;</span><span class="p">,</span> <span class="s2">&quot;Instant&quot;</span><span class="p">,</span> <span class="n">time</span><span class="p">,</span> <span class="n">pe_num</span><span class="p">,</span> <span class="n">details</span><span class="p">)</span>
+
+                <span class="k">elif</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">==</span> <span class="n">ProjectionsConstants</span><span class="o">.</span><span class="n">DEQUEUE</span><span class="p">:</span>
+                    <span class="n">mtype</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+                    <span class="n">time</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span> <span class="o">*</span> <span class="mi">1000</span>
+                    <span class="n">event</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">3</span><span class="p">])</span>
+                    <span class="n">pe</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">4</span><span class="p">])</span>
+
+                    <span class="n">details</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;From PE&quot;</span><span class="p">:</span> <span class="n">pe</span><span class="p">,</span> <span class="s2">&quot;Message Type&quot;</span><span class="p">:</span> <span class="n">mtype</span><span class="p">,</span> <span class="s2">&quot;Event ID&quot;</span><span class="p">:</span> <span class="n">event</span><span class="p">}</span>
+
+                    <span class="n">_add_to_trace_dict</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="s2">&quot;Deque&quot;</span><span class="p">,</span> <span class="s2">&quot;Instant&quot;</span><span class="p">,</span> <span class="n">time</span><span class="p">,</span> <span class="n">pe_num</span><span class="p">,</span> <span class="n">details</span><span class="p">)</span>
+
+                <span class="c1"># Interrupt from different chare ?</span>
+                <span class="k">elif</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">==</span> <span class="n">ProjectionsConstants</span><span class="o">.</span><span class="n">BEGIN_INTERRUPT</span><span class="p">:</span>
+                    <span class="n">time</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="o">*</span> <span class="mi">1000</span>
+                    <span class="n">event</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span>
+                    <span class="n">pe</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">3</span><span class="p">])</span>
+
+                    <span class="n">details</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;From PE&quot;</span><span class="p">:</span> <span class="n">pe</span><span class="p">,</span> <span class="s2">&quot;Event ID&quot;</span><span class="p">:</span> <span class="n">event</span><span class="p">}</span>
+
+                    <span class="n">_add_to_trace_dict</span><span class="p">(</span>
+                        <span class="n">data</span><span class="p">,</span> <span class="s2">&quot;Interrupt&quot;</span><span class="p">,</span> <span class="s2">&quot;Enter&quot;</span><span class="p">,</span> <span class="n">time</span><span class="p">,</span> <span class="n">pe_num</span><span class="p">,</span> <span class="n">details</span>
+                    <span class="p">)</span>
+
+                <span class="k">elif</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">==</span> <span class="n">ProjectionsConstants</span><span class="o">.</span><span class="n">END_INTERRUPT</span><span class="p">:</span>
+                    <span class="n">time</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="o">*</span> <span class="mi">1000</span>
+                    <span class="n">event</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span>
+                    <span class="n">pe</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">3</span><span class="p">])</span>
+
+                    <span class="n">details</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;From PE&quot;</span><span class="p">:</span> <span class="n">pe</span><span class="p">,</span> <span class="s2">&quot;Event ID&quot;</span><span class="p">:</span> <span class="n">event</span><span class="p">}</span>
+
+                    <span class="n">_add_to_trace_dict</span><span class="p">(</span>
+                        <span class="n">data</span><span class="p">,</span> <span class="s2">&quot;Interrupt&quot;</span><span class="p">,</span> <span class="s2">&quot;Leave&quot;</span><span class="p">,</span> <span class="n">time</span><span class="p">,</span> <span class="n">pe_num</span><span class="p">,</span> <span class="n">details</span>
+                    <span class="p">)</span>
+
+                <span class="c1"># Very start of the program - encapsulates every other event</span>
+                <span class="k">elif</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">==</span> <span class="n">ProjectionsConstants</span><span class="o">.</span><span class="n">BEGIN_COMPUTATION</span><span class="p">:</span>
+                    <span class="n">time</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="o">*</span> <span class="mi">1000</span>
+
+                    <span class="n">_add_to_trace_dict</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="s2">&quot;Computation&quot;</span><span class="p">,</span> <span class="s2">&quot;Enter&quot;</span><span class="p">,</span> <span class="n">time</span><span class="p">,</span> <span class="n">pe_num</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+
+                <span class="k">elif</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">==</span> <span class="n">ProjectionsConstants</span><span class="o">.</span><span class="n">END_COMPUTATION</span><span class="p">:</span>
+                    <span class="n">time</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="o">*</span> <span class="mi">1000</span>
+
+                    <span class="n">_add_to_trace_dict</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="s2">&quot;Computation&quot;</span><span class="p">,</span> <span class="s2">&quot;Leave&quot;</span><span class="p">,</span> <span class="n">time</span><span class="p">,</span> <span class="n">pe_num</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+
+                <span class="c1"># User event (in code)</span>
+                <span class="k">elif</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">==</span> <span class="n">ProjectionsConstants</span><span class="o">.</span><span class="n">USER_EVENT</span><span class="p">:</span>
+                    <span class="n">user_event_id</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+                    <span class="n">time</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span> <span class="o">*</span> <span class="mi">1000</span>
+                    <span class="n">event</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">3</span><span class="p">])</span>
+                    <span class="n">pe</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">4</span><span class="p">])</span>
+
+                    <span class="n">user_event_name</span> <span class="o">=</span> <span class="n">sts_reader</span><span class="o">.</span><span class="n">get_user_event</span><span class="p">(</span><span class="n">user_event_id</span><span class="p">)</span>
+
+                    <span class="n">details</span> <span class="o">=</span> <span class="p">{</span>
+                        <span class="s2">&quot;From PE&quot;</span><span class="p">:</span> <span class="n">pe</span><span class="p">,</span>
+                        <span class="s2">&quot;Event ID&quot;</span><span class="p">:</span> <span class="n">event</span><span class="p">,</span>
+                        <span class="s2">&quot;Event Type&quot;</span><span class="p">:</span> <span class="s2">&quot;User Event&quot;</span><span class="p">,</span>
+                    <span class="p">}</span>
+
+                    <span class="n">_add_to_trace_dict</span><span class="p">(</span>
+                        <span class="n">data</span><span class="p">,</span> <span class="n">user_event_name</span><span class="p">,</span> <span class="s2">&quot;Instant&quot;</span><span class="p">,</span> <span class="n">time</span><span class="p">,</span> <span class="n">pe_num</span><span class="p">,</span> <span class="n">details</span>
+                    <span class="p">)</span>
+
+                <span class="k">elif</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">==</span> <span class="n">ProjectionsConstants</span><span class="o">.</span><span class="n">USER_EVENT_PAIR</span><span class="p">:</span>
+                    <span class="n">user_event_id</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+                    <span class="n">time</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span> <span class="o">*</span> <span class="mi">1000</span>
+                    <span class="n">event</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">3</span><span class="p">])</span>
+                    <span class="n">pe</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">4</span><span class="p">])</span>
+                    <span class="n">nested_id</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">5</span><span class="p">])</span>
+
+                    <span class="n">user_event_name</span> <span class="o">=</span> <span class="n">sts_reader</span><span class="o">.</span><span class="n">get_user_event</span><span class="p">(</span><span class="n">user_event_id</span><span class="p">)</span>
+
+                    <span class="n">details</span> <span class="o">=</span> <span class="p">{</span>
+                        <span class="s2">&quot;From PE&quot;</span><span class="p">:</span> <span class="n">pe</span><span class="p">,</span>
+                        <span class="s2">&quot;Event ID&quot;</span><span class="p">:</span> <span class="n">event</span><span class="p">,</span>
+                        <span class="s2">&quot;Nested ID&quot;</span><span class="p">:</span> <span class="n">nested_id</span><span class="p">,</span>
+                        <span class="s2">&quot;Event Type&quot;</span><span class="p">:</span> <span class="s2">&quot;User Event Pair&quot;</span><span class="p">,</span>
+                    <span class="p">}</span>
+
+                    <span class="n">_add_to_trace_dict</span><span class="p">(</span>
+                        <span class="n">data</span><span class="p">,</span> <span class="n">user_event_name</span><span class="p">,</span> <span class="s2">&quot;Instant&quot;</span><span class="p">,</span> <span class="n">time</span><span class="p">,</span> <span class="n">pe_num</span><span class="p">,</span> <span class="n">details</span>
+                    <span class="p">)</span>
+
+                <span class="k">elif</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">==</span> <span class="n">ProjectionsConstants</span><span class="o">.</span><span class="n">BEGIN_USER_EVENT_PAIR</span><span class="p">:</span>
+                    <span class="n">user_event_id</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+                    <span class="n">time</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span> <span class="o">*</span> <span class="mi">1000</span>
+                    <span class="n">event</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">3</span><span class="p">])</span>
+                    <span class="n">pe</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">4</span><span class="p">])</span>
+                    <span class="n">nested_id</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">5</span><span class="p">])</span>
+
+                    <span class="n">details</span> <span class="o">=</span> <span class="p">{</span>
+                        <span class="s2">&quot;From PE&quot;</span><span class="p">:</span> <span class="n">pe</span><span class="p">,</span>
+                        <span class="s2">&quot;Event ID&quot;</span><span class="p">:</span> <span class="n">event</span><span class="p">,</span>
+                        <span class="s2">&quot;Nested ID&quot;</span><span class="p">:</span> <span class="n">nested_id</span><span class="p">,</span>
+                        <span class="s2">&quot;User Event Name&quot;</span><span class="p">:</span> <span class="n">sts_reader</span><span class="o">.</span><span class="n">get_user_event</span><span class="p">(</span><span class="n">user_event_id</span><span class="p">),</span>
+                    <span class="p">}</span>
+
+                    <span class="n">_add_to_trace_dict</span><span class="p">(</span>
+                        <span class="n">data</span><span class="p">,</span> <span class="s2">&quot;User Event Pair&quot;</span><span class="p">,</span> <span class="s2">&quot;Enter&quot;</span><span class="p">,</span> <span class="n">time</span><span class="p">,</span> <span class="n">pe_num</span><span class="p">,</span> <span class="n">details</span>
+                    <span class="p">)</span>
+
+                <span class="k">elif</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">==</span> <span class="n">ProjectionsConstants</span><span class="o">.</span><span class="n">END_USER_EVENT_PAIR</span><span class="p">:</span>
+                    <span class="n">user_event_id</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+                    <span class="n">time</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span> <span class="o">*</span> <span class="mi">1000</span>
+                    <span class="n">event</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">3</span><span class="p">])</span>
+                    <span class="n">pe</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">4</span><span class="p">])</span>
+                    <span class="n">nested_id</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">5</span><span class="p">])</span>
+
+                    <span class="n">details</span> <span class="o">=</span> <span class="p">{</span>
+                        <span class="s2">&quot;From PE&quot;</span><span class="p">:</span> <span class="n">pe</span><span class="p">,</span>
+                        <span class="s2">&quot;Event ID&quot;</span><span class="p">:</span> <span class="n">event</span><span class="p">,</span>
+                        <span class="s2">&quot;Nested ID&quot;</span><span class="p">:</span> <span class="n">nested_id</span><span class="p">,</span>
+                        <span class="s2">&quot;User Event Name&quot;</span><span class="p">:</span> <span class="n">sts_reader</span><span class="o">.</span><span class="n">get_user_event</span><span class="p">(</span><span class="n">user_event_id</span><span class="p">),</span>
+                    <span class="p">}</span>
+
+                    <span class="n">_add_to_trace_dict</span><span class="p">(</span>
+                        <span class="s2">&quot;User Event Pair&quot;</span><span class="p">,</span> <span class="s2">&quot;Leave&quot;</span><span class="p">,</span> <span class="n">time</span><span class="p">,</span> <span class="n">pe_num</span><span class="p">,</span> <span class="n">details</span>
+                    <span class="p">)</span>
+
+                <span class="c1"># User stat (in code)</span>
+                <span class="k">elif</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">==</span> <span class="n">ProjectionsConstants</span><span class="o">.</span><span class="n">USER_STAT</span><span class="p">:</span>
+                    <span class="n">time</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="o">*</span> <span class="mi">1000</span>
+                    <span class="n">user_time</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span> <span class="o">*</span> <span class="mi">1000</span>
+                    <span class="n">stat</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">3</span><span class="p">])</span>
+                    <span class="n">pe</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">4</span><span class="p">])</span>
+                    <span class="n">user_event_id</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_arr</span><span class="p">[</span><span class="mi">5</span><span class="p">])</span>
+
+                    <span class="n">user_stat_name</span> <span class="o">=</span> <span class="n">sts_reader</span><span class="o">.</span><span class="n">get_user_stat</span><span class="p">(</span><span class="n">user_event_id</span><span class="p">)</span>
+
+                    <span class="n">details</span> <span class="o">=</span> <span class="p">{</span>
+                        <span class="s2">&quot;From PE&quot;</span><span class="p">:</span> <span class="n">pe</span><span class="p">,</span>
+                        <span class="s2">&quot;User Time&quot;</span><span class="p">:</span> <span class="n">user_time</span><span class="p">,</span>
+                        <span class="s2">&quot;Stat&quot;</span><span class="p">:</span> <span class="n">stat</span><span class="p">,</span>
+                        <span class="s2">&quot;Event Type&quot;</span><span class="p">:</span> <span class="s2">&quot;User Stat&quot;</span><span class="p">,</span>
+                    <span class="p">}</span>
+
+                    <span class="n">_add_to_trace_dict</span><span class="p">(</span>
+                        <span class="n">data</span><span class="p">,</span> <span class="n">user_stat_name</span><span class="p">,</span> <span class="s2">&quot;Instant&quot;</span><span class="p">,</span> <span class="n">time</span><span class="p">,</span> <span class="n">pe_num</span><span class="p">,</span> <span class="n">details</span>
+                    <span class="p">)</span>
+
+            <span class="c1"># Making sure that the log file ends with END_COMPUTATION</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;Name&quot;</span><span class="p">])</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;Name&quot;</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">!=</span> <span class="s2">&quot;Computation&quot;</span><span class="p">:</span>
+                <span class="n">time</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;Timestamp (ns)&quot;</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="mi">1000</span>
+                <span class="n">_add_to_trace_dict</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="s2">&quot;Computation&quot;</span><span class="p">,</span> <span class="s2">&quot;Leave&quot;</span><span class="p">,</span> <span class="n">time</span><span class="p">,</span> <span class="n">pe_num</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+
+            <span class="n">log_file</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+            <span class="n">dfs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">data</span><span class="p">))</span>
+
+        <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">(</span><span class="n">dfs</span><span class="p">)</span></div>
+
+
+<span class="k">def</span> <span class="nf">_add_to_trace_dict</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">evt_type</span><span class="p">,</span> <span class="n">time</span><span class="p">,</span> <span class="n">process</span><span class="p">,</span> <span class="n">attributes</span><span class="p">):</span>
+    <span class="n">data</span><span class="p">[</span><span class="s2">&quot;Name&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+    <span class="n">data</span><span class="p">[</span><span class="s2">&quot;Event Type&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">evt_type</span><span class="p">)</span>
+    <span class="n">data</span><span class="p">[</span><span class="s2">&quot;Timestamp (ns)&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">time</span><span class="p">)</span>
+    <span class="n">data</span><span class="p">[</span><span class="s2">&quot;Process&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">process</span><span class="p">)</span>
+    <span class="n">data</span><span class="p">[</span><span class="s2">&quot;Attributes&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">attributes</span><span class="p">)</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2022-2023, Parallel Software and Systems Group, University of Maryland.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

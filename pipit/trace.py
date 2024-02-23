@@ -977,4 +977,7 @@ class Trace:
                 overlapped_comm_time / total_comm_time * 100
             )
 
+            print("Total Comm Time: " + str(total_comm_time))
+            print("Overlapped Comm Time: " + str(overlapped_comm_time))
+
         return pd.DataFrame(overlap_dict, index=["Comm-Comp Overlap %"]).T
