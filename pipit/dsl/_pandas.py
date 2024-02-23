@@ -66,22 +66,31 @@ class PandasDataset(TraceDataset):
     def show(self) -> None:
         if len(self):
             _ranks = list(self.data.keys())
-            df = (
-                pd.concat(
-                    [self.data[rank] for rank in _ranks], keys=_ranks, names=["rank"]
-                )
-                .sort_values("timestamp")
-                .reset_index()
-            )
 
             if len(self) > 20:
-                top = df.head(5).to_dict(orient="records")
-                middle = {k: "..." for k in df.columns}
-                bottom = df.tail(5).to_dict(orient="records")
+                top_df = pd.concat(
+                    [self.data[rank].head(5) for rank in _ranks], keys=_ranks, names=["rank"]
+                ).reset_index().nsmallest(5, "timestamp")
+
+                bottom_df = pd.concat(
+                    [self.data[rank].tail(5) for rank in _ranks], keys=_ranks, names=["rank"]
+                ).reset_index().nlargest(5, "timestamp").iloc[::-1]
+
+                top = top_df.to_dict(orient="records")
+                middle = {k: "..." for k in top_df.columns}
+                bottom = bottom_df.to_dict(orient="records")
+                
                 print(
                     tabulate(top + [middle] + bottom, headers="keys", tablefmt="psql")
                 )
             else:
+                df = (
+                    pd.concat(
+                        [self.data[rank] for rank in _ranks], keys=_ranks, names=["rank"]
+                    )
+                    .sort_values("timestamp")
+                    .reset_index()
+                )
                 print(tabulate(df, headers="keys", tablefmt="psql", showindex=False))
 
         print(self.__str__())
