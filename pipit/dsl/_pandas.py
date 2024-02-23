@@ -1,3 +1,4 @@
+from __future__ import annotations
 from pipit.dsl.dataset import TraceDataset, LocIndexer
 from pipit.dsl.event import Event
 from tabulate import tabulate
@@ -7,35 +8,41 @@ BUFFER_SIZE = 200
 
 
 class PandasLocIndexer(LocIndexer):
-    def __getitem__(self, key):
+    def __getitem__(self, key: tuple) -> PandasDataset | Event:
         if not isinstance(key, tuple) or len(key) != 2:
             raise ValueError("PandasLocIndexer only supports two-level indexing")
 
-        rank = key[0]
-        index = key[1]
-
-        row = self.ds.data[rank].loc[index]
-        rest = {k: v for k, v in row.items() if k not in ["rank", "idx"]}
-
-        return Event(rank=rank, idx=index, **rest)
+        rank, index = key
+        if isinstance(rank, int):
+            df = self.ds.data[rank]
+            if isinstance(index, int):
+                row = df.loc[index]
+                rest = {k: v for k, v in row.items() if k not in ["rank", "idx"]}
+                return Event(rank=rank, idx=index, **rest)
+            elif isinstance(index, slice):
+                return PandasDataset({rank: df.loc[index]})
+            else:
+                raise TypeError("Index must be an integer or a slice")
+        elif isinstance(rank, slice):
+            data = {r: df.loc[index] for r, df in list(self.ds.data.items())[rank]}
+            return PandasDataset(data)
+        else:
+            raise TypeError("Rank must be an integer or a slice")
 
 
 # For now assume that it is an MPI trace
 class PandasDataset(TraceDataset):
     def __init__(self, data=None):
-        if data is None:
-            data = dict()
-
-        self.data = data  # dictionary that maps rank -> pandas dataframe
+        self.data = data if data is not None else dict()
         self.backend = "pandas"
-        self.buffer = dict()  # dictionary that maps rank -> list of events
+        self.buffer = dict()
 
     @property
     def loc(self) -> PandasLocIndexer:
         return PandasLocIndexer(self)
 
     def __len__(self) -> int:
-        return sum([len(self.data[rank]) for rank in self.data])
+        return sum(len(df) for df in self.data.values())
 
     def push_event(self, event: Event) -> None:
         rank = event.rank
@@ -55,8 +62,7 @@ class PandasDataset(TraceDataset):
         df.set_index("idx", inplace=True)
         if rank not in self.data:
             self.data[rank] = df
-        else:
-            self.data[rank] = pd.concat([self.data[rank], df])
+        self.data[rank] = pd.concat([self.data[rank], df])
         self.buffer[rank] = []
 
     def flush(self) -> None:
@@ -68,25 +74,40 @@ class PandasDataset(TraceDataset):
             _ranks = list(self.data.keys())
 
             if len(self) > 20:
-                top_df = pd.concat(
-                    [self.data[rank].head(5) for rank in _ranks], keys=_ranks, names=["rank"]
-                ).reset_index().nsmallest(5, "timestamp")
+                top_df = (
+                    pd.concat(
+                        [self.data[rank].head(5) for rank in _ranks],
+                        keys=_ranks,
+                        names=["rank"],
+                    )
+                    .reset_index()
+                    .nsmallest(5, "timestamp")
+                )
 
-                bottom_df = pd.concat(
-                    [self.data[rank].tail(5) for rank in _ranks], keys=_ranks, names=["rank"]
-                ).reset_index().nlargest(5, "timestamp").iloc[::-1]
+                bottom_df = (
+                    pd.concat(
+                        [self.data[rank].tail(5) for rank in _ranks],
+                        keys=_ranks,
+                        names=["rank"],
+                    )
+                    .reset_index()
+                    .nlargest(5, "timestamp")
+                    .iloc[::-1]
+                )
 
                 top = top_df.to_dict(orient="records")
                 middle = {k: "..." for k in top_df.columns}
                 bottom = bottom_df.to_dict(orient="records")
-                
+
                 print(
                     tabulate(top + [middle] + bottom, headers="keys", tablefmt="psql")
                 )
             else:
                 df = (
                     pd.concat(
-                        [self.data[rank] for rank in _ranks], keys=_ranks, names=["rank"]
+                        [self.data[rank] for rank in _ranks],
+                        keys=_ranks,
+                        names=["rank"],
                     )
                     .sort_values("timestamp")
                     .reset_index()
@@ -95,6 +116,6 @@ class PandasDataset(TraceDataset):
 
         print(self.__str__())
 
-    def filter(self, condition: str) -> TraceDataset:
-        filtered_data = {rank: self.data[rank].query(condition) for rank in self.data}
+    def filter(self, condition: str) -> PandasDataset:
+        filtered_data = {rank: df.query(condition) for rank, df in self.data.items()}
         return PandasDataset(filtered_data)
