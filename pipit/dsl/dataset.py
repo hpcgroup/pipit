@@ -111,3 +111,10 @@ class TraceData(ABC):
     # @abstractmethod
     # def tail(self, n=5):
     #     pass
+
+def create_dataset() -> TraceData:
+    from pipit.util.config import get_option
+
+    if get_option("backend") == "pandas":
+        from pipit.dsl._pandas import PandasDataset
+        return PandasDataset()

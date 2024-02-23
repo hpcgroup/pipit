@@ -82,6 +82,17 @@ def url_validator(key, value):
             ).format(value, key)
         )
 
+# Validator to check if the value entered is a valid backend
+def backend_validator(key, value):
+    if value in ["pandas", "polars"]:
+        return True
+    else:
+        raise ValueError(
+            (
+                'Error loading configuration: The Value "{}" for Configuration "{}"'
+                + "must be a valid URL"
+            ).format(value, key)
+        )
 
 registered_options = {
     "log_level": {
@@ -92,6 +103,10 @@ registered_options = {
         "default": "http://localhost:8888",
         "validator": url_validator,
     },
+    "backend": {
+        "default": "pandas",
+        "validator": backend_validator,
+    }
 }
 
 global_config = {key: registered_options[key]["default"] for key in registered_options}

@@ -6,7 +6,7 @@ import pandas as pd
 
 BUFFER_SIZE = 200
 
-class PandasInterface(TraceData):
+class PandasDataset(TraceData):
     def __init__(self, data=pd.DataFrame()):
         self.data = data
         self.buffer = []
@@ -28,4 +28,4 @@ class PandasInterface(TraceData):
     
     def filter(self, condition: str) -> TraceData:
         filtered_data = self.data.query(condition)
-        return PandasInterface(filtered_data)
+        return PandasDataset(filtered_data)
