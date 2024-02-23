@@ -4,22 +4,29 @@ from pipit.dsl.event import Event
 
 
 class LocIndexer(ABC):
-    def __getitem__(self, key):
+    def __init__(self, ds):
+        self.ds = ds
+
+    def __getitem__(self, key) -> Event | TraceDataset:
         pass
 
 
 # This is the final one
 class TraceDataset(ABC):
     @abstractmethod
-    def __init__(self, streams=None, data=None):
+    def __init__(self, data=None):
         """
         streams are a list of execution locations that are being traced.
         streams can be nested, for example:
         ["process"], [("process", "thread")], [("process", "thread"), "gpu"]
         """
         self.data = data
-        self.streams = streams
         self.backend = None
+
+    @property
+    @abstractmethod
+    def loc(self) -> LocIndexer:
+        pass
 
     @abstractmethod
     def __len__(self) -> int:
@@ -42,14 +49,10 @@ class TraceDataset(ABC):
         pass
 
     def __str__(self) -> str:
-        return f":TraceDataset   {self.streams}   ({len(self.data)} events)"
+        return f":TraceDataset   ({len(self)} events)"
 
     def __repr__(self):
         return str(self)
-
-    @property
-    def loc(self):
-        return self.data.loc
 
     # @abstractmethod
     # def apply(self, f):
