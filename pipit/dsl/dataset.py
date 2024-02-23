@@ -4,10 +4,15 @@ from pipit.dsl.event import Event
 
 
 # This is the final one
-class TraceData(ABC):
+class TraceDataset(ABC):
     @abstractmethod
     def __init__(self, data):
         self.data = data
+        self.backend = None
+
+    @abstractmethod
+    def __len__(self) -> int:
+        pass
 
     @abstractmethod
     def push_event(self, event: Event) -> None:
@@ -22,8 +27,14 @@ class TraceData(ABC):
         pass
 
     @abstractmethod
-    def filter(self, condition: str) -> TraceData:
+    def filter(self, condition: str) -> TraceDataset:
         pass
+
+    def __str__(self) -> str:
+        return f":TraceDataset ({len(self)} events)"
+
+    def __repr__(self):
+        return str(self)
 
     # @abstractmethod
     # def apply(self, f):
@@ -114,7 +125,7 @@ class TraceData(ABC):
     #     pass
 
 
-def create_dataset() -> TraceData:
+def create_dataset() -> TraceDataset:
     from pipit.util.config import get_option
 
     if get_option("backend") == "pandas":
