@@ -21,7 +21,7 @@ import sys
 # import style
 # import pkg_resources
 
-sys.path.insert(0, os.path.abspath("../pipit"))
+sys.path.insert(0, os.path.abspath("../"))
 
 # -- Project information -----------------------------------------------------
 
