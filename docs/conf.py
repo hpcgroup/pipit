@@ -14,23 +14,19 @@
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
-#
-# import os
+
+import os
 import sys
 
-# sys.path.insert(0, os.path.abspath('.'))
+# import style
+# import pkg_resources
 
-# The name of the Pygments (syntax highlighting) style to use.
-from pygments.styles.default import DefaultStyle
-from pygments.token import Generic
-
-import pkg_resources
-
+sys.path.insert(0, os.path.abspath("../"))
 
 # -- Project information -----------------------------------------------------
 
 project = "pipit"
-copyright = "2022-2023, Parallel Software and Systems Group, University of Maryland"
+copyright = "2022-2024, Parallel Software and Systems Group, University of Maryland"
 author = "Abhinav Bhatele"
 
 # The full version, including alpha/beta/rc tags
@@ -59,22 +55,7 @@ templates_path = ["_templates"]
 # This pattern also affects html_static_path and html_extra_path.
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
-
-# modifications to the default style
-class PipitStyle(DefaultStyle):
-    styles = DefaultStyle.styles.copy()
-    background_color = "#f4f4f8"
-    styles[Generic.Output] = "#355"
-    styles[Generic.Prompt] = "bold #346ec9"
-
-
-dist = pkg_resources.Distribution(__file__)
-sys.path.append(".")  # make 'conf' module findable
-ep = pkg_resources.EntryPoint.parse("pipit = conf:PipitStyle", dist=dist)
-dist._ep_map = {"pygments.styles": {"plugin1": ep}}
-pkg_resources.working_set.add(dist)
-
-pygments_style = "pipit"
+# pygments_style = "style.PipitStyle"
 
 
 # -- Options for HTML output -------------------------------------------------
@@ -107,3 +88,5 @@ html_theme_options = {
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = []
+
+html_logo = "../logo.png"
