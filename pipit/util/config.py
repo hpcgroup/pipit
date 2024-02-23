@@ -82,6 +82,7 @@ def url_validator(key, value):
             ).format(value, key)
         )
 
+
 # Validator to check if the value entered is a valid backend
 def backend_validator(key, value):
     if value in ["pandas", "polars"]:
@@ -93,6 +94,7 @@ def backend_validator(key, value):
                 + "must be a valid URL"
             ).format(value, key)
         )
+
 
 registered_options = {
     "log_level": {
@@ -106,7 +108,7 @@ registered_options = {
     "backend": {
         "default": "pandas",
         "validator": backend_validator,
-    }
+    },
 }
 
 global_config = {key: registered_options[key]["default"] for key in registered_options}

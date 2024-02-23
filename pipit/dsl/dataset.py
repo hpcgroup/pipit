@@ -2,6 +2,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from pipit.dsl.event import Event
 
+
 # This is the final one
 class TraceData(ABC):
     @abstractmethod
@@ -19,7 +20,7 @@ class TraceData(ABC):
     @abstractmethod
     def show(self) -> None:
         pass
-    
+
     @abstractmethod
     def filter(self, condition: str) -> TraceData:
         pass
@@ -112,9 +113,11 @@ class TraceData(ABC):
     # def tail(self, n=5):
     #     pass
 
+
 def create_dataset() -> TraceData:
     from pipit.util.config import get_option
 
     if get_option("backend") == "pandas":
         from pipit.dsl._pandas import PandasDataset
+
         return PandasDataset()
