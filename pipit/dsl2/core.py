@@ -71,7 +71,7 @@ class Dataset:
         return Dataset(traces)
 
     def show(self) -> None:
-        if len:
+        if len(self):
             if len(self) > 20:
                 top = [e.to_dict() for e in self.head().collect()]
                 middle = {k: "..." for k in top[0].keys()}
@@ -117,7 +117,7 @@ class _Trace:
         return len(self.data)
 
     def __str__(self) -> str:
-        return f"_Trace ({len(self)} event{'' if len(self) == 1 else 's'})"
+        return f"_Trace rank={self.rank} ({len(self)} event{'' if len(self) == 1 else 's'})"
 
     def __repr__(self) -> str:
         return str(self)
