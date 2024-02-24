@@ -58,6 +58,11 @@ class TraceDataset(ABC):
         pass
 
     # @abstractmethod
+    # def map_ranks(self, f) -> TraceDataset:
+    #     # maybe we can generalize this to map_threads for OpenMP, etc.
+    #     pass
+
+    # @abstractmethod
     # def apply(self, f):
     #     pass
 
