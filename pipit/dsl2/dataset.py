@@ -7,6 +7,12 @@ from pipit.dsl2.util import create_trace, LocMixin
 
 
 class TraceDataset(LocMixin):
+    """
+    A collection of traces of different ranks, represented by
+    a dictionary that maps each rank to its trace. Also contains
+    methods for building, querying, and manipulating traces.
+    """
+
     def __init__(self, traces: Dict[int, _Trace] = None) -> None:
         self.traces = traces if traces is not None else dict()
 
@@ -21,13 +27,19 @@ class TraceDataset(LocMixin):
         return str(self)
 
     def __len__(self) -> int:
+        """
+        Returns the number of events in the dataset, across all ranks.
+        """
         return sum(self.map_traces(lambda trace: len(trace)).values())
 
     @property
     def ranks(self) -> List[int]:
         return list(sorted(self.traces.keys()))
 
-    def _locate(self, key: any) -> any:
+    def _locate(self, key: any) -> Event | TraceDataset:
+        """
+        Select events by rank and index.
+        """
         if isinstance(key, int):
             return TraceDataset({key: self.traces[key]})
 
@@ -49,6 +61,9 @@ class TraceDataset(LocMixin):
             return self.traces[rank].loc[idx]
 
     def map_traces(self, f, *args, **kwargs) -> Dict[int, any]:
+        """
+        Applies a function to each trace in the dataset.
+        """
         results = {rank: None for rank in self.traces}
 
         for rank, trace in self.traces.items():
@@ -57,6 +72,11 @@ class TraceDataset(LocMixin):
         return results
 
     def push_event(self, event: Event) -> None:
+        """
+        Adds an event to the appropriate rank's trace.
+
+        Assumes that the event is in the correct order by timestamp.
+        """
         rank = event.rank
 
         if rank not in self.traces:
@@ -65,9 +85,19 @@ class TraceDataset(LocMixin):
         self.traces[rank].push_event(event)
 
     def flush(self) -> None:
+        """
+        Flushes the buffers of all traces in the dataset.
+
+        This is used to ensure that all events are written to the
+        traces in the dataset.
+        """
         self.map_traces(lambda trace: trace.flush())
 
     def head(self, n: int = 5) -> TraceDataset:
+        """
+        Returns the first n events in the dataset across all ranks,
+        sorted by timestamp.
+        """
         traces = self.map_traces(lambda trace: trace.head(n=n))
 
         events = [event for trace in traces.values() for event in trace.collect()]
@@ -86,6 +116,10 @@ class TraceDataset(LocMixin):
         return TraceDataset(traces)
 
     def tail(self, n: int = 5) -> TraceDataset:
+        """
+        Returns the last n events in the dataset across all ranks,
+        sorted by timestamp.
+        """
         traces = self.map_traces(lambda trace: trace.tail(n=n))
 
         events = [event for trace in traces.values() for event in trace.collect()]
@@ -104,6 +138,9 @@ class TraceDataset(LocMixin):
         return TraceDataset(traces)
 
     def show(self) -> None:
+        """
+        Prints a preview of the dataset across all ranks.
+        """
         if len(self):
             if len(self) > 20:
                 top = [e.to_dict() for e in self.head().collect()]
@@ -125,42 +162,20 @@ class TraceDataset(LocMixin):
         print(self.__str__())
 
     def collect(self) -> List[Event]:
-        events = {rank: trace.collect() for rank, trace in self.traces.items()}
+        """
+        Returns all events in the dataset as a list of Event objects.
+
+        This may be both compute and memory intensive for large datasets,
+        especially if the data is columnar and needs to be reassembled.
+        """
+        events = self.map_traces(lambda trace: trace.collect())
         tmp = [event for events in events.values() for event in events]
         tmp.sort(key=lambda event: event.timestamp)
         return tmp
 
     def filter(self, condition: str) -> TraceDataset:
+        """
+        Filters the dataset using the given condition.
+        """
         filtered_traces = self.map_traces(lambda trace: trace.filter(condition))
         return TraceDataset(filtered_traces)
-
-
-# class DatasetLoc:
-#     def __init__(self, ds: TraceDataset) -> None:
-#         self.ds = ds
-
-#     def __getitem__(self, key: any) -> _Trace:
-#         # # Case 1: key is an integer
-#         # if isinstance(key, int):
-#         #     return self.ds.traces[key]
-
-#         # # Case 2: key is a slice
-#         # if isinstance(key, slice):
-#         #     start = key.start if key.start is not None else 0
-#         #     stop = key.stop if key.stop is not None else len(self.ds.traces)
-#         #     step = key.step if key.step is not None else 1
-
-#         #     return TraceDataset(
-#         #         {
-#         #             rank: trace
-#         #             for rank, trace in self.ds.traces.items()
-#         #             if start <= rank < stop and (rank - start) % step == 0
-#         #         }
-#         #     )
-
-#         # # Case 3: key is a tuple of size != 2 => raise an error
-#         # if not isinstance(key, tuple) or len(key) != 2:
-#         #     raise ValueError(f"Invalid key: {key}")
-
-#         rank, idx = key
-#         return self.ds.traces[rank].loc[idx]

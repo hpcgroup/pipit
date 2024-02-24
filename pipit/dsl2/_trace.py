@@ -6,6 +6,10 @@ from pipit.dsl2.util import LocMixin
 
 
 class _Trace(LocMixin, ABC):
+    """
+    Represents a trace of events from a single rank.
+    """
+
     @abstractmethod
     def __init__(self, rank: int, data=None) -> None:
         pass
@@ -21,36 +25,68 @@ class _Trace(LocMixin, ABC):
 
     @abstractmethod
     def __len__(self) -> int:
+        """
+        Returns the number of events in the trace.
+        May be changed to `count()` in the future.
+        """
         pass
 
     @abstractmethod
-    def _locate(self, key: any) -> any:
+    def _locate(self, key: any) -> Event | _Trace:
+        """
+        Select events by index.
+        """
         pass
 
     @abstractmethod
     def push_event(self, event: Event) -> None:
+        """
+        Adds an event to the buffer. If the buffer is full, the events
+        are flushed to the trace.
+        """
         pass
 
     @abstractmethod
     def flush(self) -> None:
+        """
+        Flushes the buffer to the trace.
+        """
         pass
 
     @abstractmethod
     def head(self, n: int = 5) -> _Trace:
+        """
+        Returns the first n events (by timestamp) in the trace.
+        """
         pass
 
     @abstractmethod
     def tail(self, n: int = 5) -> _Trace:
+        """
+        Returns the last n events (by timestamp) in the trace.
+        """
         pass
 
     @abstractmethod
     def collect(self) -> List[Event]:
+        """
+        Returns all events in the trace as a list of Event objects.
+        
+        This may be both compute and memory intensive for large datasets,
+        especially if the data is columnar and needs to be reassembled.
+        """
         pass
 
     @abstractmethod
     def show(self) -> None:
+        """
+        Prints a preview of the trace.
+        """
         pass
 
     @abstractmethod
     def filter(self, condition: str) -> _Trace:
+        """
+        Filters the trace using the given condition.
+        """
         pass

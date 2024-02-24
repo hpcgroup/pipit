@@ -7,6 +7,11 @@ from pipit.dsl2._trace import _Trace
 
 
 class _PandasTrace(_Trace):
+    """
+    Pandas-based implementation of the _Trace class, where the trace
+    of a single rank is represented by a pandas DataFrame.
+    """
+
     def __init__(self, rank: int, data=None) -> None:
         self.data = data if data is not None else pd.DataFrame()
         self.rank = rank
@@ -83,11 +88,3 @@ class _PandasTrace(_Trace):
 
     def filter(self, condition: str) -> _PandasTrace:
         return _PandasTrace(rank=self.rank, data=self.data.query(condition))
-
-
-# class _PandasTraceLoc(_TraceLoc):
-#     def __init__(self, trace: _PandasTrace) -> None:
-#         self.trace = trace
-
-#     def __getitem__(self, key: any) -> Event:
-#         return Event(rank=self.trace.rank, **self.trace.data.loc[key].to_dict())

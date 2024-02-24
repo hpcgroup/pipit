@@ -6,19 +6,25 @@ if TYPE_CHECKING:
 from abc import ABC, abstractmethod
 
 
-class Loc:
-    def __init__(self, obj: any) -> None:
-        self.obj = obj
-
-    def __getitem__(self, key: any) -> any:
-        return self.obj._locate(key)
-
-
 class LocMixin(ABC):
+    """
+    Mixin class to simplify implementation of the `loc` attribute.
+
+    When `obj.loc[...]` is used, the object's `_locate` method is called with
+    the same arguments.
+    """
+
+    class _Loc:
+        def __init__(self, obj: any) -> None:
+            self.obj = obj
+
+        def __getitem__(self, key: any) -> any:
+            return self.obj._locate(key)
+
     @property
-    def loc(self) -> Loc:
+    def loc(self) -> _Loc:
         if not hasattr(self, "_loc"):
-            self._loc = Loc(self)
+            self._loc = self._Loc(self)
         return self._loc
 
     @abstractmethod
@@ -27,6 +33,10 @@ class LocMixin(ABC):
 
 
 def create_trace(backend=None, *args, **kwargs) -> _Trace:
+    """
+    Creates a new _Trace object using the specified backend,
+    or the globally configured backend if none is specified.
+    """
     from pipit.util.config import get_option
 
     backend = backend or get_option("backend")
