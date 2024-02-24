@@ -31,6 +31,23 @@ class TraceDataset(LocMixin):
         if isinstance(key, int):
             return TraceDataset({key: self.traces[key]})
 
+        if isinstance(key, slice):
+            start = key.start if key.start is not None else 0
+            stop = key.stop if key.stop is not None else len(self.traces)
+            step = key.step if key.step is not None else 1
+
+            return TraceDataset(
+                {
+                    rank: trace
+                    for rank, trace in self.traces.items()
+                    if start <= rank < stop and (rank - start) % step == 0
+                }
+            )
+
+        if isinstance(key, tuple) and len(key) == 2:
+            rank, idx = key
+            return self.traces[rank].loc[idx]
+
     def map_traces(self, f, *args, **kwargs) -> Dict[int, any]:
         results = {rank: None for rank in self.traces}
 
