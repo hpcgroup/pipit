@@ -91,7 +91,7 @@ def backend_validator(key, value):
         raise ValueError(
             (
                 'Error loading configuration: The Value "{}" for Configuration "{}"'
-                + "must be a valid URL"
+                + "must be a valid backend ('pandas' or 'polars')"
             ).format(value, key)
         )
 
