@@ -15,10 +15,20 @@ class Reducible(ABC):
 
     @abstractmethod
     def reduce(self, func: reducer | callable, initial=None) -> any:
+        """
+        Reduces the object to a single value using the given function.
+        """
         pass
 
 
 class DictLike(Reducible):
+    """
+    A dictionary-like object that can be reduced to a single value.
+
+    Also allows for tabular display using the `show` method, and for
+    labeling the keys and values in the tabular display.
+    """
+
     def __init__(self, data: dict = None, key_label=None, value_label=None) -> None:
         self.data = data if data is not None else {}
         self.key_label = key_label
@@ -71,7 +81,7 @@ class DictLike(Reducible):
 
     def show(self) -> None:
         """
-        Prints the dictionary.
+        Prints the dictionary as a table.
         """
 
         # Convert dictionary to list of tuples (key, value)
@@ -98,6 +108,9 @@ class DictLike(Reducible):
         print(self.__str__())
 
     def reduce(self, func: reducer | callable, initial=None) -> any:
+        """
+        Reduces the dictionary to a single value using the given function.
+        """
         if func == "sum":
             return sum(self.data.values())
         elif func == "prod":

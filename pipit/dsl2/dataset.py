@@ -74,7 +74,11 @@ class TraceDataset(LocMixin):
         """
         Applies a function to each trace in the dataset.
         """
-        results = DictLike(data={rank: None for rank in self.traces})
+        results = DictLike(
+            data={rank: None for rank in self.traces},
+            key_label="rank",
+            value_label="result",
+        )
 
         for rank, trace in self.traces.items():
             results[rank] = f(trace, *args, **kwargs)
@@ -111,7 +115,7 @@ class TraceDataset(LocMixin):
         events = self.map_traces(lambda trace: trace.head(n).collect()).reduce("concat")
         events.sort(key=lambda event: event.timestamp)
 
-        traces = {}
+        traces = DictLike()
         for event in events[:n]:
             rank = event.rank
             if rank not in traces:
@@ -131,7 +135,7 @@ class TraceDataset(LocMixin):
         events = self.map_traces(lambda trace: trace.tail(n).collect()).reduce("concat")
         events.sort(key=lambda event: event.timestamp)
 
-        traces = {}
+        traces = DictLike()
         for event in events[-n:]:
             rank = event.rank
             if rank not in traces:
