@@ -5,8 +5,7 @@ from pipit.dsl2._trace import _Trace, create_trace
 from pipit.dsl2.event import Event
 
 
-# TODO: rename to TraceDataset
-class Dataset:
+class TraceDataset:
     def __init__(self, traces: Dict[int, _Trace] = None) -> None:
         self.traces = traces if traces is not None else dict()
 
@@ -23,6 +22,14 @@ class Dataset:
     def loc(self):
         pass
 
+    def map_traces(self, f, *args, **kwargs) -> Dict[int, any]:
+        results = {rank: None for rank in self.traces}
+
+        for rank, trace in self.traces.items():
+            results[rank] = f(trace, *args, **kwargs)
+
+        return results
+
     def push_event(self, event: Event) -> None:
         rank = event.rank
 
@@ -32,13 +39,12 @@ class Dataset:
         self.traces[rank].push_event(event)
 
     def flush(self) -> None:
-        for rank in self.traces:
-            self.traces[rank].flush()
+        self.map_traces(lambda trace: trace.flush())
 
-    def head(self, n: int = 5) -> Dataset:
-        traces = {rank: trace.head(n=n) for rank, trace in self.traces.items()}
+    def head(self, n: int = 5) -> TraceDataset:
+        traces = self.map_traces(lambda trace: trace.head(n=n))
+
         events = [event for trace in traces.values() for event in trace.collect()]
-
         events.sort(key=lambda event: event.timestamp)
 
         traces = {}
@@ -51,12 +57,12 @@ class Dataset:
         for rank in traces:
             traces[rank].flush()
 
-        return Dataset(traces)
+        return TraceDataset(traces)
 
-    def tail(self, n: int = 5) -> Dataset:
-        traces = {rank: trace.tail(n=n) for rank, trace in self.traces.items()}
+    def tail(self, n: int = 5) -> TraceDataset:
+        traces = self.map_traces(lambda trace: trace.tail(n=n))
+
         events = [event for trace in traces.values() for event in trace.collect()]
-
         events.sort(key=lambda event: event.timestamp)
 
         traces = {}
@@ -69,7 +75,7 @@ class Dataset:
         for rank in traces:
             traces[rank].flush()
 
-        return Dataset(traces)
+        return TraceDataset(traces)
 
     def show(self) -> None:
         if len(self):
@@ -98,11 +104,6 @@ class Dataset:
         tmp.sort(key=lambda event: event.timestamp)
         return tmp
 
-    def filter(self, condition: str) -> Dataset:
-        filtered_traces = {
-            rank: trace.filter(condition) for rank, trace in self.traces.items()
-        }
-        return Dataset(filtered_traces)
-
-    def map_ranks(self, f) -> None:
-        pass
+    def filter(self, condition: str) -> TraceDataset:
+        filtered_traces = self.map_traces(lambda trace: trace.filter(condition))
+        return TraceDataset(filtered_traces)
