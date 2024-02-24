@@ -62,7 +62,8 @@ class PandasDataset(TraceDataset):
         df.set_index("idx", inplace=True)
         if rank not in self.data:
             self.data[rank] = df
-        self.data[rank] = pd.concat([self.data[rank], df])
+        else:
+            self.data[rank] = pd.concat([self.data[rank], df])
         self.buffer[rank] = []
 
     def flush(self) -> None:
