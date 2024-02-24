@@ -108,9 +108,7 @@ class TraceDataset(LocMixin):
         Returns the first n events in the dataset across all ranks,
         sorted by timestamp.
         """
-        traces = self.map_traces(lambda trace: trace.head(n=n))
-
-        events = [event for trace in traces.values() for event in trace.collect()]
+        events = self.map_traces(lambda trace: trace.head(n).collect()).reduce("concat")
         events.sort(key=lambda event: event.timestamp)
 
         traces = {}
@@ -130,9 +128,7 @@ class TraceDataset(LocMixin):
         Returns the last n events in the dataset across all ranks,
         sorted by timestamp.
         """
-        traces = self.map_traces(lambda trace: trace.tail(n=n))
-
-        events = [event for trace in traces.values() for event in trace.collect()]
+        events = self.map_traces(lambda trace: trace.tail(n).collect()).reduce("concat")
         events.sort(key=lambda event: event.timestamp)
 
         traces = {}
@@ -178,10 +174,9 @@ class TraceDataset(LocMixin):
         This may be both compute and memory intensive for large datasets,
         especially if the data is columnar and needs to be reassembled.
         """
-        events = self.map_traces(lambda trace: trace.collect())
-        tmp = [event for events in events.values() for event in events]
-        tmp.sort(key=lambda event: event.timestamp)
-        return tmp
+        events = self.map_traces(lambda trace: trace.collect()).reduce("concat")
+        events.sort(key=lambda event: event.timestamp)
+        return events
 
     def filter(self, condition: str) -> TraceDataset:
         """

@@ -5,7 +5,7 @@ from functools import reduce
 from typing_extensions import Literal
 from tabulate import tabulate
 
-reducer = Literal["sum", "prod", "max", "min", "mean"]
+reducer = Literal["sum", "prod", "max", "min", "mean", "flatten"]
 
 
 class Reducible(ABC):
@@ -108,5 +108,8 @@ class DictLike(Reducible):
             return min(self.data.values())
         elif func == "mean":
             return sum(self.data.values()) / len(self.data)
+        elif func == "concat":
+            nested_values = list(self.data.values())
+            return [item for sublist in nested_values for item in sublist]
         else:
             return reduce(func, self.data.values(), initial)
