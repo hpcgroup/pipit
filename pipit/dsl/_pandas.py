@@ -37,12 +37,14 @@ class PandasDataset(TraceDataset):
         self.backend = "pandas"
         self.buffer = dict()
 
-    @property
-    def loc(self) -> PandasLocIndexer:
-        return PandasLocIndexer(self)
-
     def __len__(self) -> int:
         return sum(len(df) for df in self.data.values())
+
+    @property
+    def loc(self) -> PandasLocIndexer:
+        if not hasattr(self, "_loc"):
+            self._loc = PandasLocIndexer(self)
+        return self._loc
 
     def push_event(self, event: Event) -> None:
         rank = event.rank
