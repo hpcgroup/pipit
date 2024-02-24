@@ -1,16 +1,21 @@
 from __future__ import annotations
 from typing import Dict, List
 from tabulate import tabulate
-from pipit.dsl2._trace import _Trace, create_trace
+from pipit.dsl2._trace import _Trace
 from pipit.dsl2.event import Event
+from pipit.dsl2.util import create_trace, LocMixin
 
 
-class TraceDataset:
+class TraceDataset(LocMixin):
     def __init__(self, traces: Dict[int, _Trace] = None) -> None:
         self.traces = traces if traces is not None else dict()
 
     def __str__(self) -> str:
-        return f"Dataset ({len(self)} event{'' if len(self) == 1 else 's'})"
+        return (
+            f"TraceDataset ({len(self.traces)}"
+            + f" trace{'' if len(self.traces) == 1 else 's'},"
+            + f" {len(self)} event{'' if len(self) == 1 else 's'})"
+        )
 
     def __repr__(self) -> str:
         return str(self)
@@ -19,8 +24,12 @@ class TraceDataset:
         return sum(self.map_traces(lambda trace: len(trace)).values())
 
     @property
-    def loc(self):
-        pass
+    def ranks(self) -> List[int]:
+        return list(sorted(self.traces.keys()))
+
+    def _locate(self, key: any) -> any:
+        if isinstance(key, int):
+            return TraceDataset({key: self.traces[key]})
 
     def map_traces(self, f, *args, **kwargs) -> Dict[int, any]:
         results = {rank: None for rank in self.traces}
@@ -107,3 +116,34 @@ class TraceDataset:
     def filter(self, condition: str) -> TraceDataset:
         filtered_traces = self.map_traces(lambda trace: trace.filter(condition))
         return TraceDataset(filtered_traces)
+
+
+# class DatasetLoc:
+#     def __init__(self, ds: TraceDataset) -> None:
+#         self.ds = ds
+
+#     def __getitem__(self, key: any) -> _Trace:
+#         # # Case 1: key is an integer
+#         # if isinstance(key, int):
+#         #     return self.ds.traces[key]
+
+#         # # Case 2: key is a slice
+#         # if isinstance(key, slice):
+#         #     start = key.start if key.start is not None else 0
+#         #     stop = key.stop if key.stop is not None else len(self.ds.traces)
+#         #     step = key.step if key.step is not None else 1
+
+#         #     return TraceDataset(
+#         #         {
+#         #             rank: trace
+#         #             for rank, trace in self.ds.traces.items()
+#         #             if start <= rank < stop and (rank - start) % step == 0
+#         #         }
+#         #     )
+
+#         # # Case 3: key is a tuple of size != 2 => raise an error
+#         # if not isinstance(key, tuple) or len(key) != 2:
+#         #     raise ValueError(f"Invalid key: {key}")
+
+#         rank, idx = key
+#         return self.ds.traces[rank].loc[idx]

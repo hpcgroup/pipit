@@ -15,9 +15,15 @@ class _PandasTrace(_Trace):
     def __len__(self) -> int:
         return len(self.data)
 
-    @property
-    def loc(self):
-        pass
+    def _locate(self, key: any) -> _PandasTrace | Event:
+        # case 1: key is an integer
+        if isinstance(key, int):
+            row = self.data.loc[key]
+            return Event(rank=self.rank, idx=row.name, **row.to_dict())
+
+        # case 2: key is a slice
+        if isinstance(key, slice):
+            return _PandasTrace(rank=self.rank, data=self.data.loc[key])
 
     def push_event(self, event: Event) -> None:
         obj = event.to_dict()
@@ -66,7 +72,10 @@ class _PandasTrace(_Trace):
             else:
                 print(
                     tabulate(
-                        self.data, headers="keys", tablefmt="psql", showindex=False
+                        self.data.reset_index(),
+                        headers="keys",
+                        tablefmt="psql",
+                        showindex=False,
                     )
                 )
 
@@ -74,3 +83,11 @@ class _PandasTrace(_Trace):
 
     def filter(self, condition: str) -> _PandasTrace:
         return _PandasTrace(rank=self.rank, data=self.data.query(condition))
+
+
+# class _PandasTraceLoc(_TraceLoc):
+#     def __init__(self, trace: _PandasTrace) -> None:
+#         self.trace = trace
+
+#     def __getitem__(self, key: any) -> Event:
+#         return Event(rank=self.trace.rank, **self.trace.data.loc[key].to_dict())
