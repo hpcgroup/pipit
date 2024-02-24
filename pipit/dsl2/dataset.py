@@ -1,12 +1,13 @@
 from __future__ import annotations
-import pandas as pd
-from pipit.dsl.event import Event
+from typing import Dict, List
 from tabulate import tabulate
+from pipit.dsl2._trace import _Trace
+from pipit.dsl.event import Event
 
 
 # TODO: rename to TraceDataset
 class Dataset:
-    def __init__(self, traces=None) -> None:
+    def __init__(self, traces: Dict[int, _Trace] = None) -> None:
         self.traces = traces if traces is not None else dict()
 
     def __str__(self) -> str:
@@ -22,7 +23,7 @@ class Dataset:
     def loc(self):
         pass
 
-    def push_event(self, event) -> None:
+    def push_event(self, event: Event) -> None:
         rank = event.rank
 
         if rank not in self.traces:
@@ -34,7 +35,7 @@ class Dataset:
         for rank in self.traces:
             self.traces[rank].flush()
 
-    def head(self, n=5) -> Dataset:
+    def head(self, n: int = 5) -> Dataset:
         traces = {rank: trace.head(n=n) for rank, trace in self.traces.items()}
         events = [event for trace in traces.values() for event in trace.collect()]
 
@@ -52,7 +53,7 @@ class Dataset:
 
         return Dataset(traces)
 
-    def tail(self, n=5) -> Dataset:
+    def tail(self, n: int = 5) -> Dataset:
         traces = {rank: trace.tail(n=n) for rank, trace in self.traces.items()}
         events = [event for trace in traces.values() for event in trace.collect()]
 
@@ -91,13 +92,13 @@ class Dataset:
 
         print(self.__str__())
 
-    def collect(self):
+    def collect(self) -> List[Event]:
         events = {rank: trace.collect() for rank, trace in self.traces.items()}
         tmp = [event for events in events.values() for event in events]
         tmp.sort(key=lambda event: event.timestamp)
         return tmp
 
-    def filter(self, condition) -> Dataset:
+    def filter(self, condition: str) -> Dataset:
         filtered_traces = {
             rank: trace.filter(condition) for rank, trace in self.traces.items()
         }
@@ -105,79 +106,3 @@ class Dataset:
 
     def map_ranks(self, f) -> None:
         pass
-
-
-class _Trace:
-    def __init__(self, data=None, rank=0) -> None:
-        self.data = data if data is not None else pd.DataFrame()
-        self.rank = rank
-        self.buffer = []
-
-    def __len__(self) -> int:
-        return len(self.data)
-
-    def __str__(self) -> str:
-        return f"_Trace rank={self.rank} ({len(self)} event{'' if len(self) == 1 else 's'})"
-
-    def __repr__(self) -> str:
-        return str(self)
-
-    @property
-    def loc(self):
-        pass
-
-    def push_event(self, event) -> None:
-        obj = event.to_dict()
-        del obj["rank"]
-
-        self.buffer.append(obj)
-
-        if len(self.buffer) >= 200:
-            self.flush()
-
-    def flush(self) -> None:
-        if len(self.buffer) == 0:
-            return
-
-        df = pd.DataFrame(self.buffer)
-        df.set_index("idx", inplace=True)
-        self.data = pd.concat([self.data, df])
-        self.buffer = []
-
-    def head(self, n=5) -> _Trace:
-        df = self.data.head(n=n)
-        return _Trace(df, rank=self.rank)
-
-    def tail(self, n=5) -> _Trace:
-        df = self.data.tail(n=n)
-        return _Trace(df, rank=self.rank)
-
-    def collect(self):
-        records = self.data.reset_index().to_dict(orient="records")
-        events = [Event(rank=self.rank, **record) for record in records]
-        return events
-
-    def show(self) -> None:
-        if len(self):
-            if len(self) > 20:
-                top_df = self.head().data.reset_index()
-                bottom_df = self.tail().data.reset_index()
-
-                top = top_df.to_dict(orient="records")
-                middle = {k: "..." for k in top_df.columns}
-                bottom = bottom_df.to_dict(orient="records")
-
-                print(
-                    tabulate(top + [middle] + bottom, headers="keys", tablefmt="psql")
-                )
-            else:
-                print(
-                    tabulate(
-                        self.data, headers="keys", tablefmt="psql", showindex=False
-                    )
-                )
-
-        print(self.__str__())
-
-    def filter(self, condition) -> _Trace:
-        return _Trace(self.data.query(condition), rank=self.rank)
