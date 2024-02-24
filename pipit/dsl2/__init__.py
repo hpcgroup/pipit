@@ -1,1 +1,1 @@
-from .core import TraceDataset, Trace  # noqa: F401
+from .core import Dataset, _Trace  # noqa: F401

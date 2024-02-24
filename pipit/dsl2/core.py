@@ -1,19 +1,19 @@
 from __future__ import annotations
 import pandas as pd
 
-
-class TraceDataset:
+# rename to TraceDataset
+class Dataset:
     def __init__(self, traces=None) -> None:
         self.traces = traces if traces is not None else dict()
 
     def __str__(self) -> str:
-        return f"MultiRankTrace ({len(self)} events)"
+        return f"Dataset ({len(self)} event{'' if len(self) == 1 else 's'})"
 
     def __repr__(self) -> str:
         return str(self)
 
     def __len__(self) -> int:
-        return sum(len(df) for df in self.traces.values())
+        return sum(len(trace) for trace in self.traces.values())
 
     @property
     def loc(self):
@@ -23,7 +23,7 @@ class TraceDataset:
         rank = event.rank
 
         if rank not in self.traces:
-            self.traces[rank] = Trace()
+            self.traces[rank] = _Trace()
 
         self.traces[rank].push_event(event)
 
@@ -34,26 +34,26 @@ class TraceDataset:
     def show(self) -> None:
         print(self.__repr__())
 
-    def filter(self, condition) -> TraceDataset:
+    def filter(self, condition) -> Dataset:
         filtered_traces = {
             rank: trace.filter(condition) for rank, trace in self.traces.items()
         }
-        return TraceDataset(filtered_traces)
+        return Dataset(filtered_traces)
 
     def map_ranks(self, f) -> None:
         pass
 
 
-class Trace:
-    def __init__(self):
-        self.data = pd.DataFrame()
+class _Trace:
+    def __init__(self, data=None) -> None:
+        self.data = data if data is not None else pd.DataFrame()
         self.buffer = []
 
     def __len__(self) -> int:
         return len(self.data)
 
     def __str__(self) -> str:
-        return f"Trace ({len(self)} events)"
+        return f"_Trace ({len(self)} event{'' if len(self) == 1 else 's'})"
 
     def __repr__(self) -> str:
         return str(self)
@@ -83,5 +83,5 @@ class Trace:
     def show(self) -> None:
         pass
 
-    def filter(self, condition) -> Trace:
-        pass
+    def filter(self, condition) -> _Trace:
+        return _Trace(self.data.query(condition))
