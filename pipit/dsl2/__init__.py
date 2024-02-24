@@ -1,2 +1,1 @@
-from .core import MultiRankTrace, SingleRankTrace  # noqa: F401
-
+from .core import TraceDataset, Trace  # noqa: F401

@@ -1,7 +1,8 @@
 from __future__ import annotations
 import pandas as pd
 
-class MultiRankTrace:
+
+class TraceDataset:
     def __init__(self, traces=None) -> None:
         self.traces = traces if traces is not None else dict()
 
@@ -10,7 +11,7 @@ class MultiRankTrace:
 
     def __repr__(self) -> str:
         return str(self)
-    
+
     def __len__(self) -> int:
         return sum(len(df) for df in self.traces.values())
 
@@ -22,8 +23,8 @@ class MultiRankTrace:
         rank = event.rank
 
         if rank not in self.traces:
-            self.traces[rank] = SingleRankTrace()
-        
+            self.traces[rank] = Trace()
+
         self.traces[rank].push_event(event)
 
     def flush(self) -> None:
@@ -33,26 +34,30 @@ class MultiRankTrace:
     def show(self) -> None:
         print(self.__repr__())
 
-    def filter(self, condition) -> MultiRankTrace:
-        pass
+    def filter(self, condition) -> TraceDataset:
+        filtered_traces = {
+            rank: trace.filter(condition) for rank, trace in self.traces.items()
+        }
+        return TraceDataset(filtered_traces)
 
     def map_ranks(self, f) -> None:
         pass
 
-class SingleRankTrace:
+
+class Trace:
     def __init__(self):
         self.data = pd.DataFrame()
         self.buffer = []
 
     def __len__(self) -> int:
         return len(self.data)
-    
+
     def __str__(self) -> str:
-        return f"SingleRankTrace ({len(self)} events)"
+        return f"Trace ({len(self)} events)"
 
     def __repr__(self) -> str:
         return str(self)
-    
+
     @property
     def loc(self):
         pass
@@ -78,5 +83,5 @@ class SingleRankTrace:
     def show(self) -> None:
         pass
 
-    def filter(self, condition) -> SingleRankTrace:
+    def filter(self, condition) -> Trace:
         pass

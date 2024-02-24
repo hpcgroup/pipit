@@ -2,6 +2,7 @@
 # Just for helping develop the DSL API, not for production use
 # eventually all of this functionality will replace the trace.py file
 
+
 class Analyzer:
     def __init__(self, ds):
         self.ds = ds

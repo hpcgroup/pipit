@@ -17,8 +17,9 @@ class TraceDataset(ABC):
     def __init__(self, data=None):
         """
         TODO: provide option for different partition column than "rank"
-        see https://docs.dask.org/en/latest/generated/dask.dataframe.DataFrame.shuffle.html
-        or maybe provide a "shuffle" method to achieve more parallelism than just partitioning by rank
+        https://docs.dask.org/en/latest/generated/dask.dataframe.DataFrame.shuffle.html
+        or maybe provide a "shuffle" method to achieve more parallelism than just
+        partitioning by rank
         streams are a list of execution locations that are being traced.
         streams can be nested, for example:
         ["process"], [("process", "thread")], [("process", "thread"), "gpu"]
@@ -31,7 +32,7 @@ class TraceDataset(ABC):
 
     def __repr__(self):
         return str(self)
-    
+
     @abstractmethod
     def __len__(self) -> int:
         pass
