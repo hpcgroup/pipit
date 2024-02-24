@@ -11,6 +11,10 @@ class TraceDataset(LocMixin):
     A collection of traces of different ranks, represented by
     a dictionary that maps each rank to its trace. Also contains
     methods for building, querying, and manipulating traces.
+
+    This may become an abstract class in the future, instead of
+    _Trace being an abstract class. This way, each backend can
+    implement its own mapping of ranks to traces.
     """
 
     def __init__(self, traces: Dict[int, _Trace] = None) -> None:
