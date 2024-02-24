@@ -16,7 +16,7 @@ class TraceDataset:
         return str(self)
 
     def __len__(self) -> int:
-        return sum(len(trace) for trace in self.traces.values())
+        return sum(self.map_traces(lambda trace: len(trace)).values())
 
     @property
     def loc(self):
