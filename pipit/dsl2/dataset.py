@@ -9,12 +9,18 @@ from pipit.dsl2.util import create_trace, LocMixin
 class TraceDataset(LocMixin):
     """
     A collection of traces of different ranks, represented by
-    a dictionary that maps each rank to its trace. Also contains
-    methods for building, querying, and manipulating traces.
+    a dictionary that maps each rank to its trace (_Trace). Also
+    contains methods for building, querying, and manipulating
+    events in the dataset.
 
-    This may become an abstract class in the future, instead of
-    _Trace being an abstract class. This way, each backend can
-    implement its own mapping of ranks to traces.
+    This may become an abstract class in the future, which is
+    implemented by different backends. However, we would still
+    need to have an abstract _Trace class, to expose to the
+    user the `map_traces` method, which should work on an abstract
+    _Trace instead of, say, a pandas DataFrame. Thus, a backend
+    would have to implement both the TraceDataset and _Trace
+    classes. Currently, we simplify this by having TraceDataset
+    be a concrete class that uses an abstract _Trace class.
     """
 
     def __init__(self, traces: Dict[int, _Trace] = None) -> None:
