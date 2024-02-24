@@ -6,5 +6,4 @@
 from .trace import Trace  # noqa: F401
 from .util.config import get_option, set_option, reset_option  # noqa: F401
 
-from .dsl import *  # noqa: F401, F403
 from .dsl2 import *  # noqa: F401, F403

@@ -1,8 +1,8 @@
 from __future__ import annotations
 from typing import Dict, List
 from tabulate import tabulate
-from pipit.dsl2._trace import _Trace
-from pipit.dsl.event import Event
+from pipit.dsl2._trace import _Trace, create_trace
+from pipit.dsl2.event import Event
 
 
 # TODO: rename to TraceDataset
@@ -27,7 +27,7 @@ class Dataset:
         rank = event.rank
 
         if rank not in self.traces:
-            self.traces[rank] = _Trace(rank=rank)
+            self.traces[rank] = create_trace(rank=rank)
 
         self.traces[rank].push_event(event)
 
@@ -45,7 +45,7 @@ class Dataset:
         for event in events[:n]:
             rank = event.rank
             if rank not in traces:
-                traces[rank] = _Trace(rank=rank)
+                traces[rank] = create_trace(rank=rank)
             traces[rank].push_event(event)
 
         for rank in traces:
@@ -63,7 +63,7 @@ class Dataset:
         for event in events[-n:]:
             rank = event.rank
             if rank not in traces:
-                traces[rank] = _Trace(rank=rank)
+                traces[rank] = create_trace(rank=rank)
             traces[rank].push_event(event)
 
         for rank in traces:

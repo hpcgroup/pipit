@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import List
-from pipit.dsl.event import Event
+from pipit.dsl2.event import Event
 from abc import ABC, abstractmethod
 
 
@@ -11,7 +11,7 @@ class _Trace(ABC):
 
     def __str__(self) -> str:
         return (
-            f"_Trace rank={self.rank} ({len(self)}"
+            f"_Trace rank={self.rank} ({len(self)} "
             + f"event{'' if len(self) == 1 else 's'})"
         )
 
@@ -22,8 +22,8 @@ class _Trace(ABC):
     def __len__(self) -> int:
         pass
 
-    @abstractmethod
     @property
+    @abstractmethod
     def loc(self):
         pass
 
@@ -54,3 +54,14 @@ class _Trace(ABC):
     @abstractmethod
     def filter(self, condition: str) -> _Trace:
         pass
+
+
+def create_trace(backend=None, *args, **kwargs) -> _Trace:
+    from pipit.util.config import get_option
+
+    backend = backend or get_option("backend")
+
+    if backend == "pandas":
+        from pipit.dsl2._pandas import _PandasTrace
+
+        return _PandasTrace(*args, **kwargs)

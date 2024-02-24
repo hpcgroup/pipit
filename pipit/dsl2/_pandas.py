@@ -2,8 +2,8 @@ from __future__ import annotations
 from typing import List
 from tabulate import tabulate
 import pandas as pd
-from pipit.dsl.event import Event
-from pipit.dsl._trace import _Trace
+from pipit.dsl2.event import Event
+from pipit.dsl2._trace import _Trace
 
 
 class _PandasTrace(_Trace):
@@ -39,11 +39,11 @@ class _PandasTrace(_Trace):
 
     def head(self, n: int = 5) -> _PandasTrace:
         df = self.data.head(n=n)
-        return _Trace(df, rank=self.rank)
+        return _PandasTrace(rank=self.rank, data=df)
 
     def tail(self, n: int = 5) -> _PandasTrace:
         df = self.data.tail(n=n)
-        return _Trace(df, rank=self.rank)
+        return _PandasTrace(rank=self.rank, data=df)
 
     def collect(self) -> List[Event]:
         records = self.data.reset_index().to_dict(orient="records")
@@ -73,4 +73,4 @@ class _PandasTrace(_Trace):
         print(self.__str__())
 
     def filter(self, condition: str) -> _PandasTrace:
-        return _Trace(self.data.query(condition), rank=self.rank)
+        return _PandasTrace(rank=self.rank, data=self.data.query(condition))
