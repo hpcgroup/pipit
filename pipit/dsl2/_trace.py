@@ -71,7 +71,7 @@ class _Trace(LocMixin, ABC):
     def collect(self) -> List[Event]:
         """
         Returns all events in the trace as a list of Event objects.
-        
+
         This may be both compute and memory intensive for large datasets,
         especially if the data is columnar and needs to be reassembled.
         """

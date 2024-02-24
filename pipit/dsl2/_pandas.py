@@ -9,7 +9,7 @@ from pipit.dsl2._trace import _Trace
 class _PandasTrace(_Trace):
     """
     Pandas-based implementation of the _Trace class, where the trace
-    of a single rank is represented by a pandas DataFrame.
+    of a single rank is contained in a pandas DataFrame.
     """
 
     def __init__(self, rank: int, data=None) -> None:
@@ -20,7 +20,7 @@ class _PandasTrace(_Trace):
     def __len__(self) -> int:
         return len(self.data)
 
-    def _locate(self, key: any) -> _PandasTrace | Event:
+    def _locate(self, key: any) -> Event | _PandasTrace:
         # case 1: key is an integer
         if isinstance(key, int):
             row = self.data.loc[key]
@@ -31,11 +31,13 @@ class _PandasTrace(_Trace):
             return _PandasTrace(rank=self.rank, data=self.data.loc[key])
 
     def push_event(self, event: Event) -> None:
+        # remove rank from the event since it's already known
         obj = event.to_dict()
         del obj["rank"]
 
         self.buffer.append(obj)
 
+        # flush buffer if it's full
         if len(self.buffer) >= 200:
             self.flush()
 
@@ -49,19 +51,22 @@ class _PandasTrace(_Trace):
         self.buffer = []
 
     def head(self, n: int = 5) -> _PandasTrace:
-        df = self.data.head(n=n)
+        df = self.data.head(n)
         return _PandasTrace(rank=self.rank, data=df)
 
     def tail(self, n: int = 5) -> _PandasTrace:
-        df = self.data.tail(n=n)
+        df = self.data.tail(n)
         return _PandasTrace(rank=self.rank, data=df)
 
     def collect(self) -> List[Event]:
         records = self.data.reset_index().to_dict(orient="records")
+
+        # add the rank back since it's not in the DataFrame
         events = [Event(rank=self.rank, **record) for record in records]
         return events
 
     def show(self) -> None:
+        # maybe we can make this common for all backends
         if len(self):
             if len(self) > 20:
                 top_df = self.head().data.reset_index()
@@ -87,4 +92,5 @@ class _PandasTrace(_Trace):
         print(self.__str__())
 
     def filter(self, condition: str) -> _PandasTrace:
-        return _PandasTrace(rank=self.rank, data=self.data.query(condition))
+        df = self.data.query(condition)
+        return _PandasTrace(rank=self.rank, data=df)
