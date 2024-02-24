@@ -4,6 +4,7 @@ from tabulate import tabulate
 import pandas as pd
 from pipit.dsl2.event import Event
 from pipit.dsl2._trace import _Trace
+from pipit.dsl2.reduce import DictLike, Reducible
 
 
 class _PandasTrace(_Trace):
@@ -17,7 +18,7 @@ class _PandasTrace(_Trace):
         self.rank = rank
         self.buffer = []
 
-    def __len__(self) -> int:
+    def count(self) -> int:
         return len(self.data)
 
     def _locate(self, key: any) -> Event | _PandasTrace:
@@ -67,8 +68,8 @@ class _PandasTrace(_Trace):
 
     def show(self) -> None:
         # maybe we can make this common for all backends
-        if len(self):
-            if len(self) > 20:
+        if self.count():
+            if self.count() > 20:
                 top_df = self.head().data.reset_index()
                 bottom_df = self.tail().data.reset_index()
 
@@ -94,3 +95,7 @@ class _PandasTrace(_Trace):
     def filter(self, condition: str) -> _PandasTrace:
         df = self.data.query(condition)
         return _PandasTrace(rank=self.rank, data=df)
+
+    def map_events(self, func, *args, **kwargs) -> Reducible:
+        series = self.data.apply(func, axis=1, *args, **kwargs)
+        return DictLike(data=series.to_dict(), key_label="idx", value_label="result")

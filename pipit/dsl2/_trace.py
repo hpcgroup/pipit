@@ -3,6 +3,7 @@ from typing import List
 from pipit.dsl2.event import Event
 from abc import ABC, abstractmethod
 from pipit.dsl2.util import LocMixin
+from pipit.dsl2.reduce import Reducible
 
 
 class _Trace(LocMixin, ABC):
@@ -16,15 +17,15 @@ class _Trace(LocMixin, ABC):
 
     def __str__(self) -> str:
         return (
-            f"_Trace (rank={self.rank}, {len(self)} "
-            + f"event{'' if len(self) == 1 else 's'})"
+            f"_Trace (rank={self.rank}, {self.count()} "
+            + f"event{'' if self.count() == 1 else 's'})"
         )
 
     def __repr__(self) -> str:
         return str(self)
 
     @abstractmethod
-    def __len__(self) -> int:
+    def count(self) -> int:
         """
         Returns the number of events in the trace.
         May be changed to `count()` in the future.
@@ -88,5 +89,12 @@ class _Trace(LocMixin, ABC):
     def filter(self, condition: str) -> _Trace:
         """
         Filters the trace using the given condition.
+        """
+        pass
+
+    @abstractmethod
+    def map_events(self, f, *args, **kwargs) -> Reducible:
+        """
+        Applies a function to each event in the trace.
         """
         pass

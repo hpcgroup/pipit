@@ -7,7 +7,7 @@ class Event:
 
     def __str__(self) -> str:
         return (
-            "Event"
+            "Event "
             + f"({', '.join([f'{k}={v.__repr__()}' for k, v in self.kwargs.items()])})"
         )
 
