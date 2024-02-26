@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import List
+from typing import List, Generator
 from pipit.dsl2.event import Event
 from abc import ABC, abstractmethod
 from pipit.dsl2.util import LocMixin
@@ -96,5 +96,19 @@ class _Trace(LocMixin, ABC):
     def map_events(self, f, *args, **kwargs) -> DictLike:
         """
         Applies a function to each event in the trace.
+        """
+        pass
+
+    @abstractmethod
+    def iter_events(self) -> Generator[Event, None, None]:
+        """
+        Returns an iterator over the events in the trace.
+        """
+        pass
+
+    @abstractmethod
+    def add_column(self, name: str, values: any) -> None:
+        """
+        Adds a column to the trace.
         """
         pass
