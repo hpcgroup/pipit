@@ -158,7 +158,12 @@ class TraceDataset(LocMixin):
                 bottom = [e.to_dict() for e in self.tail().collect()]
 
                 print(
-                    tabulate(top + [middle] + bottom, headers="keys", tablefmt="psql")
+                    tabulate(
+                        top + [middle] + bottom,
+                        headers="keys",
+                        maxcolwidths=25,
+                        tablefmt="psql",
+                    )
                 )
             else:
                 print(
@@ -166,6 +171,7 @@ class TraceDataset(LocMixin):
                         [e.to_dict() for e in self.collect()],
                         headers="keys",
                         tablefmt="psql",
+                        maxcolwidths=20,
                     )
                 )
 
