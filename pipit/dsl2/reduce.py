@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 from functools import reduce
 from typing_extensions import Literal
 from tabulate import tabulate
@@ -8,20 +7,7 @@ from tabulate import tabulate
 reducer = Literal["sum", "prod", "max", "min", "mean", "flatten"]
 
 
-class Reducible(ABC):
-    """
-    Mixin class for objects that can be reduced to a single value.
-    """
-
-    @abstractmethod
-    def reduce(self, func: reducer | callable, initial=None) -> any:
-        """
-        Reduces the object to a single value using the given function.
-        """
-        pass
-
-
-class DictLike(Reducible):
+class DictLike:
     """
     A dictionary-like object that can be reduced to a single value.
 
@@ -97,7 +83,7 @@ class DictLike(Reducible):
         if len(table) > 20:
             print(
                 tabulate(
-                    table[:10] + [("...", "...")] + table[-10:],
+                    table[:5] + [("...", "...")] + table[-5:],
                     headers=headers,
                     tablefmt="psql",
                 )

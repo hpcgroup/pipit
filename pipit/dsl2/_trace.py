@@ -3,7 +3,7 @@ from typing import List
 from pipit.dsl2.event import Event
 from abc import ABC, abstractmethod
 from pipit.dsl2.util import LocMixin
-from pipit.dsl2.reduce import Reducible
+from pipit.dsl2.reduce import DictLike
 
 
 class _Trace(LocMixin, ABC):
@@ -93,7 +93,7 @@ class _Trace(LocMixin, ABC):
         pass
 
     @abstractmethod
-    def map_events(self, f, *args, **kwargs) -> Reducible:
+    def map_events(self, f, *args, **kwargs) -> DictLike:
         """
         Applies a function to each event in the trace.
         """

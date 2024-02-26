@@ -4,7 +4,7 @@ from tabulate import tabulate
 import pandas as pd
 from pipit.dsl2.event import Event
 from pipit.dsl2._trace import _Trace
-from pipit.dsl2.reduce import DictLike, Reducible
+from pipit.dsl2.reduce import DictLike
 
 
 class _PandasTrace(_Trace):
@@ -96,6 +96,6 @@ class _PandasTrace(_Trace):
         df = self.data.query(condition)
         return _PandasTrace(rank=self.rank, data=df)
 
-    def map_events(self, func, *args, **kwargs) -> Reducible:
+    def map_events(self, func, *args, **kwargs) -> DictLike:
         series = self.data.apply(func, axis=1, *args, **kwargs)
         return DictLike(data=series.to_dict(), key_label="idx", value_label="result")
