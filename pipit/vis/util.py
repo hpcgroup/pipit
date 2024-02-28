@@ -3,7 +3,7 @@ from bokeh.models import BasicTicker, CustomJSHover, FuncTickFormatter
 from bokeh.plotting import output_notebook
 from bokeh.plotting import show as bk_show
 from bokeh.themes import Theme
-from pipit import config
+import pipit as pp
 
 
 # Helper functions
@@ -39,7 +39,7 @@ def show(p, return_fig=False):
         doc.add_root(p)
         doc.theme = Theme(
             json=yaml.load(
-                config["theme"],
+                pp.get_option("theme"),
                 Loader=yaml.FullLoader,
             )
         )
@@ -47,7 +47,7 @@ def show(p, return_fig=False):
     if in_notebook():
         # If notebook, show it in output cell
         output_notebook(hide_banner=True)
-        bk_show(bkapp, notebook_url=config["notebook_url"])
+        bk_show(bkapp, notebook_url=pp.get_option("notebook_url"))
     else:
         # If standalone, start HTTP server and show in browser
         from bokeh.server.server import Server
@@ -110,9 +110,9 @@ JS_FORMAT_SIZE = """
 """
 
 
-def get_process_ticker(N):
+def get_process_ticker(num_ranks):
     return BasicTicker(
-        base=2, desired_num_ticks=min(N, 16), min_interval=1, num_minor_ticks=0
+        base=2, desired_num_ticks=min(num_ranks, 16), min_interval=1, num_minor_ticks=0
     )
 
 

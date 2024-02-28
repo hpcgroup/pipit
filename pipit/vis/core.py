@@ -38,7 +38,7 @@ def comm_matrix(
     Returns:
         Bokeh figure object if return_fig, None otherwise
     """
-    N = data.shape[0]
+    num_ranks = data.shape[0]
 
     # Define color mapper
     if cmap == "linear":
@@ -54,12 +54,12 @@ def comm_matrix(
     p = figure(
         x_axis_label="Receiver",
         y_axis_label="Sender",
-        x_range=(-0.5, N - 0.5),
-        y_range=(N - 0.5, -0.5),
+        x_range=(-0.5, num_ranks - 0.5),
+        y_range=(num_ranks - 0.5, -0.5),
         x_axis_location="above",
         tools="hover,pan,reset,wheel_zoom,save",
-        width=90 + clamp(N * 30, 200, 500),
-        height=10 + clamp(N * 30, 200, 500),
+        width=90 + clamp(num_ranks * 30, 200, 500),
+        height=10 + clamp(num_ranks * 30, 200, 500),
         toolbar_location="below",
     )
 
@@ -67,23 +67,25 @@ def comm_matrix(
     p.image(
         image=[np.flipud(data)],
         x=-0.5,
-        y=N - 0.5,
-        dw=N,
-        dh=N,
+        y=num_ranks - 0.5,
+        dw=num_ranks,
+        dh=num_ranks,
         color_mapper=color_mapper,
     )
 
     color_bar = ColorBar(
         color_mapper=color_mapper,
-        formatter=get_size_tick_formatter(ignore_range=cmap == "log")
-        if output == "size"
-        else NumeralTickFormatter(),
+        formatter=(
+            get_size_tick_formatter(ignore_range=cmap == "log")
+            if output == "size"
+            else NumeralTickFormatter()
+        ),
         width=15,
     )
     p.add_layout(color_bar, "right")
 
     # Customize plot
-    p.axis.ticker = get_process_ticker(N=N)
+    p.axis.ticker = get_process_ticker(num_ranks=num_ranks)
     p.grid.visible = False
 
     # Configure hover

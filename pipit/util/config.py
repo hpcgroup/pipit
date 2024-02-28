@@ -83,6 +83,23 @@ def url_validator(key, value):
         )
 
 
+# Validator to check if theme is valid YAML
+def theme_validator(key, value):
+    import yaml
+
+    try:
+        yaml.safe_load(value)
+    except yaml.YAMLError:
+        raise ValueError(
+            (
+                'Error loading configuration: The Value "{}" for Configuration "{}"'
+                + "must be a valid YAML"
+            ).format(value, key)
+        )
+    else:
+        return True
+
+
 registered_options = {
     "log_level": {
         "default": "INFO",
@@ -91,6 +108,34 @@ registered_options = {
     "notebook_url": {
         "default": "http://localhost:8888",
         "validator": url_validator,
+    },
+    "theme": {
+        "default": """
+            attrs:
+                Plot:
+                    height: 350
+                    width: 700
+                    background_fill_color: "#fafafa"
+                Axis:
+                    axis_label_text_font_style: "bold"
+                    minor_tick_line_color: null
+                Toolbar:
+                    autohide: true
+                    logo: null
+                HoverTool:
+                    point_policy: "follow_mouse"
+                Legend:
+                    label_text_font_size: "8.5pt"
+                    spacing: 10
+                    border_line_color: null
+                    glyph_width: 16
+                    glyph_height: 16
+                Scatter:
+                    size: 9
+                DataRange1d:
+                    range_padding: 0.05
+        """,
+        "validator": theme_validator,
     },
 }
 
