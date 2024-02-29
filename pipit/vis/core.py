@@ -13,7 +13,6 @@ from .util import (
     get_process_ticker,
     get_size_hover_formatter,
     get_size_tick_formatter,
-    get_tooltips,
     show,
 )
 
@@ -38,7 +37,7 @@ def comm_matrix(
     Returns:
         Bokeh figure object if return_fig, None otherwise
     """
-    num_ranks = data.shape[0]
+    nranks = data.shape[0]
 
     # Define color mapper
     if cmap == "linear":
@@ -54,12 +53,12 @@ def comm_matrix(
     p = figure(
         x_axis_label="Receiver",
         y_axis_label="Sender",
-        x_range=(-0.5, num_ranks - 0.5),
-        y_range=(num_ranks - 0.5, -0.5),
+        x_range=(-0.5, nranks - 0.5),
+        y_range=(nranks - 0.5, -0.5),
         x_axis_location="above",
         tools="hover,pan,reset,wheel_zoom,save",
-        width=90 + clamp(num_ranks * 30, 200, 500),
-        height=10 + clamp(num_ranks * 30, 200, 500),
+        width=90 + clamp(nranks * 30, 200, 500),
+        height=10 + clamp(nranks * 30, 200, 500),
         toolbar_location="below",
     )
 
@@ -67,9 +66,9 @@ def comm_matrix(
     p.image(
         image=[np.flipud(data)],
         x=-0.5,
-        y=num_ranks - 0.5,
-        dw=num_ranks,
-        dh=num_ranks,
+        y=-0.5,
+        dw=nranks,
+        dh=nranks,
         color_mapper=color_mapper,
     )
 
@@ -85,24 +84,16 @@ def comm_matrix(
     p.add_layout(color_bar, "right")
 
     # Customize plot
-    p.axis.ticker = get_process_ticker(num_ranks=num_ranks)
+    p.axis.ticker = get_process_ticker(nranks=nranks)
     p.grid.visible = False
 
     # Configure hover
     hover = p.select(HoverTool)
-    hover.tooltips = get_tooltips(
-        {
-            "Sender": "Process $y{0.}",
-            "Receiver": "Process $x{0.}",
-            "Bytes": "@image{custom}",
-        }
-        if output == "size"
-        else {
-            "Sender": "Process $y{0.}",
-            "Receiver": "Process $x{0.}",
-            "Count": "@image",
-        }
-    )
+    hover.tooltips = [
+        ("sender", "$y{0.}"),
+        ("receiver", "$x{0.}"),
+        ("value", "@image") if output == "count" else ("value", "@image{custom}"),
+    ]
     hover.formatters = {"@image": get_size_hover_formatter()}
 
     # Return plot
@@ -139,12 +130,14 @@ def message_histogram(
     # Customize plot
     p.xaxis.formatter = get_size_tick_formatter()
     p.yaxis.formatter = NumeralTickFormatter()
+    p.xgrid.visible = False
 
     # Configure hover
     hover = p.select(HoverTool)
-    hover.tooltips = get_tooltips(
-        {"Bin": "@left{custom} - @right{custom}", "Number of messages": "@top"}
-    )
+    hover.tooltips = [
+        ("Bin", "@left{custom} - @right{custom}"),
+        ("Count", "@top"),
+    ]
     hover.formatters = {
         "@left": get_size_hover_formatter(),
         "@right": get_size_hover_formatter(),

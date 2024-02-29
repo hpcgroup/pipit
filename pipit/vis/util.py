@@ -1,5 +1,5 @@
 import yaml
-from bokeh.models import BasicTicker, CustomJSHover, FuncTickFormatter
+from bokeh.models import BasicTicker, CustomJSHover, CustomJSTickFormatter
 from bokeh.plotting import output_notebook
 from bokeh.plotting import show as bk_show
 from bokeh.themes import Theme
@@ -36,6 +36,7 @@ def show(p, return_fig=False):
 
     # Create a Bokeh app containing the figure
     def bkapp(doc):
+        doc.clear()
         doc.add_root(p)
         doc.theme = Theme(
             json=yaml.load(
@@ -56,27 +57,6 @@ def show(p, return_fig=False):
         server.start()
         server.io_loop.add_callback(server.show, "/")
         server.io_loop.start()
-
-
-def get_tooltips(tooltips_dict):
-    """Returns nicely formatted HTML tooltips from a dict"""
-
-    html = ""
-    for k, v in tooltips_dict.items():
-        html += f"""
-            <div>
-                <span style=\"font-size: 12px; font-weight: bold;\">{k}:</span>&nbsp;
-                <span style=\"font-size: 12px; font-family: monospace;\">{v}</span>
-            </div>
-        """
-    html += """
-        <style>
-            div.bk-tooltip > div > div:not(:last-child) {
-                display:none !important;
-            }
-        </style>
-    """
-    return html
 
 
 def clamp(value, min_val, max_val):
@@ -110,9 +90,9 @@ JS_FORMAT_SIZE = """
 """
 
 
-def get_process_ticker(num_ranks):
+def get_process_ticker(nranks):
     return BasicTicker(
-        base=2, desired_num_ticks=min(num_ranks, 16), min_interval=1, num_minor_ticks=0
+        base=2, desired_num_ticks=min(nranks, 16), min_interval=1, num_minor_ticks=0
     )
 
 
@@ -128,7 +108,7 @@ def get_size_hover_formatter():
 
 def get_size_tick_formatter(ignore_range=False):
     x = "tick" if ignore_range else "Math.max(...ticks) - Math.min(...ticks);"
-    return FuncTickFormatter(
+    return CustomJSTickFormatter(
         code=f"""
             let x = {x}
             let y = tick;
