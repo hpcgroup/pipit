@@ -26,7 +26,7 @@ jobs:
       - name: Install Python packages
         run: |
           pip install --upgrade pip
-          pip install --upgrade numpy pandas pytest otf2 bokeh==2.4.3 datashader
+          pip install --upgrade numpy pandas pytest otf2 bokeh datashader
 
       - name: Lint and format check with flake8 and black
         if: ${{ matrix.python-version == 3.9 }}
@@ -54,7 +54,7 @@ jobs:
       - name: Install Python packages
         run: |
           pip install --upgrade pip
-          pip install --upgrade numpy pandas pytest otf2 bokeh==2.4.3 datashader
+          pip install --upgrade numpy pandas pytest otf2 bokeh datashader
 
       - name: Basic test with pytest
         run: |
