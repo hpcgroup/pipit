@@ -29,10 +29,6 @@ class Trace:
         self.inc_metrics = []
         self.exc_metrics = []
 
-        from .vis.util import generate_palette
-
-        self.palette = generate_palette(self)
-
     def create_cct(self):
         # adds a column of cct nodes to the events dataframe
         # and stores the graph object in self.cct

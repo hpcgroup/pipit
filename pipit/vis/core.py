@@ -70,6 +70,7 @@ def comm_matrix(
         dw=nranks,
         dh=nranks,
         color_mapper=color_mapper,
+        origin="top_left",
     )
 
     color_bar = ColorBar(
@@ -90,9 +91,9 @@ def comm_matrix(
     # Configure hover
     hover = p.select(HoverTool)
     hover.tooltips = [
-        ("sender", "$y{0.}"),
-        ("receiver", "$x{0.}"),
-        ("value", "@image") if output == "count" else ("value", "@image{custom}"),
+        ("Sender", "$y{0.}"),
+        ("Receiver", "$x{0.}"),
+        ("Count", "@image") if output == "count" else ("Volume", "@image{custom}"),
     ]
     hover.formatters = {"@image": get_size_hover_formatter()}
 
