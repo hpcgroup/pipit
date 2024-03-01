@@ -869,38 +869,40 @@ class Trace:
             patterns.append(match_original)
 
         return patterns
+    
+    @staticmethod
+    def kernel_type(name, cat):
+        if "ncclKernel" in name:
+            return "comm"
+        elif (
+            "memcpy" in cat
+            or "memset" in cat
+            or "Memcpy" in name
+            or "Memset" in name
+        ):
+            return "mem"
+        else:
+            return "comp"
+
+    @staticmethod
+    def merge_intervals(intervals):
+        merged_intervals = [intervals.pop(0)]
+
+        while len(intervals) > 0:
+            top_start, top_end = merged_intervals[-1]
+            curr_start, curr_end = intervals.pop(0)
+
+            if curr_end >= top_start and curr_start <= top_end:
+                merged_intervals[-1] = (
+                    min([curr_start, top_start]),
+                    max([curr_end, top_end]),
+                )
+            else:
+                merged_intervals.append((curr_start, curr_end))
+
+        return merged_intervals
 
     def comm_comp_overlap(self):
-        def kernel_type(name, cat):
-            if "ncclKernel" in name:
-                return "comm"
-            elif (
-                "memcpy" in cat
-                or "memset" in cat
-                or "Memcpy" in name
-                or "Memset" in name
-            ):
-                return "mem"
-            else:
-                return "comp"
-
-        def merge_intervals(intervals):
-            merged_intervals = [intervals.pop(0)]
-
-            while len(intervals) > 0:
-                top_start, top_end = merged_intervals[-1]
-                curr_start, curr_end = intervals.pop(0)
-
-                if curr_end >= top_start and curr_start <= top_end:
-                    merged_intervals[-1] = (
-                        min([curr_start, top_start]),
-                        max([curr_end, top_end]),
-                    )
-                else:
-                    merged_intervals.append((curr_start, curr_end))
-
-            return merged_intervals
-
         self._match_events()
 
         overlap_dict = dict()
@@ -920,11 +922,11 @@ class Trace:
             gpu_df = gpu_df.loc[gpu_df["Event Type"] == "Enter"]
 
             gpu_df["kernel_type"] = gpu_df.apply(
-                lambda row: kernel_type(row["Name"], row["Attributes"]["cat"]), axis=1
+                lambda row: Trace.kernel_type(row["Name"], row["Attributes"]["cat"]), axis=1
             )
 
             comm_df = gpu_df.loc[gpu_df["kernel_type"] == "comm"]
-            comm_intervals = merge_intervals(
+            comm_intervals = Trace.merge_intervals(
                 list(
                     zip(
                         comm_df["Timestamp (ns)"].to_list(),
@@ -934,7 +936,7 @@ class Trace:
             )
 
             comp_df = gpu_df.loc[gpu_df["kernel_type"] == "comp"]
-            comp_intervals = merge_intervals(
+            comp_intervals = Trace.merge_intervals(
                 list(
                     zip(
                         comp_df["Timestamp (ns)"].to_list(),
@@ -977,7 +979,93 @@ class Trace:
                 overlapped_comm_time / total_comm_time * 100
             )
 
+            print("GPU " + str(i))
+            print("Total Time: " + str(max(gpu_df["Timestamp (ns)"]) - min(gpu_df["Timestamp (ns)"])))
+            print("Total Comp Time: " + str((comp_df["_matching_timestamp"] - comp_df["Timestamp (ns)"]).sum()))
             print("Total Comm Time: " + str(total_comm_time))
-            print("Overlapped Comm Time: " + str(overlapped_comm_time))
+            print("Overlapped Comm-Comp Time: " + str(overlapped_comm_time))
+            print("")
 
         return pd.DataFrame(overlap_dict, index=["Comm-Comp Overlap %"]).T
+
+    # need to clean up so that this doesn't reuse code from the above function
+    def breakdown(self):
+        self._match_events()
+
+        # hack for now because of weird ranks
+        filtered_df = self.events[
+            pd.to_numeric(self.events["Process"], errors="coerce").notnull()
+        ]
+        filtered_df = filtered_df.loc[filtered_df["Process"] < 1000]
+        processes = set(filtered_df["Process"])
+
+        breakdown_dict = {p: {} for p in processes}
+
+        for p in processes:
+            gpu_df = self.events.loc[
+                (self.events["Process"] == p) & (self.events["Thread"] != -1)
+            ]
+
+            gpu_df = gpu_df.loc[gpu_df["Event Type"] == "Enter"]
+
+            gpu_df["kernel_type"] = gpu_df.apply(
+                lambda row: Trace.kernel_type(row["Name"], row["Attributes"]["cat"]), axis=1
+            )
+
+            comm_df = gpu_df.loc[gpu_df["kernel_type"] == "comm"]
+            comm_intervals = Trace.merge_intervals(
+                list(
+                    zip(
+                        comm_df["Timestamp (ns)"].to_list(),
+                        comm_df["_matching_timestamp"].to_list(),
+                    )
+                )
+            )
+
+            comp_df = gpu_df.loc[gpu_df["kernel_type"] == "comp"]
+            comp_intervals = Trace.merge_intervals(
+                list(
+                    zip(
+                        comp_df["Timestamp (ns)"].to_list(),
+                        comp_df["_matching_timestamp"].to_list(),
+                    )
+                )
+            )
+
+            comm_enter_times, comm_leave_times = zip(*comm_intervals)
+            comp_enter_times, comp_leave_times = zip(*comp_intervals)
+            comp_df = pd.DataFrame(
+                {
+                    "Timestamp (ns)": comp_enter_times,
+                    "_matching_timestamp": comp_leave_times,
+                }
+            )
+
+            total_comm_time, overlapped_comm_time = 0, 0
+            for j in range(len(comm_enter_times)):
+                curr_enter_time, curr_leave_time = (
+                    comm_enter_times[j],
+                    comm_leave_times[j],
+                )
+                total_comm_time += curr_leave_time - curr_enter_time
+
+                overlapped_df = comp_df.loc[
+                    (comp_df["Timestamp (ns)"] <= curr_leave_time)
+                    & (comp_df["_matching_timestamp"] >= curr_enter_time)
+                ]
+
+                overlapped_comm_time += overlapped_df.apply(
+                    lambda row: (
+                        min([row["_matching_timestamp"], curr_leave_time])
+                        - max([row["Timestamp (ns)"], curr_enter_time])
+                    ),
+                    axis=1,
+                ).sum()
+
+            breakdown_dict[p]["Total Time"] = max(gpu_df["Timestamp (ns)"]) - min(gpu_df["Timestamp (ns)"])
+            breakdown_dict[p]["Only Comp"] = (comp_df["_matching_timestamp"] - comp_df["Timestamp (ns)"]).sum() - overlapped_comm_time
+            breakdown_dict[p]["Overlapped Comm-Comp"] = overlapped_comm_time
+            breakdown_dict[p]["Only Comm"] = total_comm_time - overlapped_comm_time
+            breakdown_dict[p]["Other"] = breakdown_dict[p]["Total Time"] - (breakdown_dict[p]["Only Comp"] + breakdown_dict[p]["Only Comm"] + breakdown_dict[p]["Overlapped Comm-Comp"])
+
+        return breakdown_dict
