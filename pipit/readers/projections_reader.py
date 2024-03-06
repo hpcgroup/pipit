@@ -165,10 +165,9 @@ class STSReader:
             # Add to self.chares
             elif line_arr[0] == "CHARE":
                 id = int(line_arr[1])
-                name = line_arr[2][1 : len(line_arr[2]) - 1]
-                dimensions = int(line_arr[3])
+                name = " ".join(line_arr[2:-1])[1:-1]
+                dimensions = int(line_arr[-1])
                 self.chares[id] = (name, dimensions)
-                # print(int(line_arr[1]), line_arr[2][1:len(line_arr[2]) - 1])
 
             # add to self.entries
             elif line_arr[0] == "ENTRY":
@@ -180,7 +179,6 @@ class STSReader:
                 id = int(line_arr[2])
                 entry_name = line_arr[3][1 : len(line_arr[3]) - 1]
                 chare_id = int(line_arr[4])
-                # name = self.chares[chare_id][0] + '::' + entry_name
                 self.entries[id] = (entry_name, chare_id)
 
             # Add to message_table
@@ -525,7 +523,7 @@ class ProjectionsReader:
                         "Message Length": msglen,
                         "Event ID": event,
                         "Send Time": send_time,
-                        "Destinatopn PEs": destPEs,
+                        "Destination PEs": destPEs,
                     }
 
                     _add_to_trace_dict(
@@ -563,7 +561,7 @@ class ProjectionsReader:
                         "Entry Type": "Processing",
                         "Event ID": event,
                         "Message Length": msglen,
-                        "Recieve Time": recv_time,
+                        "Receive Time": recv_time,
                         "ID List": id,
                         "CPU Start Time": cpu_start_time,
                         "perf counts list": perf_counts,
