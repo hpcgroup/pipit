@@ -969,7 +969,6 @@ class Trace:
                     continue
                 else:
                     last_instant_event = last_instant_event.iloc[-1]
-                last_timestamp = last_instant_event["Timestamp (ns)"]
 
                 # Get the corresponding send event.
                 last_event = self.events[
@@ -978,7 +977,8 @@ class Trace:
                         self.events["Process"]
                         == last_instant_event["Attributes"]["sender"]
                     )
-                    & (self.events["Name"].isin(send_events))
+                    & (self.events["Name"].isin(send_events)
+                    & (self.events["Event Type"] == "Leave"))
                 ].iloc[-1]
                 last_timestamp = last_event["Timestamp (ns)"]
                 last_process = last_event["Process"]
