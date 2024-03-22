@@ -67,6 +67,14 @@ class Trace:
         return NsightReader(filename, create_cct).read()
 
     @staticmethod
+    def from_pytorch(dir_name, create_cct=False):
+        """Read an PyTorch trace (perfetto json format) into a new Trace object."""
+        # import this lazily to avoid circular dependencies
+        from .readers.pytorch_reader import PytorchReader
+
+        return PytorchReader(dir_name, create_cct).read()
+
+    @staticmethod
     def from_csv(filename):
         events_dataframe = pd.read_csv(filename, skipinitialspace=True)
 
@@ -118,16 +126,30 @@ class Trace:
             ]
 
             # list of processes and/or threads to iterate over
-            if "Thread" in self.events.columns:
-                exec_locations = set(zip(self.events["Process"], self.events["Thread"]))
-                has_thread = True
-            else:
-                exec_locations = set(self.events["Process"])
-                has_thread = False
+            has_rank, has_thread = "Rank" in self.events.columns, "Thread" in self.events.columns
+
+            exec_location_names = ["Process"]
+            if has_rank: exec_location_names.append("Rank")
+            if has_thread: exec_location_names.append("Thread")
+
+            exec_locations = set(zip(*[self.events[exec_location_name] for exec_location_name in exec_location_names]))
 
             for curr_loc in exec_locations:
+                if has_rank and has_thread:
+                    curr_process, curr_rank, curr_thread = curr_loc
+                    filtered_df = enter_leave_df.loc[
+                        (enter_leave_df["Process"] == curr_process)
+                        & (enter_leave_df["Thread"] == curr_thread)
+                        & (enter_leave_df["Rank"] == curr_rank)
+                    ]
+                elif has_rank:
+                    curr_process, curr_rank = curr_loc
+                    filtered_df = enter_leave_df.loc[
+                        (enter_leave_df["Process"] == curr_process)
+                        & (enter_leave_df["Rank"] == curr_rank)
+                    ]
                 # only filter by thread if the trace has a thread column
-                if has_thread:
+                elif has_thread:
                     curr_process, curr_thread = curr_loc
                     filtered_df = enter_leave_df.loc[
                         (enter_leave_df["Process"] == curr_process)
@@ -861,3 +883,208 @@ class Trace:
             patterns.append(match_original)
 
         return patterns
+    
+    @staticmethod
+    def kernel_type(name, cat):
+        if "ncclKernel" in name:
+            return "comm"
+        elif (
+            "memcpy" in cat
+            or "memset" in cat
+            or "Memcpy" in name
+            or "Memset" in name
+        ):
+            return "mem"
+        else:
+            return "comp"
+
+    @staticmethod
+    def merge_intervals(intervals):
+        merged_intervals = [intervals.pop(0)]
+
+        while len(intervals) > 0:
+            top_start, top_end = merged_intervals[-1]
+            curr_start, curr_end = intervals.pop(0)
+
+            if curr_end >= top_start and curr_start <= top_end:
+                merged_intervals[-1] = (
+                    min([curr_start, top_start]),
+                    max([curr_end, top_end]),
+                )
+            else:
+                merged_intervals.append((curr_start, curr_end))
+
+        return merged_intervals
+
+    def comm_comp_overlap(self):
+        self._match_events()
+
+        overlap_dict = dict()
+
+        ranks = set(self.events["Rank"])
+
+        # hack for now because of weird ranks
+        filtered_df = self.events[
+            pd.to_numeric(self.events["Process"], errors="coerce").notnull()
+        ]
+        filtered_df = filtered_df.loc[filtered_df["Process"] < 1000]
+
+        for i in ranks:
+            # need to have a better fix: in hta tool, all non-cpu "streams" are made -1
+            # also, all the appropriate columns need to be made numeric, categorical, etc
+            gpu_df = filtered_df.loc[
+                (filtered_df["Rank"] == i) & (filtered_df["Thread"] != -1)
+            ]
+
+            gpu_df = gpu_df.loc[gpu_df["Event Type"] == "Enter"]
+
+            gpu_df["kernel_type"] = gpu_df.apply(
+                lambda row: Trace.kernel_type(row["Name"], row["Attributes"]["cat"]), axis=1
+            )
+
+            comm_df = gpu_df.loc[gpu_df["kernel_type"] == "comm"]
+            comm_intervals = Trace.merge_intervals(
+                list(
+                    zip(
+                        comm_df["Timestamp (ns)"].to_list(),
+                        comm_df["_matching_timestamp"].to_list(),
+                    )
+                )
+            )
+
+            comp_df = gpu_df.loc[gpu_df["kernel_type"] == "comp"]
+            comp_intervals = Trace.merge_intervals(
+                list(
+                    zip(
+                        comp_df["Timestamp (ns)"].to_list(),
+                        comp_df["_matching_timestamp"].to_list(),
+                    )
+                )
+            )
+
+            comm_enter_times, comm_leave_times = zip(*comm_intervals)
+            comp_enter_times, comp_leave_times = zip(*comp_intervals)
+            comp_df = pd.DataFrame(
+                {
+                    "Timestamp (ns)": comp_enter_times,
+                    "_matching_timestamp": comp_leave_times,
+                }
+            )
+
+            total_comm_time, overlapped_comm_time = 0, 0
+            for j in range(len(comm_enter_times)):
+                curr_enter_time, curr_leave_time = (
+                    comm_enter_times[j],
+                    comm_leave_times[j],
+                )
+                total_comm_time += curr_leave_time - curr_enter_time
+
+                overlapped_df = comp_df.loc[
+                    (comp_df["Timestamp (ns)"] <= curr_leave_time)
+                    & (comp_df["_matching_timestamp"] >= curr_enter_time)
+                ]
+
+                overlapped_comm_time += overlapped_df.apply(
+                    lambda row: (
+                        min([row["_matching_timestamp"], curr_leave_time])
+                        - max([row["Timestamp (ns)"], curr_enter_time])
+                    ),
+                    axis=1,
+                ).sum()
+
+            overlap_dict["Rank " + str(i)] = (
+                overlapped_comm_time / total_comm_time * 100
+            )
+
+            print("GPU " + str(i))
+            print("Total Time: " + str(max(gpu_df["Timestamp (ns)"]) - min(gpu_df["Timestamp (ns)"])))
+            print("Total Comp Time: " + str((comp_df["_matching_timestamp"] - comp_df["Timestamp (ns)"]).sum()))
+            print("Total Comm Time: " + str(total_comm_time))
+            print("Overlapped Comm-Comp Time: " + str(overlapped_comm_time))
+            print("")
+
+        return pd.DataFrame(overlap_dict, index=["Comm-Comp Overlap %"]).T
+
+    # need to clean up so that this doesn't reuse code from the above function
+    def breakdown(self):
+        self._match_events()
+
+        ranks = set(self.events["Rank"])
+
+        breakdown_dict = {str(p): {} for p in ranks}
+
+        # hack for now because of weird ranks
+        filtered_df = self.events[
+            pd.to_numeric(self.events["Process"], errors="coerce").notnull()
+        ]
+        filtered_df = filtered_df.loc[filtered_df["Process"] < 1000]
+
+        for p in ranks:
+            # comment about fix in comm-comp overlap
+            gpu_df = filtered_df.loc[
+                (filtered_df["Rank"] == p) & (filtered_df["Thread"] != -1)
+            ]
+
+            gpu_df = gpu_df.loc[gpu_df["Event Type"] == "Enter"]
+
+            gpu_df["kernel_type"] = gpu_df.apply(
+                lambda row: Trace.kernel_type(row["Name"], row["Attributes"]["cat"]), axis=1
+            )
+
+            comm_df = gpu_df.loc[gpu_df["kernel_type"] == "comm"]
+            comm_intervals = Trace.merge_intervals(
+                list(
+                    zip(
+                        comm_df["Timestamp (ns)"].to_list(),
+                        comm_df["_matching_timestamp"].to_list(),
+                    )
+                )
+            )
+
+            comp_df = gpu_df.loc[gpu_df["kernel_type"] == "comp"]
+            comp_intervals = Trace.merge_intervals(
+                list(
+                    zip(
+                        comp_df["Timestamp (ns)"].to_list(),
+                        comp_df["_matching_timestamp"].to_list(),
+                    )
+                )
+            )
+
+            comm_enter_times, comm_leave_times = zip(*comm_intervals)
+            comp_enter_times, comp_leave_times = zip(*comp_intervals)
+            comp_df = pd.DataFrame(
+                {
+                    "Timestamp (ns)": comp_enter_times,
+                    "_matching_timestamp": comp_leave_times,
+                }
+            )
+
+            total_comm_time, overlapped_comm_time = 0, 0
+            for j in range(len(comm_enter_times)):
+                curr_enter_time, curr_leave_time = (
+                    comm_enter_times[j],
+                    comm_leave_times[j],
+                )
+                total_comm_time += curr_leave_time - curr_enter_time
+
+                overlapped_df = comp_df.loc[
+                    (comp_df["Timestamp (ns)"] <= curr_leave_time)
+                    & (comp_df["_matching_timestamp"] >= curr_enter_time)
+                ]
+
+                overlapped_comm_time += overlapped_df.apply(
+                    lambda row: (
+                        min([row["_matching_timestamp"], curr_leave_time])
+                        - max([row["Timestamp (ns)"], curr_enter_time])
+                    ),
+                    axis=1,
+                ).sum()
+
+            breakdown_dict[str(p)]["Total Time"] = max(gpu_df["Timestamp (ns)"]) - min(gpu_df["Timestamp (ns)"])
+            breakdown_dict[str(p)]["Only Comp"] = (comp_df["_matching_timestamp"] - comp_df["Timestamp (ns)"]).sum() - overlapped_comm_time
+            breakdown_dict[str(p)]["Overlapped Comm-Comp"] = overlapped_comm_time
+            breakdown_dict[str(p)]["Only Comm"] = total_comm_time - overlapped_comm_time
+            breakdown_dict[str(p)]["Other"] = breakdown_dict[str(p)]["Total Time"] - (breakdown_dict[str(p)]["Only Comp"] + breakdown_dict[str(p)]["Only Comm"] + breakdown_dict[str(p)]["Overlapped Comm-Comp"])
+
+        return breakdown_dict
