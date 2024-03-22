@@ -36,6 +36,8 @@ class PytorchReader:
                 df["ph"].replace({"X": "Enter", "i": "Instant"}, inplace=True)
                 df = pd.concat([df, temp_df], ignore_index=True)
 
+                df["Rank"] = np.full(len(df), data["distributedInfo"]["rank"])
+
                 dfs.append(df)
 
         df = pd.concat(dfs)
@@ -58,7 +60,7 @@ class PytorchReader:
 
         # not very performant right now
         attribute_cols = set(df.columns) - set(
-            ["Event Type", "Name", "Process", "Thread", "Timestamp (ns)"]
+            ["Event Type", "Name", "Rank", "Process", "Thread", "Timestamp (ns)"]
         )
         df["Attributes"] = [
             {k: v for k, v in x.items() if pd.notnull(v)}
@@ -66,7 +68,7 @@ class PytorchReader:
         ]
         df.drop(columns=attribute_cols, inplace=True)
         df = df[
-            ["Timestamp (ns)", "Event Type", "Name", "Thread", "Process", "Attributes"]
+            ["Timestamp (ns)", "Event Type", "Name", "Rank", "Process", "Thread", "Attributes"]
         ]
 
         definitions_df = df.loc[df["Event Type"] == "M"]
@@ -79,7 +81,7 @@ class PytorchReader:
             columns={"Name": "Definition Type", "args": "Attributes"}, inplace=True
         )
         definitions_df = definitions_df[
-            ["Definition Type", "Process", "Thread", "Attributes"]
+            ["Definition Type", "Rank", "Process", "Thread", "Attributes"]
         ]
 
         trace = pipit.trace.Trace(definitions_df, df)
