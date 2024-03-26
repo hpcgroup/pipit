@@ -1024,4 +1024,3 @@ class Trace:
             if len(critical_path) > 1:
                 critical_dfs.append(pd.DataFrame(critical_path))
         return critical_dfs
-        
