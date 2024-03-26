@@ -17,7 +17,7 @@ from .util import (
 )
 
 
-def comm_matrix(
+def plot_comm_matrix(
     data, output="size", cmap="log", palette="Viridis256", return_fig=False
 ):
     """Plots the trace's communication matrix.
@@ -101,7 +101,7 @@ def comm_matrix(
     return show(p, return_fig=return_fig)
 
 
-def message_histogram(
+def plot_message_histogram(
     data,
     return_fig=False,
 ):
