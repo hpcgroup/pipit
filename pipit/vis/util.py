@@ -5,6 +5,53 @@ from bokeh.plotting import show as bk_show
 from bokeh.themes import Theme
 import pipit as pp
 
+# Custom tickers and formatters
+
+# JS expression to convert bytes to human-readable string
+# "x" is the value (in bytes) being compared
+# "y" is the value (in bytes) being formatted
+JS_FORMAT_SIZE = """
+    if(x < 1e3)
+        return (y).toFixed(2) + " B";
+    if(x < 1e6)
+        return (y / 1e3).toFixed(2) + " kB";
+    if(x < 1e9)
+        return (y / 1e6).toFixed(2) + " MB";
+    if(x < 1e12)
+        return (y / 1e9).toFixed(2) + " GB";
+    if(x < 1e15)
+        return (y / 1e12).toFixed(2) + " TB";
+    else
+        return (y / 1e15).toFixed(2) + " PB";
+"""
+
+
+def get_process_ticker(nranks):
+    return BasicTicker(
+        base=2, desired_num_ticks=min(nranks, 16), min_interval=1, num_minor_ticks=0
+    )
+
+
+def get_size_hover_formatter():
+    return CustomJSHover(
+        code=f"""
+            let x = value;
+            let y = value;
+            {JS_FORMAT_SIZE}
+        """
+    )
+
+
+def get_size_tick_formatter(ignore_range=False):
+    x = "tick" if ignore_range else "Math.max(...ticks) - Math.min(...ticks);"
+    return CustomJSTickFormatter(
+        code=f"""
+            let x = {x}
+            let y = tick;
+            {JS_FORMAT_SIZE}
+        """
+    )
+
 
 # Helper functions
 def in_notebook():
@@ -67,51 +114,3 @@ def clamp(value, min_val, max_val):
     if value > max_val:
         return max_val
     return value
-
-
-# Custom tickers and formatters
-
-# JS expression to convert bytes to human-readable string
-# "x" is the value (in bytes) being compared
-# "y" is the value (in bytes) being formatted
-JS_FORMAT_SIZE = """
-    if(x < 1e3)
-        return (y).toFixed(2) + " B";
-    if(x < 1e6)
-        return (y / 1e3).toFixed(2) + " kB";
-    if(x < 1e9)
-        return (y / 1e6).toFixed(2) + " MB";
-    if(x < 1e12)
-        return (y / 1e9).toFixed(2) + " GB";
-    if(x < 1e15)
-        return (y / 1e12).toFixed(2) + " TB";
-    else
-        return (y / 1e15).toFixed(2) + " PB";
-"""
-
-
-def get_process_ticker(nranks):
-    return BasicTicker(
-        base=2, desired_num_ticks=min(nranks, 16), min_interval=1, num_minor_ticks=0
-    )
-
-
-def get_size_hover_formatter():
-    return CustomJSHover(
-        code=f"""
-            let x = value;
-            let y = value;
-            {JS_FORMAT_SIZE}
-        """
-    )
-
-
-def get_size_tick_formatter(ignore_range=False):
-    x = "tick" if ignore_range else "Math.max(...ticks) - Math.min(...ticks);"
-    return CustomJSTickFormatter(
-        code=f"""
-            let x = {x}
-            let y = tick;
-            {JS_FORMAT_SIZE}
-        """
-    )
