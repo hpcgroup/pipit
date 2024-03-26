@@ -911,6 +911,8 @@ class Trace:
         critical_path = []
         last_event = None
         leave_events = self.events[(self.events["Event Type"] == "Leave")]
+        num_of_processes = leave_events["Process"].astype(int).max()
+
         if "MPI_Finalize" in self.events["Name"].values:
             last_event = self.events[
                 (self.events["Event Type"] == "Leave")
@@ -922,10 +924,8 @@ class Trace:
         last_process = last_event["Process"]
         last_timestamp = last_event["Timestamp (ns)"]
         critical_path.append(last_event)
-
         after_recieve = False
         after_collective = False
-
         # Main loop to trace back
         while True:
             # Filter for events from the same process before the last timestamp
@@ -977,8 +977,10 @@ class Trace:
                         self.events["Process"]
                         == last_instant_event["Attributes"]["sender"]
                     )
-                    & (self.events["Name"].isin(send_events)
-                    & (self.events["Event Type"] == "Leave"))
+                    & (
+                        self.events["Name"].isin(send_events)
+                        & (self.events["Event Type"] == "Leave")
+                    )
                 ].iloc[-1]
                 last_timestamp = last_event["Timestamp (ns)"]
                 last_process = last_event["Process"]
@@ -995,12 +997,31 @@ class Trace:
                 after_collective = True
                 after_receive = False
 
+            start_times = []
+            check_if_done = leave_events[leave_events["Name"] == last_event["Name"]]
+            for start_time in check_if_done.iloc[0 : num_of_processes + 1][
+                "Timestamp (ns)"
+            ]:
+                start_times.append(start_time)
+
             # Exit if we have traced back to the beginning
-            if last_event["Name"] == leave_events.iloc[0]["Name"]:
-                critical_paths.append(critical_path)
-                break
+            leave_events = leave_events.reset_index(drop=True)
+            if (
+                leave_events[
+                    (leave_events["Timestamp (ns)"] == last_event["Timestamp (ns)"])
+                ].index
+                <= num_of_processes + 1
+            ):
+                if (
+                    last_event["Name"] == leave_events.iloc[0]["Name"]
+                    and last_event["Timestamp (ns)"] in start_times
+                ):
+                    critical_paths.append(critical_path)
+                    break
 
         critical_dfs = []
         for critical_path in critical_paths:
-            critical_dfs.append(pd.DataFrame(critical_path))
+            if len(critical_path) > 1:
+                critical_dfs.append(pd.DataFrame(critical_path))
         return critical_dfs
+        
