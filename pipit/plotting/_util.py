@@ -23,7 +23,7 @@ import numpy as np
 import pandas as pd
 
 # Constants
-theme = "default"
+theme = "paper"
 notebook_url = "http://localhost:8888"
 
 THEME_DEFAULT = """
@@ -79,7 +79,7 @@ THEME_PAPER = """
         Legend:
             label_text_font_size: "15pt"
             label_text_font: "Gill Sans"
-            spacing: -1
+            spacing: 7
             padding: 0
             border_line_color: null
             glyph_width: 16
@@ -462,7 +462,7 @@ def get_palette(trace, scale=None):
     # names = funcs["Name"].unique().tolist()
     names = reversed(trace.flat_profile(["time.inc"]).index.tolist())
     depths = (
-        funcs.groupby("Name")["_depth"]
+        funcs.groupby("Name", observed=True)["_depth"]
         .agg(lambda x: x.value_counts().index[0])
         .to_dict()
     )

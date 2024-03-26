@@ -577,7 +577,7 @@ class Trace:
                 self.events.loc[self.events["Event Type"] == "Enter"]
                 .groupby([groupby_column, "Process"], observed=True)[metrics]
                 .sum()
-                .groupby(groupby_column)
+                .groupby(groupby_column, observed=True)
                 .mean()
             )
 

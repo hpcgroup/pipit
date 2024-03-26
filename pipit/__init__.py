@@ -4,3 +4,6 @@
 # SPDX-License-Identifier: MIT
 
 from .trace import Trace  # noqa: F401
+
+# import everything from plotting
+from .plotting import *  # noqa: F401,F403
