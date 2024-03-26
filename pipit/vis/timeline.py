@@ -7,6 +7,7 @@ from bokeh.models import (
     Grid,
     FixedTicker,
     CustomJS,
+    CustomJSTickFormatter
 )
 from bokeh.plotting import figure
 from bokeh.transform import dodge
@@ -18,6 +19,7 @@ from pipit.vis.util import (
     trimmed,
     show,
     factorize_tuples,
+    get_time_tick_formatter
 )
 
 
@@ -217,15 +219,15 @@ def plot_timeline(trace, show_depth=False, instant_events=False):
     p.add_layout(g2)
 
     # Additional plot config
-    # p.xaxis.formatter = get_time_tick_formatter()
-    # p.yaxis.formatter = FuncTickFormatter(
-    #     args={
-    #         "uniques": uniques,
-    #     },
-    #     code="""
-    #         return "Process " + uniques[Math.floor(tick)][0];
-    #     """,
-    # )
+    p.xaxis.formatter = get_time_tick_formatter()
+    p.yaxis.formatter = CustomJSTickFormatter(
+        args={
+            "uniques": uniques,
+        },
+        code="""
+            return "Process " + uniques[Math.floor(tick)][0];
+        """,
+    )
 
     p.yaxis.ticker = FixedTicker(ticks=process_ticks + 0.1)
     p.yaxis.major_tick_line_color = None

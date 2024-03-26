@@ -126,7 +126,7 @@ registered_options = {
                     point_policy: "follow_mouse"
                 Legend:
                     label_text_font_size: "8.5pt"
-                    spacing: 10
+                    spacing: 6
                     border_line_color: null
                     glyph_width: 16
                     glyph_height: 16
