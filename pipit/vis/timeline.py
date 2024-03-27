@@ -1,32 +1,37 @@
 import numpy as np
 import pandas as pd
 from bokeh.models import (
+    Arrow,
     ColumnDataSource,
-    HoverTool,
-    WheelZoomTool,
-    Grid,
-    FixedTicker,
     CustomJS,
     CustomJSTickFormatter,
-    Arrow,
+    FixedTicker,
+    Grid,
+    HoverTool,
     OpenHead,
+    WheelZoomTool,
 )
 from bokeh.events import RangesUpdate, Tap
 from bokeh.plotting import figure
 from bokeh.transform import dodge
 
+import pipit as pp
 from pipit.vis.util import (
-    get_time_hover_formatter,
-    get_html_tooltips,
-    get_factor_cmap,
-    trimmed,
-    show,
     factorize_tuples,
+    get_factor_cmap,
+    get_html_tooltips,
+    get_time_hover_formatter,
     get_time_tick_formatter,
+    show,
+    trimmed,
 )
 
 
-def prepare_data(trace, show_depth, instant_events):
+def prepare_data(trace: pp.Trace, show_depth: bool, instant_events: bool):
+    """
+    Prepare data for plotting the timeline.
+    """
+
     # Generate necessary metrics
     trace.calc_exc_metrics(["Timestamp (ns)"])
     trace._match_events()
@@ -81,8 +86,14 @@ def prepare_data(trace, show_depth, instant_events):
 
 
 def update_cds(
-    event, events, instant_events, min_ts, max_ts, hbar_source, scatter_source
-):
+    event: RangesUpdate,
+    events: pd.DataFrame,
+    instant_events: bool,
+    min_ts: float,
+    max_ts: float,
+    hbar_source: ColumnDataSource,
+    scatter_source: ColumnDataSource,
+) -> None:
     """
     Callback function that updates the 3 data sources based on the new range.
     Called when user zooms or pans the timeline.
@@ -129,7 +140,13 @@ def update_cds(
             scatter_source.data = inst
 
 
-def tap_callback(event, events, trace, show_depth, p):
+def tap_callback(
+    event: Tap,
+    events: pd.DataFrame,
+    trace: pp.Trace,
+    show_depth: bool,
+    p: figure,
+) -> None:
     """
     Callback function that adds an MPI message arrow when user clicks
     on a send or receive event.
@@ -253,7 +270,7 @@ def plot_timeline(trace, show_depth=False, instant_events=False):
     # Image for small functions
     p.image_rgba(source=image_source)
 
-    # Add custom grid lines
+    # Additional plot config
     p.ygrid.visible = False
     g1 = Grid(
         dimension=1,
@@ -274,8 +291,6 @@ def plot_timeline(trace, show_depth=False, instant_events=False):
     )
     p.add_layout(g1)
     p.add_layout(g2)
-
-    # Additional plot config
     p.xaxis.formatter = get_time_tick_formatter()
     p.yaxis.formatter = CustomJSTickFormatter(
         args={
@@ -285,29 +300,15 @@ def plot_timeline(trace, show_depth=False, instant_events=False):
             return "Process " + uniques[Math.floor(tick)][0];
         """,
     )
-
     p.yaxis.ticker = FixedTicker(ticks=process_ticks + 0.1)
     p.yaxis.major_tick_line_color = None
-
     p.toolbar.active_scroll = p.select(dict(type=WheelZoomTool))[0]
-    p.on_event(
-        RangesUpdate,
-        lambda event: update_cds(
-            event, events, instant_events, min_ts, max_ts, hbar_source, scatter_source
-        ),
-    )
-    p.on_event(Tap, lambda event: tap_callback(event, events, trace, show_depth, p))
 
-    # Move legend to the right
+    # Legend config
     p.add_layout(p.legend[0], "below")
     p.legend.orientation = "horizontal"
     p.legend.location = "center"
     p.legend.nrows = 2
-
-    # Make initial call to our callback
-    update_cds(
-        None, events, instant_events, min_ts, max_ts, hbar_source, scatter_source
-    )
 
     # Hover config
     hover = p.select(HoverTool)
@@ -340,6 +341,20 @@ def plot_timeline(trace, show_depth=False, instant_events=False):
             hbar_tooltip.style.display = 'none';
         }
     """
+    )
+
+    # Add interactive Python callbacks
+    p.on_event(
+        RangesUpdate,
+        lambda event: update_cds(
+            event, events, instant_events, min_ts, max_ts, hbar_source, scatter_source
+        ),
+    )
+    p.on_event(Tap, lambda event: tap_callback(event, events, trace, show_depth, p))
+
+    # Make initial call to callback
+    update_cds(
+        None, events, instant_events, min_ts, max_ts, hbar_source, scatter_source
     )
 
     # Return plot
