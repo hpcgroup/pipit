@@ -37,9 +37,6 @@ def prepare_data(trace: pp.Trace, show_depth: bool, instant_events: bool):
     trace._match_events()
     trace._match_caller_callee()
 
-    min_ts = trace.events["Timestamp (ns)"].min()
-    max_ts = trace.events["Timestamp (ns)"].max()
-
     # Prepare data for plotting
     events = (
         trace.events[
@@ -58,9 +55,9 @@ def prepare_data(trace: pp.Trace, show_depth: bool, instant_events: bool):
         else list(zip(events["Process"]))
     )
 
-    codes, uniques = factorize_tuples(y_tuples)
+    codes, y_tuples = factorize_tuples(y_tuples)
     events["y"] = codes
-    num_ys = len(uniques)
+    num_ys = len(y_tuples)
 
     events["_depth"] = events["_depth"].astype(float).fillna("")
     events["name_trimmed"] = trimmed(events["Name"])
@@ -82,15 +79,13 @@ def prepare_data(trace: pp.Trace, show_depth: bool, instant_events: bool):
         ]
     ]
 
-    return events, min_ts, max_ts, uniques, num_ys
+    return events, y_tuples, num_ys
 
 
 def update_cds(
     event: RangesUpdate,
     events: pd.DataFrame,
     instant_events: bool,
-    min_ts: float,
-    max_ts: float,
     hbar_source: ColumnDataSource,
     scatter_source: ColumnDataSource,
 ) -> None:
@@ -99,8 +94,8 @@ def update_cds(
     Called when user zooms or pans the timeline.
     """
 
-    x0 = event.x0 if event is not None else min_ts
-    x1 = event.x1 if event is not None else max_ts
+    x0 = event.x0 if event is not None else events["Timestamp (ns)"].min()
+    x1 = event.x1 if event is not None else events["Timestamp (ns)"].max()
 
     x0 = x0 - (x1 - x0) * 0.25
     x1 = x1 + (x1 - x0) * 0.25
@@ -200,13 +195,13 @@ def plot_timeline(trace, show_depth=False, instant_events=False):
     bars, and MPI messages are represented by lines connecting send/receive events."""
 
     # Prepare data to be plotted
-    events, min_ts, max_ts, uniques, num_ys = prepare_data(
+    events, y_tuples, num_ys = prepare_data(
         trace, show_depth, instant_events
     )
 
     depth_ticks = np.arange(0, num_ys)
     process_ticks = np.array(
-        [i for i, v in enumerate(uniques) if len(v) == 1 or v[1] == 0]
+        [i for i, v in enumerate(y_tuples) if len(v) == 1 or v[1] == 0]
     )
 
     # Define the data sources (Bokeh ColumnDataSource)
@@ -220,6 +215,7 @@ def plot_timeline(trace, show_depth=False, instant_events=False):
 
     # Create Bokeh plot
     plot_height = 120 + 22 * num_ys
+    min_ts, max_ts = events["Timestamp (ns)"].min(), events["Timestamp (ns)"].max()
 
     p = figure(
         x_range=(min_ts, max_ts + (max_ts - min_ts) * 0.05),
@@ -238,20 +234,6 @@ def plot_timeline(trace, show_depth=False, instant_events=False):
     line_cmap = get_factor_cmap("Name", trace, scale=0.7)
 
     # Add glyphs
-    # Scatter for instant events
-    if instant_events:
-        scatter = p.scatter(
-            x="Timestamp (ns)",
-            y=dodge("y", -0.2 if show_depth else 0),
-            # size=9,
-            line_color="#0868ac",
-            alpha=1,
-            color="#ccebc5",
-            line_width=0.8,
-            marker="diamond",
-            source=scatter_source,
-            # legend_label="Instant event",
-        )
 
     # Bars for "large" functions
     hbar = p.hbar(
@@ -270,6 +252,21 @@ def plot_timeline(trace, show_depth=False, instant_events=False):
     # Image for small functions
     p.image_rgba(source=image_source)
 
+    # Scatter for instant events
+    if instant_events:
+        scatter = p.scatter(
+            x="Timestamp (ns)",
+            y=dodge("y", -0.2 if show_depth else 0),
+            # size=9,
+            line_color="#0868ac",
+            alpha=1,
+            color="#ccebc5",
+            line_width=0.8,
+            marker="diamond",
+            source=scatter_source,
+            legend_label="Instant event",
+        )
+    
     # Additional plot config
     p.ygrid.visible = False
     g1 = Grid(
@@ -294,10 +291,10 @@ def plot_timeline(trace, show_depth=False, instant_events=False):
     p.xaxis.formatter = get_time_tick_formatter()
     p.yaxis.formatter = CustomJSTickFormatter(
         args={
-            "uniques": uniques,
+            "y_tuples": y_tuples,
         },
         code="""
-            return "Process " + uniques[Math.floor(tick)][0];
+            return "Process " + y_tuples[Math.floor(tick)][0];
         """,
     )
     p.yaxis.ticker = FixedTicker(ticks=process_ticks + 0.1)
@@ -347,14 +344,14 @@ def plot_timeline(trace, show_depth=False, instant_events=False):
     p.on_event(
         RangesUpdate,
         lambda event: update_cds(
-            event, events, instant_events, min_ts, max_ts, hbar_source, scatter_source
+            event, events, instant_events, hbar_source, scatter_source
         ),
     )
     p.on_event(Tap, lambda event: tap_callback(event, events, trace, show_depth, p))
 
     # Make initial call to callback
     update_cds(
-        None, events, instant_events, min_ts, max_ts, hbar_source, scatter_source
+        None, events, instant_events, hbar_source, scatter_source
     )
 
     # Return plot
