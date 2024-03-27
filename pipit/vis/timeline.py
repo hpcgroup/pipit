@@ -7,8 +7,11 @@ from bokeh.models import (
     Grid,
     FixedTicker,
     CustomJS,
-    CustomJSTickFormatter
+    CustomJSTickFormatter,
+    Arrow,
+    OpenHead,
 )
+from bokeh.events import RangesUpdate, Tap
 from bokeh.plotting import figure
 from bokeh.transform import dodge
 
@@ -19,16 +22,11 @@ from pipit.vis.util import (
     trimmed,
     show,
     factorize_tuples,
-    get_time_tick_formatter
+    get_time_tick_formatter,
 )
 
 
-def plot_timeline(trace, show_depth=False, instant_events=False):
-    """Displays the events of a trace against time
-
-    Instant events are represented by points, functions are represented by horizontal
-    bars, and MPI messages are represented by lines connecting send/receive events."""
-
+def prepare_data(trace, show_depth, instant_events):
     # Generate necessary metrics
     trace.calc_exc_metrics(["Timestamp (ns)"])
     trace._match_events()
@@ -47,7 +45,6 @@ def plot_timeline(trace, show_depth=False, instant_events=False):
         .sort_values(by="time.inc", ascending=False)
         .copy(deep=False)
     )
-    events["_depth"] = events["_depth"].astype(float).fillna("")
 
     # Determine y-coordinates from process and depth
     y_tuples = (
@@ -60,11 +57,7 @@ def plot_timeline(trace, show_depth=False, instant_events=False):
     events["y"] = codes
     num_ys = len(uniques)
 
-    depth_ticks = np.arange(0, num_ys)
-    process_ticks = np.array(
-        [i for i, v in enumerate(uniques) if len(v) == 1 or v[1] == 0]
-    )
-
+    events["_depth"] = events["_depth"].astype(float).fillna("")
     events["name_trimmed"] = trimmed(events["Name"])
     events["_matching_event"] = events["_matching_event"].fillna(-1)
 
@@ -84,56 +77,132 @@ def plot_timeline(trace, show_depth=False, instant_events=False):
         ]
     ]
 
-    # Define CDS for glyphs to be empty
-    hbar_source = ColumnDataSource(events.head(1))
+    return events, min_ts, max_ts, uniques, num_ys
+
+
+def update_cds(
+    event, events, instant_events, min_ts, max_ts, hbar_source, scatter_source
+):
+    """
+    Callback function that updates the 3 data sources based on the new range.
+    Called when user zooms or pans the timeline.
+    """
+
+    x0 = event.x0 if event is not None else min_ts
+    x1 = event.x1 if event is not None else max_ts
+
+    x0 = x0 - (x1 - x0) * 0.25
+    x1 = x1 + (x1 - x0) * 0.25
+
+    # Remove events that are out of bounds
+    in_bounds = events[
+        (
+            (events["Event Type"] == "Instant")
+            & (events["Timestamp (ns)"] > x0)
+            & (events["Timestamp (ns)"] < x1)
+        )
+        | (
+            (events["Event Type"] == "Enter")
+            & (events["_matching_timestamp"] > x0)
+            & (events["Timestamp (ns)"] < x1)
+        )
+    ].copy(deep=False)
+
+    # Update hbar_source to keep 5000 largest functions
+    func = in_bounds[in_bounds["Event Type"] == "Enter"]
+    large = func
+    hbar_source.data = large
+
+    # Update scatter_source to keep sampled events
+    if instant_events:
+        inst = in_bounds[in_bounds["Event Type"] == "Instant"].copy(deep=False)
+
+        if len(inst) > 500:
+            inst["bin"] = pd.cut(x=inst["Timestamp (ns)"], bins=1000, labels=False)
+
+            grouped = inst.groupby(["bin", "y"])
+            samples = grouped.first().reset_index()
+            samples = samples[~samples["Timestamp (ns)"].isna()]
+
+            scatter_source.data = samples
+        else:
+            scatter_source.data = inst
+
+
+def tap_callback(event, events, trace, show_depth, p):
+    """
+    Callback function that adds an MPI message arrow when user clicks
+    on a send or receive event.
+    """
+    x = event.x
+    y = event.y
+
+    candidates = events[
+        (events["Event Type"] == "Instant")
+        & (events["Name"].isin(["MpiSend", "MpiRecv", "MpiIsend", "MpiIrecv"]))
+        & (events["y"] == round(y))
+    ]
+
+    dx = candidates["Timestamp (ns)"] - x
+    distance = pd.Series(dx * dx)
+
+    selected = candidates.iloc[distance.argsort().values]
+
+    if len(selected) >= 1:
+        selected = selected.iloc[0]
+
+        match = trace._get_matching_p2p_event(selected.name)
+        send = (
+            selected
+            if selected["Name"] in ["MpiSend", "MpiIsend"]
+            else events.loc[match]
+        )
+        recv = (
+            selected
+            if selected["Name"] in ["MpiRecv", "MpiIrecv"]
+            else events.loc[match]
+        )
+
+        arrow = Arrow(
+            end=OpenHead(line_color="#28282B", line_width=1.5, size=8),
+            line_color="#28282B",
+            line_width=1.5,
+            x_start=send["Timestamp (ns)"],
+            y_start=send["y"] - 0.2 if show_depth else send["y"],
+            x_end=recv["Timestamp (ns)"],
+            y_end=recv["y"] - 0.2 if show_depth else recv["y"],
+            level="overlay",
+        )
+        p.add_layout(arrow)
+
+
+def plot_timeline(trace, show_depth=False, instant_events=False):
+    """Displays the events of a trace against time
+
+    Instant events are represented by points, functions are represented by horizontal
+    bars, and MPI messages are represented by lines connecting send/receive events."""
+
+    # Prepare data to be plotted
+    events, min_ts, max_ts, uniques, num_ys = prepare_data(
+        trace, show_depth, instant_events
+    )
+
+    depth_ticks = np.arange(0, num_ys)
+    process_ticks = np.array(
+        [i for i, v in enumerate(uniques) if len(v) == 1 or v[1] == 0]
+    )
+
+    # Define the data sources (Bokeh ColumnDataSource)
+    hbar_source = ColumnDataSource(events.head(0))
     scatter_source = ColumnDataSource(events.head(0))
-
-    # Callback function that updates CDS
-    def update_cds(event):
-        x0 = event.x0 if event is not None else min_ts
-        x1 = event.x1 if event is not None else max_ts
-
-        x0 = x0 - (x1 - x0) * 0.25
-        x1 = x1 + (x1 - x0) * 0.25
-
-        # Remove events that are out of bounds
-        in_bounds = events[
-            (
-                (events["Event Type"] == "Instant")
-                & (events["Timestamp (ns)"] > x0)
-                & (events["Timestamp (ns)"] < x1)
-            )
-            | (
-                (events["Event Type"] == "Enter")
-                & (events["_matching_timestamp"] > x0)
-                & (events["Timestamp (ns)"] < x1)
-            )
-        ].copy(deep=False)
-
-        # Update hbar_source to keep 5000 largest functions
-        func = in_bounds[in_bounds["Event Type"] == "Enter"]
-        large = func
-        hbar_source.data = large
-
-        # Update scatter_source to keep sampled events
-        if instant_events:
-            inst = in_bounds[in_bounds["Event Type"] == "Instant"].copy(deep=False)
-
-            if len(inst) > 500:
-                inst["bin"] = pd.cut(x=inst["Timestamp (ns)"], bins=1000, labels=False)
-
-                grouped = inst.groupby(["bin", "y"])
-                samples = grouped.first().reset_index()
-                samples = samples[~samples["Timestamp (ns)"].isna()]
-
-                scatter_source.data = samples
-            else:
-                scatter_source.data = inst
+    image_source = ColumnDataSource(
+        data=dict(
+            image=[np.zeros((50, 16), dtype=np.uint32)], x=[0], y=[0], dw=[0], dh=[0]
+        )
+    )
 
     # Create Bokeh plot
-    # min_height = 50 + 22 * len(events["Name"].unique())
-    plot_height = 100 + 22 * num_ys
-    # height = clamp(plot_height, min_height, 900)
+    plot_height = 120 + 22 * num_ys
 
     p = figure(
         x_range=(min_ts, max_ts + (max_ts - min_ts) * 0.05),
@@ -144,42 +213,15 @@ def plot_timeline(trace, show_depth=False, instant_events=False):
         height=min(500, plot_height),
         sizing_mode="stretch_width",
         toolbar_location=None,
-        # x_axis_label="Time",
+        x_axis_label="Time",
     )
 
-    # p.min_border_bottom = height - plot_height
-
-    # Create color maps
+    # Define color mappings
     fill_cmap = get_factor_cmap("Name", trace)
     line_cmap = get_factor_cmap("Name", trace, scale=0.7)
 
-    # Add lines for each process
-    # p.segment(
-    #     x0=[0] * len(process_ticks),
-    #     x1=[max_ts] * len(process_ticks),
-    #     y0=process_ticks,
-    #     y1=process_ticks,
-    #     line_dash="dotted",
-    #     line_color="gray",
-    # )
-
-    # Add bars for large functions
-    hbar = p.hbar(
-        left="Timestamp (ns)",
-        right="_matching_timestamp",
-        y="y",
-        height=0.8 if show_depth else 0.8,
-        source=hbar_source,
-        fill_color=fill_cmap,
-        line_color=line_cmap,
-        line_width=1,
-        line_alpha=0.5,
-        legend_field="name_trimmed",
-    )
-
-    # Add raster for small functions
-    # p.image_rgba(source=image_source)
-
+    # Add glyphs
+    # Scatter for instant events
     if instant_events:
         scatter = p.scatter(
             x="Timestamp (ns)",
@@ -194,10 +236,25 @@ def plot_timeline(trace, show_depth=False, instant_events=False):
             # legend_label="Instant event",
         )
 
-    # Add custom grid lines
-    # p.xgrid.visible = False
-    p.ygrid.visible = False
+    # Bars for "large" functions
+    hbar = p.hbar(
+        left="Timestamp (ns)",
+        right="_matching_timestamp",
+        y="y",
+        height=0.8 if show_depth else 0.8,
+        source=hbar_source,
+        fill_color=fill_cmap,
+        line_color=line_cmap,
+        line_width=1,
+        line_alpha=0.5,
+        legend_field="name_trimmed",
+    )
 
+    # Image for small functions
+    p.image_rgba(source=image_source)
+
+    # Add custom grid lines
+    p.ygrid.visible = False
     g1 = Grid(
         dimension=1,
         grid_line_color="white",
@@ -210,8 +267,8 @@ def plot_timeline(trace, show_depth=False, instant_events=False):
     g2 = Grid(
         dimension=1,
         grid_line_width=2,
-        # band_fill_color="gray",
-        # band_fill_alpha=0.1,
+        band_fill_color="gray",
+        band_fill_alpha=0.1,
         ticker=FixedTicker(ticks=process_ticks - 0.5),
         level="glyph",
     )
@@ -233,8 +290,13 @@ def plot_timeline(trace, show_depth=False, instant_events=False):
     p.yaxis.major_tick_line_color = None
 
     p.toolbar.active_scroll = p.select(dict(type=WheelZoomTool))[0]
-    # p.on_event(RangesUpdate, update_cds)
-    # p.on_event(Tap, tap_callback)
+    p.on_event(
+        RangesUpdate,
+        lambda event: update_cds(
+            event, events, instant_events, min_ts, max_ts, hbar_source, scatter_source
+        ),
+    )
+    p.on_event(Tap, lambda event: tap_callback(event, events, trace, show_depth, p))
 
     # Move legend to the right
     p.add_layout(p.legend[0], "below")
@@ -243,7 +305,9 @@ def plot_timeline(trace, show_depth=False, instant_events=False):
     p.legend.nrows = 2
 
     # Make initial call to our callback
-    update_cds(None)
+    update_cds(
+        None, events, instant_events, min_ts, max_ts, hbar_source, scatter_source
+    )
 
     # Hover config
     hover = p.select(HoverTool)
