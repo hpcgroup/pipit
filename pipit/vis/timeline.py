@@ -28,10 +28,7 @@ from pipit.vis.util import (
 
 
 def prepare_data(trace: pp.Trace, show_depth: bool, instant_events: bool):
-    """
-    Prepare data for plotting the timeline.
-    """
-
+    """Prepare data for plotting the timeline."""
     # Generate necessary metrics
     trace.calc_exc_metrics(["Timestamp (ns)"])
     trace._match_events()
@@ -90,8 +87,10 @@ def update_cds(
     scatter_source: ColumnDataSource,
 ) -> None:
     """
-    Callback function that updates the 3 data sources based on the new range.
-    Called when user zooms or pans the timeline.
+    Callback function that updates the 3 data sources (hbar_source, scatter_source,
+    image_source) based on the new range.
+
+    Called when user zooms or pans the timeline (and once initially).
     """
 
     x0 = event.x0 if event is not None else events["Timestamp (ns)"].min()
@@ -188,23 +187,30 @@ def tap_callback(
         p.add_layout(arrow)
 
 
-def plot_timeline(trace, show_depth=False, instant_events=False):
-    """Displays the events of a trace against time
+def plot_timeline(
+    trace: pp.Trace,
+    show_depth: bool = False,
+    instant_events: bool = False,
+):
+    """
+    Displays the events of a trace on a timeline.
 
-    Instant events are represented by points, functions are represented by horizontal
-    bars, and MPI messages are represented by lines connecting send/receive events."""
+    Instant events are drawn as points, function calls are drawn as horizontal bars,
+    and MPI messages are drawn as arrows.
+
+    Args:
+        trace: The trace to be visualized.
+        show_depth: Whether to show the depth of the function calls.
+        instant_events: Whether to show instant events.
+
+    Returns:
+        The Bokeh plot.
+    """
 
     # Prepare data to be plotted
-    events, y_tuples, num_ys = prepare_data(
-        trace, show_depth, instant_events
-    )
+    events, y_tuples, num_ys = prepare_data(trace, show_depth, instant_events)
 
-    depth_ticks = np.arange(0, num_ys)
-    process_ticks = np.array(
-        [i for i, v in enumerate(y_tuples) if len(v) == 1 or v[1] == 0]
-    )
-
-    # Define the data sources (Bokeh ColumnDataSource)
+    # Define the 3 data sources (Bokeh ColumnDataSource)
     hbar_source = ColumnDataSource(events.head(0))
     scatter_source = ColumnDataSource(events.head(0))
     image_source = ColumnDataSource(
@@ -234,7 +240,6 @@ def plot_timeline(trace, show_depth=False, instant_events=False):
     line_cmap = get_factor_cmap("Name", trace, scale=0.7)
 
     # Add glyphs
-
     # Bars for "large" functions
     hbar = p.hbar(
         left="Timestamp (ns)",
@@ -266,8 +271,15 @@ def plot_timeline(trace, show_depth=False, instant_events=False):
             source=scatter_source,
             legend_label="Instant event",
         )
-    
+
     # Additional plot config
+    p.toolbar.active_scroll = p.select(dict(type=WheelZoomTool))[0]
+
+    # Grid config
+    depth_ticks = np.arange(0, num_ys)
+    process_ticks = np.array(
+        [i for i, v in enumerate(y_tuples) if len(v) == 1 or v[1] == 0]
+    )
     p.ygrid.visible = False
     g1 = Grid(
         dimension=1,
@@ -288,6 +300,8 @@ def plot_timeline(trace, show_depth=False, instant_events=False):
     )
     p.add_layout(g1)
     p.add_layout(g2)
+
+    # Axis config
     p.xaxis.formatter = get_time_tick_formatter()
     p.yaxis.formatter = CustomJSTickFormatter(
         args={
@@ -299,7 +313,6 @@ def plot_timeline(trace, show_depth=False, instant_events=False):
     )
     p.yaxis.ticker = FixedTicker(ticks=process_ticks + 0.1)
     p.yaxis.major_tick_line_color = None
-    p.toolbar.active_scroll = p.select(dict(type=WheelZoomTool))[0]
 
     # Legend config
     p.add_layout(p.legend[0], "below")
@@ -340,7 +353,7 @@ def plot_timeline(trace, show_depth=False, instant_events=False):
     """
     )
 
-    # Add interactive Python callbacks
+    # Add interactive callbacks (these happen on the Python side)
     p.on_event(
         RangesUpdate,
         lambda event: update_cds(
@@ -350,9 +363,7 @@ def plot_timeline(trace, show_depth=False, instant_events=False):
     p.on_event(Tap, lambda event: tap_callback(event, events, trace, show_depth, p))
 
     # Make initial call to callback
-    update_cds(
-        None, events, instant_events, hbar_source, scatter_source
-    )
+    update_cds(None, events, instant_events, hbar_source, scatter_source)
 
     # Return plot
     return show(p)
