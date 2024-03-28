@@ -191,6 +191,7 @@ def plot_timeline(
     trace: pp.Trace,
     show_depth: bool = False,
     instant_events: bool = False,
+    critical_path: bool = False,
 ):
     """
     Displays the events of a trace on a timeline.
@@ -202,6 +203,8 @@ def plot_timeline(
         trace: The trace to be visualized.
         show_depth: Whether to show the depth of the function calls.
         instant_events: Whether to show instant events.
+        critical_path: Whether to show the critical path. NOTE: critical_path currently
+            only works when show_depth==False. TODO: make it work with show_depth=True.
 
     Returns:
         The Bokeh plot.
@@ -271,6 +274,20 @@ def plot_timeline(
             source=scatter_source,
             legend_label="Instant event",
         )
+
+    # Lines for critical path
+    if critical_path:
+        critical_dfs = trace.critical_path_analysis()
+        for df in critical_dfs:
+            p.line(
+                x="Timestamp (ns)",
+                y="Process",
+                source=ColumnDataSource(df),
+                line_width=2,
+                line_color="black",
+                legend_label="Critical Path",
+                level="overlay",
+            )
 
     # Additional plot config
     p.toolbar.active_scroll = p.select(dict(type=WheelZoomTool))[0]
