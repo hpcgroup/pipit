@@ -279,15 +279,21 @@ def plot_timeline(
     if critical_path:
         critical_dfs = trace.critical_path_analysis()
         for df in critical_dfs:
-            p.line(
-                x="Timestamp (ns)",
-                y="Process",
-                source=ColumnDataSource(df),
-                line_width=2,
-                line_color="black",
-                legend_label="Critical Path",
-                level="overlay",
-            )
+            # Draw arrows
+            # TODO: can we vectorize this?
+            for i in range(len(df) - 1):
+                p.add_layout(
+                    Arrow(
+                        end=OpenHead(line_color="black", line_width=2, size=8),
+                        line_color="black",
+                        line_width=2,
+                        x_start=df["Timestamp (ns)"].iloc[i],
+                        y_start=df["Process"].iloc[i],
+                        x_end=df["Timestamp (ns)"].iloc[i + 1],
+                        y_end=df["Process"].iloc[i + 1],
+                        level="overlay",
+                    )
+                )
 
     # Additional plot config
     p.toolbar.active_scroll = p.select(dict(type=WheelZoomTool))[0]
