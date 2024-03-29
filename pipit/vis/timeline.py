@@ -86,7 +86,8 @@ def prepare_data(trace: pp.Trace, show_depth: bool, instant_events: bool):
 
 
 def update_cds(
-    event: RangesUpdate,
+    x0: float,
+    x1: float,
     events: pd.DataFrame,
     instant_events: bool,
     hbar_source: ColumnDataSource,
@@ -98,10 +99,6 @@ def update_cds(
 
     Called when user zooms or pans the timeline (and once initially).
     """
-
-    x0 = event.x0 if event is not None else events["Timestamp (ns)"].min()
-    x1 = event.x1 if event is not None else events["Timestamp (ns)"].max()
-
     x0 = x0 - (x1 - x0) * 0.25
     x1 = x1 + (x1 - x0) * 0.25
 
@@ -199,6 +196,8 @@ def plot_timeline(
     instant_events: bool = False,
     critical_path: bool = False,
     messages: str = "click",
+    x_start: float = None,
+    x_end: float = None,
 ):
     """
     Displays the events of a trace on a timeline.
@@ -213,6 +212,8 @@ def plot_timeline(
         critical_path: Whether to show the critical path. NOTE: critical_path currently
             only works when show_depth==False. TODO: make it work with show_depth=True.
         show_messages: Whether to show MPI messages. Can be "click" (default), or "all".
+        x_start: The start time of the x-axis range.
+        x_end: The end time of the x-axis range.
 
     Returns:
         The Bokeh plot.
@@ -220,7 +221,7 @@ def plot_timeline(
 
     # Prepare data to be plotted
     events, y_tuples, num_ys = prepare_data(trace, show_depth, instant_events)
-
+    
     # Define the 3 data sources (Bokeh ColumnDataSource)
     hbar_source = ColumnDataSource(events.head(0))
     scatter_source = ColumnDataSource(events.head(0))
@@ -231,11 +232,14 @@ def plot_timeline(
     )
 
     # Create Bokeh plot
-    plot_height = 120 + 22 * num_ys
-    min_ts, max_ts = events["Timestamp (ns)"].min(), events["Timestamp (ns)"].max()
+    if x_start is None:
+        x_start = events["Timestamp (ns)"].min()
+    if x_end is None:
+        x_end = events["Timestamp (ns)"].max() + (events["Timestamp (ns)"].max() - events["Timestamp (ns)"].min()) * 0.05
 
+    plot_height = 120 + 22 * num_ys
     p = figure(
-        x_range=(min_ts, max_ts + (max_ts - min_ts) * 0.05),
+        x_range=(x_start, x_end),
         y_range=(num_ys - 0.5, -0.5),
         x_axis_location="above",
         tools="hover,xpan,reset,xbox_zoom,xwheel_zoom,save",
@@ -315,6 +319,19 @@ def plot_timeline(
     if critical_path:
         critical_dfs = trace.critical_path_analysis()
         for df in critical_dfs:
+            # Draw hatch pattern
+            p.hbar(
+                left="Timestamp (ns)",
+                right="_matching_timestamp",
+                y="Process",
+                height=0.8,
+                source=df,
+                fill_color=None,
+                line_color=None,
+                hatch_color="white",
+                hatch_pattern="right_diagonal_line",
+            )
+
             # Draw arrows
             # TODO: can we vectorize this?
             for i in range(len(df)):
@@ -432,7 +449,7 @@ def plot_timeline(
     p.on_event(
         RangesUpdate,
         lambda event: update_cds(
-            event, events, instant_events, hbar_source, scatter_source
+            event.x0, event.x1, events, instant_events, hbar_source, scatter_source
         ),
     )
 
@@ -440,7 +457,7 @@ def plot_timeline(
         p.on_event(Tap, lambda event: tap_callback(event, events, trace, show_depth, p))
 
     # Make initial call to callback
-    update_cds(None, events, instant_events, hbar_source, scatter_source)
+    update_cds(x_start, x_end, events, instant_events, hbar_source, scatter_source)
 
     # Return plot
     return show(p)
