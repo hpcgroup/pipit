@@ -10,7 +10,6 @@ from bokeh.models import (
     HoverTool,
     OpenHead,
     WheelZoomTool,
-    TeeHead
 )
 from bokeh.events import RangesUpdate, Tap
 from bokeh.plotting import figure
@@ -38,11 +37,7 @@ def prepare_data(trace: pp.Trace, show_depth: bool, instant_events: bool):
 
     # Prepare data for plotting
     events = (
-        trace.events[
-            trace.events["Event Type"].isin(
-                ["Enter", "Instant"]
-            )
-        ]
+        trace.events[trace.events["Event Type"].isin(["Enter", "Instant"])]
         .sort_values(by="time.inc", ascending=False)
         .copy(deep=False)
     )
@@ -86,7 +81,6 @@ def prepare_data(trace: pp.Trace, show_depth: bool, instant_events: bool):
     events.loc[events["Name"] == "MpiIsendComplete", "first_letter"] = "ISC"
     events.loc[events["Name"] == "MpiCollectiveBegin", "first_letter"] = "CB"
     events.loc[events["Name"] == "MpiCollectiveEnd", "first_letter"] = "CE"
-    
 
     return events, y_tuples, num_ys
 
@@ -295,20 +289,27 @@ def plot_timeline(
         for i in range(len(sends)):
             p.add_layout(
                 Arrow(
-                    end=OpenHead(line_color="#28282B", line_width=1.5, size=4, line_alpha=0.8),
+                    end=OpenHead(
+                        line_color="#28282B", line_width=1.5, size=4, line_alpha=0.8
+                    ),
                     line_color="#28282B",
                     line_width=1.5,
                     x_start=sends["Timestamp (ns)"].iloc[i],
-                    y_start=sends["y"].iloc[i] - 0.2 if show_depth else sends["y"].iloc[i],
-                    x_end=events.loc[sends["_matching_event"].iloc[i]]["Timestamp (ns)"],
-                    y_end=events.loc[sends["_matching_event"].iloc[i]]["y"]
-                    - 0.2
-                    if show_depth
-                    else events.loc[sends["_matching_event"].iloc[i]]["y"],
+                    y_start=(
+                        sends["y"].iloc[i] - 0.2 if show_depth else sends["y"].iloc[i]
+                    ),
+                    x_end=events.loc[sends["_matching_event"].iloc[i]][
+                        "Timestamp (ns)"
+                    ],
+                    y_end=(
+                        events.loc[sends["_matching_event"].iloc[i]]["y"] - 0.2
+                        if show_depth
+                        else events.loc[sends["_matching_event"].iloc[i]]["y"]
+                    ),
                     level="annotation",
                     line_alpha=0.8,
                 )
-            ) 
+            )
 
     # Arrows for critical path
     if critical_path:
@@ -316,13 +317,29 @@ def plot_timeline(
         for df in critical_dfs:
             # Draw arrows
             # TODO: can we vectorize this?
-            for i in range(len(df) - 1):
+            for i in range(len(df)):
+                # Step 1) Leave to Enter
                 p.add_layout(
                     Arrow(
-                        end=OpenHead(line_color="black", line_width=2, size=8),
+                        end=OpenHead(line_color="black", line_width=1.5, size=5),
                         line_color="black",
-                        line_width=2,
+                        line_width=1.5,
                         x_start=df["Timestamp (ns)"].iloc[i],
+                        y_start=df["Process"].iloc[i],
+                        x_end=df["_matching_timestamp"].iloc[i],
+                        y_end=df["Process"].iloc[i],
+                        level="overlay",
+                    )
+                )
+
+            for i in range(len(df) - 1):
+                # Step 2) Enter to previous Leave
+                p.add_layout(
+                    Arrow(
+                        end=OpenHead(line_color="black", line_width=1.5, size=5),
+                        line_color="black",
+                        line_width=1.5,
+                        x_start=df["_matching_timestamp"].iloc[i],
                         y_start=df["Process"].iloc[i],
                         x_end=df["Timestamp (ns)"].iloc[i + 1],
                         y_end=df["Process"].iloc[i + 1],
