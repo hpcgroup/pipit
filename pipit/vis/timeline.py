@@ -10,6 +10,7 @@ from bokeh.models import (
     HoverTool,
     OpenHead,
     WheelZoomTool,
+    TeeHead
 )
 from bokeh.events import RangesUpdate, Tap
 from bokeh.plotting import figure
@@ -33,12 +34,13 @@ def prepare_data(trace: pp.Trace, show_depth: bool, instant_events: bool):
     trace.calc_exc_metrics(["Timestamp (ns)"])
     trace._match_events()
     trace._match_caller_callee()
+    trace._match_messages()
 
     # Prepare data for plotting
     events = (
         trace.events[
             trace.events["Event Type"].isin(
-                ["Enter", "Instant"] if instant_events else ["Enter"]
+                ["Enter", "Instant"]
             )
         ]
         .sort_values(by="time.inc", ascending=False)
@@ -75,6 +77,16 @@ def prepare_data(trace: pp.Trace, show_depth: bool, instant_events: bool):
             "Event Type",
         ]
     ]
+    events["first_letter"] = ""
+    events.loc[events["Name"] == "MpiSend", "first_letter"] = "S"
+    events.loc[events["Name"] == "MpiRecv", "first_letter"] = "R"
+    events.loc[events["Name"] == "MpiIsend", "first_letter"] = "IS"
+    events.loc[events["Name"] == "MpiIrecv", "first_letter"] = "IR"
+    events.loc[events["Name"] == "MpiIrecvRequest", "first_letter"] = "IRR"
+    events.loc[events["Name"] == "MpiIsendComplete", "first_letter"] = "ISC"
+    events.loc[events["Name"] == "MpiCollectiveBegin", "first_letter"] = "CB"
+    events.loc[events["Name"] == "MpiCollectiveEnd", "first_letter"] = "CE"
+    
 
     return events, y_tuples, num_ys
 
@@ -192,6 +204,7 @@ def plot_timeline(
     show_depth: bool = False,
     instant_events: bool = False,
     critical_path: bool = False,
+    show_messages: str = "click",
 ):
     """
     Displays the events of a trace on a timeline.
@@ -205,6 +218,7 @@ def plot_timeline(
         instant_events: Whether to show instant events.
         critical_path: Whether to show the critical path. NOTE: critical_path currently
             only works when show_depth==False. TODO: make it work with show_depth=True.
+        show_messages: Whether to show MPI messages. Can be "click" (default), or "all".
 
     Returns:
         The Bokeh plot.
@@ -275,7 +289,28 @@ def plot_timeline(
             legend_label="Instant event",
         )
 
-    # Lines for critical path
+    # Arrows for MPI messages
+    if show_messages == "all":
+        sends = events[events["Name"].isin(["MpiSend", "MpiIsend"])]
+        for i in range(len(sends)):
+            p.add_layout(
+                Arrow(
+                    end=OpenHead(line_color="#28282B", line_width=1.5, size=4, line_alpha=0.8),
+                    line_color="#28282B",
+                    line_width=1.5,
+                    x_start=sends["Timestamp (ns)"].iloc[i],
+                    y_start=sends["y"].iloc[i] - 0.2 if show_depth else sends["y"].iloc[i],
+                    x_end=events.loc[sends["_matching_event"].iloc[i]]["Timestamp (ns)"],
+                    y_end=events.loc[sends["_matching_event"].iloc[i]]["y"]
+                    - 0.2
+                    if show_depth
+                    else events.loc[sends["_matching_event"].iloc[i]]["y"],
+                    level="annotation",
+                    line_alpha=0.8,
+                )
+            ) 
+
+    # Arrows for critical path
     if critical_path:
         critical_dfs = trace.critical_path_analysis()
         for df in critical_dfs:
@@ -383,7 +418,9 @@ def plot_timeline(
             event, events, instant_events, hbar_source, scatter_source
         ),
     )
-    p.on_event(Tap, lambda event: tap_callback(event, events, trace, show_depth, p))
+
+    if show_messages == "click":
+        p.on_event(Tap, lambda event: tap_callback(event, events, trace, show_depth, p))
 
     # Make initial call to callback
     update_cds(None, events, instant_events, hbar_source, scatter_source)
