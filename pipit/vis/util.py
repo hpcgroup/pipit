@@ -298,20 +298,33 @@ def clamp(value, min_val, max_val):
 
 
 def get_html_tooltips(tooltips_dict):
-    html = ""
+    html = """
+        <div class="bk-tooltip-content">
+            <div>
+                <div style="display: table; border-spacing: 2px;">
+    """
     for k, v in tooltips_dict.items():
         html += f"""
-            <div>
-                <span style=\"font-size: 12px; font-weight: bold;\">{k}:</span>&nbsp;
-                <span style=\"font-size: 12px; font-family: monospace;\">{v}</span>
+            <div style="display: table-row;">
+                <div class="bk-tooltip-row-label" style="display: table-cell;">
+                {k}:
+                </div>
+                <div class="bk-tooltip-row-value" style="display: table-cell;">
+                    <span data-value="">{v}</span>
+                </div>
             </div>
         """
     html += """
+        </div></div></div>
         <style>
             div.bk-tooltip > div > div:not(:last-child) {
                 display:none !important;
             }
+            div.bk-tooltip-content > div > div:not(:last-child) {
+                display:none !important;
+            }
         </style>
+
     """
     return html
 
