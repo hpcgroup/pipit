@@ -333,9 +333,7 @@ def plot_timeline(
             )
 
             # Draw arrows
-            # TODO: can we vectorize this?
-            for i in range(len(df)):
-                # Step 1) Leave to Enter
+            for i in range(len(df) - 1):
                 p.add_layout(
                     Arrow(
                         end=OpenHead(line_color="black", line_width=1.5, size=5),
@@ -343,26 +341,41 @@ def plot_timeline(
                         line_width=1.5,
                         x_start=df["Timestamp (ns)"].iloc[i],
                         y_start=df["Process"].iloc[i],
-                        x_end=df["_matching_timestamp"].iloc[i],
-                        y_end=df["Process"].iloc[i],
-                        level="overlay",
-                    )
-                )
-
-            for i in range(len(df) - 1):
-                # Step 2) Enter to previous Leave
-                p.add_layout(
-                    Arrow(
-                        end=OpenHead(line_color="black", line_width=1.5, size=5),
-                        line_color="black",
-                        line_width=1.5,
-                        x_start=df["_matching_timestamp"].iloc[i],
-                        y_start=df["Process"].iloc[i],
                         x_end=df["Timestamp (ns)"].iloc[i + 1],
                         y_end=df["Process"].iloc[i + 1],
                         level="overlay",
                     )
                 )
+            # TODO: can we vectorize this?
+            # # Step 1) Leave to Enter
+            # for i in range(len(df)):
+            #     p.add_layout(
+            #         Arrow(
+            #             end=OpenHead(line_color="black", line_width=1.5, size=5),
+            #             line_color="black",
+            #             line_width=1.5,
+            #             x_start=df["Timestamp (ns)"].iloc[i],
+            #             y_start=df["Process"].iloc[i],
+            #             x_end=df["_matching_timestamp"].iloc[i],
+            #             y_end=df["Process"].iloc[i],
+            #             level="overlay",
+            #         )
+            #     )
+
+            # # Step 2) Enter to previous Leave
+            # for i in range(len(df) - 1):
+            #     p.add_layout(
+            #         Arrow(
+            #             end=OpenHead(line_color="black", line_width=1.5, size=5),
+            #             line_color="black",
+            #             line_width=1.5,
+            #             x_start=df["_matching_timestamp"].iloc[i],
+            #             y_start=df["Process"].iloc[i],
+            #             x_end=df["Timestamp (ns)"].iloc[i + 1],
+            #             y_end=df["Process"].iloc[i + 1],
+            #             level="overlay",
+            #         )
+            #     )
 
     # Additional plot config
     p.toolbar.active_scroll = p.select(dict(type=WheelZoomTool))[0]
