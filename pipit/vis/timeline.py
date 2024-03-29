@@ -204,7 +204,7 @@ def plot_timeline(
     show_depth: bool = False,
     instant_events: bool = False,
     critical_path: bool = False,
-    show_messages: str = "click",
+    messages: str = "click",
 ):
     """
     Displays the events of a trace on a timeline.
@@ -290,7 +290,7 @@ def plot_timeline(
         )
 
     # Arrows for MPI messages
-    if show_messages == "all":
+    if messages == "all":
         sends = events[events["Name"].isin(["MpiSend", "MpiIsend"])]
         for i in range(len(sends)):
             p.add_layout(
@@ -419,7 +419,7 @@ def plot_timeline(
         ),
     )
 
-    if show_messages == "click":
+    if messages == "click":
         p.on_event(Tap, lambda event: tap_callback(event, events, trace, show_depth, p))
 
     # Make initial call to callback
