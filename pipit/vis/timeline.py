@@ -221,7 +221,7 @@ def plot_timeline(
 
     # Prepare data to be plotted
     events, y_tuples, num_ys = prepare_data(trace, show_depth, instant_events)
-    
+
     # Define the 3 data sources (Bokeh ColumnDataSource)
     hbar_source = ColumnDataSource(events.head(0))
     scatter_source = ColumnDataSource(events.head(0))
@@ -235,9 +235,12 @@ def plot_timeline(
     if x_start is None:
         x_start = events["Timestamp (ns)"].min()
     if x_end is None:
-        x_end = events["Timestamp (ns)"].max() + (events["Timestamp (ns)"].max() - events["Timestamp (ns)"].min()) * 0.05
+        x_end = (
+            events["Timestamp (ns)"].max()
+            + (events["Timestamp (ns)"].max() - events["Timestamp (ns)"].min()) * 0.05
+        )
 
-    plot_height = 120 + 22 * num_ys
+    plot_height = 140 + 22 * num_ys
     p = figure(
         x_range=(x_start, x_end),
         y_range=(num_ys - 0.5, -0.5),
@@ -336,9 +339,9 @@ def plot_timeline(
             for i in range(len(df) - 1):
                 p.add_layout(
                     Arrow(
-                        end=OpenHead(line_color="black", line_width=1.5, size=5),
+                        end=OpenHead(line_color="black", line_width=2, size=9),
                         line_color="black",
-                        line_width=1.5,
+                        line_width=2,
                         x_start=df["Timestamp (ns)"].iloc[i],
                         y_start=df["Process"].iloc[i],
                         x_end=df["Timestamp (ns)"].iloc[i + 1],

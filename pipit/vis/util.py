@@ -101,6 +101,7 @@ JS_FORMAT_TIME = """
         var str = "";
         if (ms) str += ms + "ms ";
         if (us) str += Math.round(us) + "us";
+        else str += "0us";
 
         return str;
     }
@@ -114,6 +115,7 @@ JS_FORMAT_TIME = """
     if (ms) str += ms + "ms ";
     if (us) str += us + "us ";
     if (ns) str += ns + "ns";
+    else if (!us) str += "0ns";
 
     return str;
 """
@@ -375,7 +377,7 @@ def get_height(num_yticks, height_per_tick=400):
 
 LIGHT = [
     "#aec7e8",
-    "#ffbb78",
+    # "#ffbb78",            # reserved for sim_life_1d
     "#98df8a",
     "#ff9896",
     "#c5b0d5",
@@ -422,6 +424,8 @@ def get_palette(trace, scale=None):
     palette["MPI_Waitany"] = "#c7c7c7"
     palette["MPI_Waitall"] = "#c7c7c7"
     palette["Idle"] = "#c7c7c7"
+
+    palette["sim_life_1d"] = "#ffbb78"
 
     dark_index = 0
     light_index = 0
