@@ -952,6 +952,15 @@ class Trace:
         # Return the Bokeh plot
         return plot_message_histogram(data, *args, **kwargs)
 
+    def plot_comm_over_time(self, output="size", message_type="send", *args, **kwargs):
+        from .vis import plot_comm_over_time
+
+        # Generate the data
+        data = self.comm_over_time(output=output, message_type=message_type, *args, **kwargs)
+
+        # Return the Bokeh plot
+        return plot_comm_over_time(data, message_type=message_type, output=output)
+
     def plot_timeline(self, *args, **kwargs):
         from .vis import plot_timeline
 

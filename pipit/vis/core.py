@@ -14,6 +14,8 @@ from .util import (
     get_size_hover_formatter,
     get_size_tick_formatter,
     show,
+    get_time_tick_formatter,
+    get_time_hover_formatter,
 )
 
 
@@ -145,4 +147,53 @@ def plot_message_histogram(
     }
 
     # Return plot
+    return show(p, return_fig=return_fig)
+
+
+def plot_comm_over_time(data, output, message_type, return_fig=False):
+    """Plots the trace's communication over time.
+
+    Args:
+        data (hist, edges): Histogram and edges
+        output (str): Specifies whether the matrix contains "size" or "count" values.
+        message_type (str): Specifies whether the message is "send" or "receive".
+        return_fig (bool, optional): Specifies whether to return the Bokeh figure
+            object. Defaults to False, which displays the result and returns nothing.
+
+    Returns:
+        Bokeh figure object if return_fig, None otherwise
+    """
+
+    hist, edges = data
+    is_size = output == "size"
+
+    p = figure(
+        x_axis_label="Time",
+        y_axis_label="Total volume sent" if is_size else "Number of messages",
+        tools="hover,save",
+    )
+    p.y_range.start = 0
+    p.xaxis.formatter = get_time_tick_formatter()
+    p.yaxis.formatter = get_size_tick_formatter()
+
+    p.quad(top=hist, bottom=0, left=edges[:-1], right=edges[1:], line_color="white")
+
+    hover = p.select(HoverTool)
+    hover.tooltips = (
+        [
+            ("Bin", "@left{custom} - @right{custom}"),
+            ("Total volume sent:", "@top{custom}"),
+        ]
+        if is_size
+        else [
+            ("Bin", "@left{custom} - @right{custom}"),
+            ("number of messages:", "@top"),
+        ]
+    )
+    hover.formatters = {
+        "@left": get_time_hover_formatter(),
+        "@right": get_time_hover_formatter(),
+        "@top": get_size_hover_formatter(),
+    }
+
     return show(p, return_fig=return_fig)
