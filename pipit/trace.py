@@ -295,6 +295,17 @@ class Trace:
         """
         Matches corresponding MpiSend/MpiRecv and MpiIsend/MpiIrecv instant events
         """
+        # if we've already matched -- i.e. if _matching_event column exists AND it's not empty for MpiSend/MpiRecv
+        if (
+            "_matching_event" in self.events.columns
+            and not self.events[
+                self.events["Name"].isin(["MpiSend", "MpiRecv", "MpiIsend", "MpiIrecv"])
+            ]["_matching_event"]
+            .isnull()
+            .all()
+        ):
+            return
+
         if "_matching_event" not in self.events.columns:
             self.events["_matching_event"] = None
 
@@ -956,7 +967,9 @@ class Trace:
         from .vis import plot_comm_over_time
 
         # Generate the data
-        data = self.comm_over_time(output=output, message_type=message_type, *args, **kwargs)
+        data = self.comm_over_time(
+            output=output, message_type=message_type, *args, **kwargs
+        )
 
         # Return the Bokeh plot
         return plot_comm_over_time(data, message_type=message_type, output=output)

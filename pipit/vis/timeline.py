@@ -245,7 +245,7 @@ def plot_timeline(
             + (events["Timestamp (ns)"].max() - events["Timestamp (ns)"].min()) * 0.05
         )
 
-    height = height if height is not None else 140 + 30 * num_ys
+    height = height if height is not None else 120 + 30 * num_ys
     p = figure(
         x_range=(x_start, x_end),
         y_range=(num_ys - 0.5, -0.5),
