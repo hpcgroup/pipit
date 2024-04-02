@@ -404,7 +404,7 @@ DARK = [
 def get_palette(trace, scale=None):
     funcs = trace.events[trace.events["Event Type"] == "Enter"]
     # names = funcs["Name"].unique().tolist()
-    names = reversed(trace.flat_profile(["time.inc"]).index.tolist())
+    names = reversed(trace.flat_profile(["time.exc"]).index.tolist())
 
     depths = (
         funcs.groupby("Name", observed=True)["_depth"]

@@ -198,6 +198,8 @@ def plot_timeline(
     messages: str = "click",
     x_start: float = None,
     x_end: float = None,
+    width: int = None,
+    height: int = None,
 ):
     """
     Displays the events of a trace on a timeline.
@@ -214,6 +216,9 @@ def plot_timeline(
         show_messages: Whether to show MPI messages. Can be "click" (default), or "all".
         x_start: The start time of the x-axis range.
         x_end: The end time of the x-axis range.
+        width: The width of the plot. Default is None, which makes the plot full width.
+        height: The height of the plot. Default is None, which makes the plot adapt to the
+            number of ticks on the y-axis.
 
     Returns:
         The Bokeh plot.
@@ -240,15 +245,16 @@ def plot_timeline(
             + (events["Timestamp (ns)"].max() - events["Timestamp (ns)"].min()) * 0.05
         )
 
-    plot_height = 140 + 22 * num_ys
+    height = height if height is not None else 140 + 30 * num_ys
     p = figure(
         x_range=(x_start, x_end),
         y_range=(num_ys - 0.5, -0.5),
         x_axis_location="above",
         tools="hover,xpan,reset,xbox_zoom,xwheel_zoom,save",
         output_backend="webgl",
-        height=min(500, plot_height),
-        sizing_mode="stretch_width",
+        height=min(500, height),
+        sizing_mode="stretch_width" if width is None else "fixed",
+        width=width,
         toolbar_location=None,
         x_axis_label="Time",
     )
@@ -296,11 +302,7 @@ def plot_timeline(
         for i in range(len(sends)):
             p.add_layout(
                 Arrow(
-                    end=OpenHead(
-                        line_color="#28282B", line_width=1.5, size=4, line_alpha=0.8
-                    ),
-                    line_color="#28282B",
-                    line_width=1.5,
+                    end=OpenHead(),
                     x_start=sends["Timestamp (ns)"].iloc[i],
                     y_start=(
                         sends["y"].iloc[i] - 0.2 if show_depth else sends["y"].iloc[i]
@@ -314,7 +316,6 @@ def plot_timeline(
                         else events.loc[sends["_matching_event"].iloc[i]]["y"]
                     ),
                     level="annotation",
-                    line_alpha=0.8,
                 )
             )
 
@@ -336,6 +337,7 @@ def plot_timeline(
             )
 
             # Draw arrows
+            # TODO: can we vectorize this?
             for i in range(len(df) - 1):
                 p.add_layout(
                     Arrow(
@@ -349,36 +351,6 @@ def plot_timeline(
                         level="overlay",
                     )
                 )
-            # TODO: can we vectorize this?
-            # # Step 1) Leave to Enter
-            # for i in range(len(df)):
-            #     p.add_layout(
-            #         Arrow(
-            #             end=OpenHead(line_color="black", line_width=1.5, size=5),
-            #             line_color="black",
-            #             line_width=1.5,
-            #             x_start=df["Timestamp (ns)"].iloc[i],
-            #             y_start=df["Process"].iloc[i],
-            #             x_end=df["_matching_timestamp"].iloc[i],
-            #             y_end=df["Process"].iloc[i],
-            #             level="overlay",
-            #         )
-            #     )
-
-            # # Step 2) Enter to previous Leave
-            # for i in range(len(df) - 1):
-            #     p.add_layout(
-            #         Arrow(
-            #             end=OpenHead(line_color="black", line_width=1.5, size=5),
-            #             line_color="black",
-            #             line_width=1.5,
-            #             x_start=df["_matching_timestamp"].iloc[i],
-            #             y_start=df["Process"].iloc[i],
-            #             x_end=df["Timestamp (ns)"].iloc[i + 1],
-            #             y_end=df["Process"].iloc[i + 1],
-            #             level="overlay",
-            #         )
-            #     )
 
     # Additional plot config
     p.toolbar.active_scroll = p.select(dict(type=WheelZoomTool))[0]
