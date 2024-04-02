@@ -291,6 +291,89 @@ class Trace:
                 {"_depth": "category", "_parent": "category"}
             )
 
+    def _match_messages(self):
+        """
+        Matches corresponding MpiSend/MpiRecv and MpiIsend/MpiIrecv instant events
+        """
+        # if we've already matched -- i.e. if _matching_event column exists AND it's not empty for MpiSend/MpiRecv
+        if (
+            "_matching_event" in self.events.columns
+            and not self.events[
+                self.events["Name"].isin(["MpiSend", "MpiRecv", "MpiIsend", "MpiIrecv"])
+            ]["_matching_event"]
+            .isnull()
+            .all()
+        ):
+            return
+
+        if "_matching_event" not in self.events.columns:
+            self.events["_matching_event"] = None
+
+        if "_matching_timestamp" not in self.events.columns:
+            self.events["_matching_timestamp"] = np.nan
+
+        matching_events = list(self.events["_matching_event"])
+        matching_times = list(self.events["_matching_timestamp"])
+
+        mpi_events = self.events[
+            self.events["Name"].isin(["MpiSend", "MpiRecv", "MpiIsend", "MpiIrecv"])
+        ]
+
+        queue = [[] for _ in range(len(self.events["Process"].unique()))]
+
+        df_indices = list(mpi_events.index)
+        timestamps = list(mpi_events["Timestamp (ns)"])
+        names = list(mpi_events["Name"])
+        attrs = list(mpi_events["Attributes"])
+        processes = list(mpi_events["Process"])
+
+        # Iterate through all events
+        for i in range(len(mpi_events)):
+            curr_df_index = df_indices[i]
+            curr_timestamp = timestamps[i]
+            curr_name = names[i]
+            curr_attrs = attrs[i]
+            curr_process = processes[i]
+
+            if curr_name == "MpiSend" or curr_name == "MpiIsend":
+                # Add current dataframe index, timestmap, and process to stack
+                if "receiver" in curr_attrs:
+                    queue[curr_attrs["receiver"]].append(
+                        (curr_df_index, curr_timestamp, curr_name, curr_process)
+                    )
+            elif curr_name == "MpiRecv" or curr_name == "MpiIrecv":
+                if "sender" in curr_attrs:
+                    send_process = None
+                    i = 0
+
+                    # we want to iterate through the queue in order
+                    # until we find the corresponding "send" event
+                    while send_process != curr_attrs["sender"] and i < len(
+                        queue[curr_process]
+                    ):
+                        send_df_index, send_timestamp, send_name, send_process = queue[
+                            curr_process
+                        ][i]
+                        i += 1
+
+                    if send_process == curr_attrs["sender"] and i <= len(
+                        queue[curr_process]
+                    ):
+                        # remove matched event from queue
+                        del queue[curr_process][i - 1]
+
+                        # Fill in the lists with the matching values if event found
+                        matching_events[send_df_index] = curr_df_index
+                        matching_events[curr_df_index] = send_df_index
+
+                        matching_times[send_df_index] = curr_timestamp
+                        matching_times[curr_df_index] = send_timestamp
+
+        self.events["_matching_event"] = matching_events
+        self.events["_matching_timestamp"] = matching_times
+
+        self.events = self.events.astype({"_matching_event": "Int32"})
+
     def calc_inc_metrics(self, columns=None):
         # if no columns are specified by the user, then we calculate
         # inclusive metrics for all the numeric columns in the trace
@@ -548,7 +631,7 @@ class Trace:
                 self.events.loc[self.events["Event Type"] == "Enter"]
                 .groupby([groupby_column, "Process"], observed=True)[metrics]
                 .sum()
-                .groupby(groupby_column)
+                .groupby(groupby_column, observed=True)
                 .mean()
             )
 
@@ -597,7 +680,7 @@ class Trace:
 
         return imbalance_df
 
-    def idle_time(self, idle_functions=["Idle"], MPI_events=False):
+    def idle_time(self, idle_functions=["Idle"], mpi_events=False):
         # dict for creating a new dataframe
         idle_times = {"Process": [], "Idle Time": []}
 
@@ -605,19 +688,19 @@ class Trace:
             idle_times["Process"].append(process)
             idle_times["Idle Time"].append(
                 self._calculate_idle_time_for_process(
-                    process, idle_functions, MPI_events
+                    process, idle_functions, mpi_events
                 )
             )
         return pd.DataFrame(idle_times)
 
     def _calculate_idle_time_for_process(
-        self, process, idle_functions=["Idle"], MPI_events=False
+        self, process, idle_functions=["Idle"], mpi_events=False
     ):
         # calculate inclusive metrics
         if "time.inc" not in self.events.columns:
             self.calc_inc_metrics()
 
-        if MPI_events:
+        if mpi_events:
             idle_functions += ["MPI_Wait", "MPI_Waitall", "MPI_Recv"]
         # filter the dataframe to include only 'Enter' events within the specified
         # process with the specified function names
@@ -861,3 +944,210 @@ class Trace:
             patterns.append(match_original)
 
         return patterns
+
+    def plot_comm_matrix(self, output="size", *args, **kwargs):
+        from .vis import plot_comm_matrix
+
+        # Generate the data
+        data = self.comm_matrix(output=output)
+
+        # Return the Bokeh plot
+        return plot_comm_matrix(data, output=output, *args, **kwargs)
+
+    def plot_message_histogram(self, bins=20, *args, **kwargs):
+        from .vis import plot_message_histogram
+
+        # Generate the data
+        data = self.message_histogram(bins=bins)
+
+        # Return the Bokeh plot
+        return plot_message_histogram(data, *args, **kwargs)
+
+    def plot_comm_over_time(self, output="size", message_type="send", *args, **kwargs):
+        from .vis import plot_comm_over_time
+
+        # Generate the data
+        data = self.comm_over_time(
+            output=output, message_type=message_type, *args, **kwargs
+        )
+
+        # Return the Bokeh plot
+        return plot_comm_over_time(data, message_type=message_type, output=output)
+
+    def plot_comm_by_process(self, output="size", *args, **kwargs):
+        from .vis import plot_comm_by_process
+
+        # Generate the data
+        data = self.comm_by_process(output=output)
+
+        # Return the Bokeh plot
+        return plot_comm_by_process(data, output=output, *args, **kwargs)
+
+    def plot_timeline(self, *args, **kwargs):
+        from .vis import plot_timeline
+
+        # Return the Bokeh plot
+        return plot_timeline(self, *args, **kwargs)
+
+    def critical_path_analysis(self):
+        self._match_events()
+
+        instant_recv_events = ["MpiRecv", "MpiIrecv"]
+        recv_events = ["MPI_Recv", "MPI_Irecv"]
+        send_events = ["MPI_Send", "MPI_Isend"]
+        collective_functions = [
+            "MPI_Allgather",
+            "MPI_Allgatherv",
+            "MPI_Allreduce",
+            "MPI_Alltoall",
+            "MPI_Alltoallv",
+            "MPI_Alltoallw",
+            "MPI_Barrier",
+            "MPI_Bcast",
+            "MPI_Gather",
+            "MPI_Gatherv",
+            "MPI_Iallgather",
+            "MPI_Iallreduce",
+            "MPI_Ibarrier",
+            "MPI_Ibcast",
+            "MPI_Igather",
+            "MPI_Igatherv",
+            "MPI_Ireduce",
+            "MPI_Iscatter",
+            "MPI_Iscatterv",
+            "MPI_Reduce",
+            "MPI_Scatter",
+            "MPI_Scatterv",
+            "MPI_Exscan",
+            "MPI_Op_create",
+            "MPI_Op_free",
+            "MPI_Reduce_local",
+            "MPI_Reduce_scatter",
+            "MPI_Scan",
+            "MPI_File_iread_at_all",
+            "MPI_File_iwrite_at_all",
+            "MPI_File_iread_all",
+            "MPI_File_iwrite_all",
+            "MPI_File_read_all_begin",
+            "MPI_File_write_all_begin",
+            "MPI_File_write_all_end",
+            "MPI_File_close",
+        ]
+
+        critical_paths = []
+        critical_path = []
+        last_event = None
+        leave_events = self.events[(self.events["Event Type"] == "Leave")]
+        num_of_processes = leave_events["Process"].astype(int).max()
+
+        if "MPI_Finalize" in self.events["Name"].values:
+            last_event = self.events[
+                (self.events["Event Type"] == "Leave")
+                & (self.events["Name"] == "MPI_Finalize")
+            ].iloc[-1]
+        else:
+            last_event = self.events[self.events["Event Type"] == "Leave"].iloc[-1]
+        last_name = last_event["Name"]
+        last_process = last_event["Process"]
+        last_timestamp = last_event["Timestamp (ns)"]
+        critical_path.append(last_event)
+        after_recieve = False
+        after_collective = False
+        # Main loop to trace back
+        while True:
+            # Filter for events from the same process before the last timestamp
+            candidate_events = leave_events[
+                (leave_events["Process"] == last_event["Process"])
+                & (leave_events["Timestamp (ns)"] < last_event["Timestamp (ns)"])
+            ]
+
+            # obtain the latest function after the collective function call.
+            # we basically do the something similar to starting with MPI_Finalize
+            # but this time we use a different function.
+            if after_collective:
+                candidate_name = candidate_events.iloc[-1]["Name"]
+                candidate_events = leave_events[
+                    (leave_events["Name"] == candidate_name)
+                    & (leave_events["Timestamp (ns)"] < last_event["Timestamp (ns)"])
+                ]
+
+            # No more events to trace back from.
+            if candidate_events.empty:
+                break
+
+            # Select the last event from the candidates if
+            # we the previous event is not a receive.
+            if not after_recieve:
+                last_event = candidate_events.iloc[-1]
+                critical_path.append(last_event)
+
+            # If we continue after a receive function.
+            if last_event["Name"] in recv_events:
+                # Get the corresponding instant event for the recv function.
+                last_instant_event = self.events[
+                    (self.events["Event Type"] == "Instant")
+                    & (self.events["Timestamp (ns)"] < last_timestamp)
+                    & (self.events["Process"] == last_process)
+                    & (self.events["Name"].isin(instant_recv_events))
+                ]
+                # Sometimes recv function have some instant events which
+                # do not include the sender information. We ignore them.
+                if last_instant_event.empty:
+                    continue
+                else:
+                    last_instant_event = last_instant_event.iloc[-1]
+
+                # Get the corresponding send event.
+                last_event = self.events[
+                    (self.events["Timestamp (ns)"] < last_timestamp)
+                    & (
+                        self.events["Process"]
+                        == last_instant_event["Attributes"]["sender"]
+                    )
+                    & (
+                        self.events["Name"].isin(send_events)
+                        & (self.events["Event Type"] == "Leave")
+                    )
+                ].iloc[-1]
+                last_timestamp = last_event["Timestamp (ns)"]
+                last_process = last_event["Process"]
+
+                after_receive = True
+                after_collective = False
+                critical_path.append(last_event)
+                pass
+
+            # Restart the detection after a collective function.
+            if last_event["Name"] in collective_functions:
+                critical_paths.append(critical_path)
+                critical_path = []
+                after_collective = True
+                after_receive = False
+
+            start_times = []
+            check_if_done = leave_events[leave_events["Name"] == last_event["Name"]]
+            for start_time in check_if_done.iloc[0 : num_of_processes + 1][
+                "Timestamp (ns)"
+            ]:
+                start_times.append(start_time)
+
+            # Exit if we have traced back to the beginning
+            leave_events = leave_events.reset_index(drop=True)
+            if (
+                leave_events[
+                    (leave_events["Timestamp (ns)"] == last_event["Timestamp (ns)"])
+                ].index
+                <= num_of_processes + 1
+            ):
+                if (
+                    last_event["Name"] == leave_events.iloc[0]["Name"]
+                    and last_event["Timestamp (ns)"] in start_times
+                ):
+                    critical_paths.append(critical_path)
+                    break
+
+        critical_dfs = []
+        for critical_path in critical_paths:
+            if len(critical_path) > 1:
+                critical_dfs.append(pd.DataFrame(critical_path))
+        return critical_dfs
