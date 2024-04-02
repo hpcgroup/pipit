@@ -200,6 +200,7 @@ def plot_timeline(
     x_end: float = None,
     width: int = None,
     height: int = None,
+    legend_nrows: int = None,
 ):
     """
     Displays the events of a trace on a timeline.
@@ -217,8 +218,10 @@ def plot_timeline(
         x_start: The start time of the x-axis range.
         x_end: The end time of the x-axis range.
         width: The width of the plot. Default is None, which makes the plot full width.
-        height: The height of the plot. Default is None, which makes the plot adapt to the
-            number of ticks on the y-axis.
+        height: The height of the plot. Default is None, which makes the plot adapt to
+            the number of ticks on the y-axis.
+        legend_nrows: The number of rows in the legend. Default is None, which makes the
+            legend adapt to the number of items.
 
     Returns:
         The Bokeh plot.
@@ -245,7 +248,7 @@ def plot_timeline(
             + (events["Timestamp (ns)"].max() - events["Timestamp (ns)"].min()) * 0.05
         )
 
-    height = height if height is not None else 120 + 30 * num_ys
+    height = height if height is not None else 150 + 30 * num_ys
     p = figure(
         x_range=(x_start, x_end),
         y_range=(num_ys - 0.5, -0.5),
@@ -398,7 +401,7 @@ def plot_timeline(
     p.add_layout(p.legend[0], "below")
     p.legend.orientation = "horizontal"
     p.legend.location = "center"
-    p.legend.nrows = 2
+    p.legend.nrows = legend_nrows if legend_nrows is not None else "auto"
 
     # Hover config
     hover = p.select(HoverTool)

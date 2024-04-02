@@ -217,7 +217,7 @@ def get_percent_hover_formatter():
 # TODO: maybe do this client side with transform
 def trimmed(names: pd.Series) -> pd.Series:
     return np.where(
-        names.str.len() < 30, names, names.str[0:20] + "..." + names.str[-5:]
+        names.str.len() < 30, names, names.str[0:10] + "..." + names.str[-5:]
     )
 
 

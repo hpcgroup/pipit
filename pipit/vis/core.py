@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 from bokeh.models import (
     ColorBar,
     HoverTool,
@@ -7,6 +8,8 @@ from bokeh.models import (
     NumeralTickFormatter,
 )
 from bokeh.plotting import figure
+from bokeh.models import BasicTicker
+from bokeh.transform import dodge
 
 from .util import (
     clamp,
@@ -150,7 +153,9 @@ def plot_message_histogram(
     return show(p, return_fig=return_fig)
 
 
-def plot_comm_over_time(data, output, message_type, return_fig=False):
+def plot_comm_over_time(
+    data: tuple, output: str, message_type: str, return_fig: bool = False
+):
     """Plots the trace's communication over time.
 
     Args:
@@ -194,6 +199,91 @@ def plot_comm_over_time(data, output, message_type, return_fig=False):
         "@left": get_time_hover_formatter(),
         "@right": get_time_hover_formatter(),
         "@top": get_size_hover_formatter(),
+    }
+
+    return show(p, return_fig=return_fig)
+
+
+def plot_comm_by_process(
+    data: pd.DataFrame,
+    output: str,
+    return_fig: bool = False,
+    width: int = None,
+    height: int = 600,
+):
+    """
+    Plots the trace's communication by process.
+
+    Args:
+        data (pd.DataFrame): DataFrame containing the communication data.
+        output (str): Specifies whether the matrix contains "size" or "count" values.
+        return_fig (bool, optional): Specifies whether to return the Bokeh figure
+            object. Defaults to False, which displays the result and returns nothing.
+        width: The width of the plot. Default is None, which makes the plot full width.
+        height: The height of the plot. Default is 600.
+
+    Returns:
+        Bokeh figure object if return_fig, None otherwise
+    """
+    data.reset_index()
+    is_size = output == "size"
+
+    p = figure(
+        x_range=(-0.5, len(data) - 0.5),
+        y_axis_label="Volume",
+        x_axis_label="Process",
+        tools="hover,save",
+        width=width,
+        sizing_mode="fixed" if width is not None else "stretch_width",
+        height=height,
+    )
+    p.y_range.start = 0
+    p.y_range.range_padding = 0.5
+
+    p.xgrid.visible = False
+    p.yaxis.formatter = get_size_tick_formatter()
+    p.xaxis.ticker = BasicTicker(
+        base=2,
+        desired_num_ticks=min(len(data), 16),
+        min_interval=1,
+        num_minor_ticks=0,
+    )
+
+    p.vbar(
+        x=dodge("Process", -0.1667, range=p.y_range),
+        top="Sent",
+        width=0.2,
+        source=data,
+        color="#1f77b4",
+        legend_label="Total sent",
+    )
+    p.vbar(
+        x=dodge("Process", 0.1667, range=p.y_range),
+        top="Received",
+        width=0.2,
+        source=data,
+        color="#d62728",
+        legend_label="Total received",
+    )
+    p.add_layout(p.legend[0], "below")
+    p.legend.orientation = "horizontal"
+    p.legend.location = "center"
+
+    hover = p.select(HoverTool)
+    hover.tooltips = (
+        [
+            ("Bin", "@left{custom} - @right{custom}"),
+            ("Total volume sent:", "@top{custom}"),
+        ]
+        if is_size
+        else [
+            ("Bin", "@left{custom} - @right{custom}"),
+            ("number of messages:", "@top"),
+        ]
+    )
+    hover.formatters = {
+        "@Sent": get_size_hover_formatter(),
+        "@Received": get_size_hover_formatter(),
     }
 
     return show(p, return_fig=return_fig)
