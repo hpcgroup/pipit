@@ -1,5 +1,24 @@
 # from .event import Event
-# from .partition import Partition
+# from .partition_old import Partition
+# from pandas import DataFrame
+
+# # def _get_event_list(trace):
+# #     event_list = []
+# #     unique_processes = trace.events['Process'].unique().tolist()
+# #     unique_processes.sort()
+# #     for process in unique_processes:
+# #         process_filtered_events: DataFrame = trace.events[(trace.events['Process'] == process)]
+
+# #         prev_event = None
+# #         prev_event_row = None
+# #         for index, event_row in process_filtered_events.iterrows():
+# #             event = None
+# #             event_name = event_row['Name']
+# #             event_type = event_row['Event Type']
+
+# #             if event_type == 'Instant':
+# #                 if event_name
+
 
 # def _get_event_graph(trace):
 #     """ Get event graph from trace

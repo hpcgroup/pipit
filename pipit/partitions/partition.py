@@ -2,19 +2,54 @@ from .event import Event
 from typing import Set, List, Dict
 
 class Partition:
-    def __init__(self, partition_id, event_list):
-        self.partition_id: int = partition_id
-        #self.event_list = event_list
-        self.event_dict = {}
-        for event in event_list:
-            self.event_dict[event.event_id] = event
-            event.add_partition(self)
-        #for event in self.event_list:
-        #    event.add_partition(self)
-        self.parents: Set[int] = set()
-        self.children: Set[int] = set()
+    # Each Partition is started as a singular event consisting of an MPI operation
+    # We will later add in computation events  
+    
+    def __init__(self, parition_id: int):
+        """
+        Constructor for empty partition 
+        """
+        self.partition_id: int = parition_id
+        
+        # event's set 
+        # each id in events correlates to the trace.events df
+        self.events: Set[Event] = set()
+        
+        # for all p in parents, p happens before self
+        self.parents: Set[Partition] = set()
+        # for all c in children, c happens after self
+        self.children: Set[Partition] = set()
+
         self.processes: Set[int] = set()
-        self.events_set: Set[Event] = set(event_list)
+        
+
+        # variables for leap
+        self.distance = 0
+        self.min_event_start: float = float('inf')
+        self.max_event_end: 0
+        self.__calc_min_max_time()
+
+        # Variables for Tarjan's algorithm
+        self.visited = False
+        self.index = -1
+        self.low_link = -1
+    
+
+    def __init__(self, event: Event):
+        self.partition_id: int = event.event_id
+        
+        # event's set 
+        # each id in events correlates to the trace.events df
+        self.events: Set[Event] = set()
+        self.events.add(event)
+        
+        # for all p in parents, p happens before self
+        self.parents: Set[Partition] = set()
+        # for all c in children, c happens after self
+        self.children: Set[Partition] = set()
+
+        self.processes: Set[int] = set()
+        
 
         # variables for leap
         self.distance = 0
@@ -26,16 +61,7 @@ class Partition:
         self.visited = False
         self.index = -1
         self.low_link = -1
-
-    def __calc_min_max_time(self):
-        if len(self.events_set) > 0:    
-            self.min_event_start = min([event.start_time for event in self.events_set])
-            self.max_event_end = max([event.end_time for event in self.events_set])
-
-    def initialize_for_tarjan(self):
-        self.visited = False
-        self.index = -1
-        self.low_link = -1
+    
 
     def __hash__(self) -> int:
         return self.partition_id
@@ -46,16 +72,36 @@ class Partition:
     def __ne__(self, other):
         return self.partition_id != other.partition_id
 
-    def merge_partition(self, other):
-        self.event_dict.update(other.event_dict)
-        self.get_parents()
-        self.get_children()
-        for event_id, event in self.event_dict.items():
-            event.add_partition(self)
-        self.events_set.update(other.events_set)
-        self.get_children()
-        self.get_parents()
+    def absorb_partition(self, other: "Partition"):
+        self.events.update(other.events)
+        
+        self.parents.update(other.parents)
+        self.children.update(other.children)
+        self.processes.update(other.processes)
+
+        if self in self.parents:
+            self.parents.remove(self)
+        if self in self.children:
+            self.children.remove(self)
+        if other in self.parents:
+            self.parents.remove(other)
+        if other in self.children:
+            self.children.remove(other)
+        
         return self
+
+    def add_processes(self, processes: Set[int]):
+        self.processes.update(processes)
+
+    def __calc_min_max_time(self):
+        if len(self.events_set) > 0:    
+            self.min_event_start = min([event.start_time for event in self.events_set])
+            self.max_event_end = max([event.end_time for event in self.events_set])
+
+    def initialize_for_tarjan(self):
+        self.visited = False
+        self.index = -1
+        self.low_link = -1
 
     def add_event(self, e : Event):
         self.event_dict[e.event_id] = e
@@ -68,24 +114,6 @@ class Partition:
 
         if e.end_time > self.max_event_end:
             self.max_event_end = e.end_time
-
-    def get_parents(self):
-        self.parents = set()
-        for event_id, event in self.event_dict.items():
-            if event.prev_event != None and event.prev_event.partition != self:
-                self.parents.add(event.prev_event.partition.partition_id)
-
-        return self.parents
-
-    def get_children(self): 
-        self.children = set()
-        for event_id, event in self.event_dict.items():
-            if event.next_event != None and event.next_event.partition != self:
-                self.children.add(event.next_event.partition.partition_id)
-        return self.children
-
-    def get_events(self):
-        return self.event_dict
 
     @staticmethod
     def tarjan_strongly_connected(graph):
