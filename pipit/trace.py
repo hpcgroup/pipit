@@ -65,7 +65,7 @@ class Trace:
         from .readers.nsight_reader import NsightReader
 
         return NsightReader(filename, create_cct).read()
-    
+
     @staticmethod
     def from_pytorch(dir_name, create_cct=False):
         """Read an PyTorch trace (perfetto json format) into a new Trace object."""
@@ -126,16 +126,45 @@ class Trace:
             ]
 
             # list of processes and/or threads to iterate over
-            if "Thread" in self.events.columns:
-                exec_locations = set(zip(self.events["Process"], self.events["Thread"]))
-                has_thread = True
-            else:
-                exec_locations = set(self.events["Process"])
-                has_thread = False
+            has_rank, has_thread = (
+                "Rank" in self.events.columns,
+                "Thread" in self.events.columns,
+            )
 
+            exec_location_names = ["Process"]
+            if has_rank:
+                exec_location_names.append("Rank")
+            if has_thread:
+                exec_location_names.append("Thread")
+
+            exec_locations = set(
+                zip(
+                    *[
+                        self.events[exec_location_name]
+                        for exec_location_name in exec_location_names
+                    ]
+                )
+            )
+
+            # TODO: there has to be a better way of doing this
+            # TODO: do this everywhere there is such a loop,
+            # like create_cct, match_caller_callee, etc
             for curr_loc in exec_locations:
+                if has_rank and has_thread:
+                    curr_process, curr_rank, curr_thread = curr_loc
+                    filtered_df = enter_leave_df.loc[
+                        (enter_leave_df["Process"] == curr_process)
+                        & (enter_leave_df["Thread"] == curr_thread)
+                        & (enter_leave_df["Rank"] == curr_rank)
+                    ]
+                elif has_rank:
+                    curr_process, curr_rank = curr_loc
+                    filtered_df = enter_leave_df.loc[
+                        (enter_leave_df["Process"] == curr_process)
+                        & (enter_leave_df["Rank"] == curr_rank)
+                    ]
                 # only filter by thread if the trace has a thread column
-                if has_thread:
+                elif has_thread:
                     curr_process, curr_thread = curr_loc
                     filtered_df = enter_leave_df.loc[
                         (enter_leave_df["Process"] == curr_process)
