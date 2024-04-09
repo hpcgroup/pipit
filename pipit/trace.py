@@ -869,11 +869,12 @@ class Trace:
             patterns.append(match_original)
 
         return patterns
-
+    
     @staticmethod
     def kernel_type(name, cat):
         if "ncclKernel" in name:
             return "comm"
+        # TODO: check whether name or cat matters
         elif "memcpy" in cat or "memset" in cat or "Memcpy" in name or "Memset" in name:
             return "mem"
         else:
@@ -896,106 +897,27 @@ class Trace:
                 merged_intervals.append((curr_start, curr_end))
 
         return merged_intervals
+    
+    # TODO: mean over ranks to breakdown
+    # TODO: change phase names to those in paper
+    # TODO: comments
+    # TODO: unit tests - compare with hta tool
 
-    def comm_comp_overlap(self):
-        self._match_events()
-
-        overlap_dict = dict()
-
-        ranks = set(self.events["Rank"])
-
-        # hack for now because of weird ranks
-        filtered_df = self.events[
-            pd.to_numeric(self.events["Process"], errors="coerce").notnull()
-        ]
-        filtered_df = filtered_df.loc[filtered_df["Process"] < 1000]
-
-        for i in ranks:
-            # need to have a better fix: in hta tool, all non-cpu "streams" are made -1
-            # also, all the columns need to be made numeric, categorical, etc
-            gpu_df = filtered_df.loc[
-                (filtered_df["Rank"] == i) & (filtered_df["Thread"] != -1)
-            ]
-
-            gpu_df = gpu_df.loc[gpu_df["Event Type"] == "Enter"]
-
-            gpu_df["kernel_type"] = gpu_df.apply(
-                lambda row: Trace.kernel_type(row["Name"], row["Attributes"]["cat"]),
-                axis=1,
-            )
-
-            comm_df = gpu_df.loc[gpu_df["kernel_type"] == "comm"]
-            comm_intervals = Trace.merge_intervals(
-                list(
-                    zip(
-                        comm_df["Timestamp (ns)"].to_list(),
-                        comm_df["_matching_timestamp"].to_list(),
-                    )
-                )
-            )
-
-            comp_df = gpu_df.loc[gpu_df["kernel_type"] == "comp"]
-            comp_intervals = Trace.merge_intervals(
-                list(
-                    zip(
-                        comp_df["Timestamp (ns)"].to_list(),
-                        comp_df["_matching_timestamp"].to_list(),
-                    )
-                )
-            )
-
-            comm_enter_times, comm_leave_times = zip(*comm_intervals)
-            comp_enter_times, comp_leave_times = zip(*comp_intervals)
-            comp_df = pd.DataFrame(
-                {
-                    "Timestamp (ns)": comp_enter_times,
-                    "_matching_timestamp": comp_leave_times,
-                }
-            )
-
-            total_comm_time, overlapped_comm_time = 0, 0
-            for j in range(len(comm_enter_times)):
-                curr_enter_time, curr_leave_time = (
-                    comm_enter_times[j],
-                    comm_leave_times[j],
-                )
-                total_comm_time += curr_leave_time - curr_enter_time
-
-                overlapped_df = comp_df.loc[
-                    (comp_df["Timestamp (ns)"] <= curr_leave_time)
-                    & (comp_df["_matching_timestamp"] >= curr_enter_time)
-                ]
-
-                overlapped_comm_time += overlapped_df.apply(
-                    lambda row: (
-                        min([row["_matching_timestamp"], curr_leave_time])
-                        - max([row["Timestamp (ns)"], curr_enter_time])
-                    ),
-                    axis=1,
-                ).sum()
-
-            overlap_dict["Rank " + str(i)] = (
-                overlapped_comm_time / total_comm_time * 100
-            )
-
-        return pd.DataFrame(overlap_dict, index=["Comm-Comp Overlap %"]).T
-
-    # need to clean up so that this doesn't reuse code from the above function
-    def breakdown(self):
+    def comm_comp_breakdown(self):
         self._match_events()
 
         ranks = set(self.events["Rank"])
 
         breakdown_dict = {str(p): {} for p in ranks}
 
-        # hack for now because of weird ranks
+        # TODO: hack for now because of weird ranks - fix using definitions
         filtered_df = self.events[
             pd.to_numeric(self.events["Process"], errors="coerce").notnull()
         ]
         filtered_df = filtered_df.loc[filtered_df["Process"] < 1000]
 
         for p in ranks:
-            # comment about fix in comm-comp overlap
+            # TODO: in hta tool, cpu threads are -1 but how is this working?
             gpu_df = filtered_df.loc[
                 (filtered_df["Rank"] == p) & (filtered_df["Thread"] != -1)
             ]
