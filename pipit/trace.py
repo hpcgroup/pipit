@@ -125,18 +125,11 @@ class Trace:
                 self.events["Event Type"].isin(["Enter", "Leave"])
             ]
 
-            # list of processes and/or threads to iterate over
-            has_rank, has_thread = (
-                "Rank" in self.events.columns,
-                "Thread" in self.events.columns,
-            )
-
-            exec_location_names = ["Process"]
-            if has_rank:
-                exec_location_names.append("Rank")
-            if has_thread:
-                exec_location_names.append("Thread")
-
+            exec_location_names = [
+                loc_name
+                for loc_name in ["Process", "Rank", "Thread"]
+                if loc_name in self.events.columns
+            ]
             exec_locations = set(
                 zip(
                     *[
@@ -146,34 +139,11 @@ class Trace:
                 )
             )
 
-            # TODO: there has to be a better way of doing this
-            # TODO: do this everywhere there is such a loop,
-            # like create_cct, match_caller_callee, etc
             for curr_loc in exec_locations:
-                if has_rank and has_thread:
-                    curr_process, curr_rank, curr_thread = curr_loc
-                    filtered_df = enter_leave_df.loc[
-                        (enter_leave_df["Process"] == curr_process)
-                        & (enter_leave_df["Thread"] == curr_thread)
-                        & (enter_leave_df["Rank"] == curr_rank)
-                    ]
-                elif has_rank:
-                    curr_process, curr_rank = curr_loc
-                    filtered_df = enter_leave_df.loc[
-                        (enter_leave_df["Process"] == curr_process)
-                        & (enter_leave_df["Rank"] == curr_rank)
-                    ]
-                # only filter by thread if the trace has a thread column
-                elif has_thread:
-                    curr_process, curr_thread = curr_loc
-                    filtered_df = enter_leave_df.loc[
-                        (enter_leave_df["Process"] == curr_process)
-                        & (enter_leave_df["Thread"] == curr_thread)
-                    ]
-                else:
-                    filtered_df = enter_leave_df.loc[
-                        (enter_leave_df["Process"] == curr_loc)
-                    ]
+                filter_mask = np.full(len(enter_leave_df), True)
+                for i in range(len(curr_loc)):
+                    filter_mask &= enter_leave_df[exec_location_names[i]] == curr_loc[i]
+                filtered_df = enter_leave_df[filter_mask]
 
                 stack = []
 
@@ -255,26 +225,25 @@ class Trace:
                 )
             ]
 
-            # list of processes and/or threads to iterate over
-            if "Thread" in self.events.columns:
-                exec_locations = set(zip(self.events["Process"], self.events["Thread"]))
-                has_thread = True
-            else:
-                exec_locations = set(self.events["Process"])
-                has_thread = False
+            exec_location_names = [
+                loc_name
+                for loc_name in ["Process", "Rank", "Thread"]
+                if loc_name in self.events.columns
+            ]
+            exec_locations = set(
+                zip(
+                    *[
+                        self.events[exec_location_name]
+                        for exec_location_name in exec_location_names
+                    ]
+                )
+            )
 
             for curr_loc in exec_locations:
-                # only filter by thread if the trace has a thread column
-                if has_thread:
-                    curr_process, curr_thread = curr_loc
-                    filtered_df = enter_leave_df.loc[
-                        (enter_leave_df["Process"] == curr_process)
-                        & (enter_leave_df["Thread"] == curr_thread)
-                    ]
-                else:
-                    filtered_df = enter_leave_df.loc[
-                        (enter_leave_df["Process"] == curr_loc)
-                    ]
+                filter_mask = np.full(len(enter_leave_df), True)
+                for i in range(len(curr_loc)):
+                    filter_mask &= enter_leave_df[exec_location_names[i]] == curr_loc[i]
+                filtered_df = enter_leave_df[filter_mask]
 
                 # Depth is the level in the
                 # Call Tree starting from 0
