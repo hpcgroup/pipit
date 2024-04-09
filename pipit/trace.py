@@ -996,13 +996,6 @@ class Trace:
                 overlapped_comm_time / total_comm_time * 100
             )
 
-            print("GPU " + str(i))
-            print("Total Time: " + str(max(gpu_df["Timestamp (ns)"]) - min(gpu_df["Timestamp (ns)"])))
-            print("Total Comp Time: " + str((comp_df["_matching_timestamp"] - comp_df["Timestamp (ns)"]).sum()))
-            print("Total Comm Time: " + str(total_comm_time))
-            print("Overlapped Comm-Comp Time: " + str(overlapped_comm_time))
-            print("")
-
         return pd.DataFrame(overlap_dict, index=["Comm-Comp Overlap %"]).T
 
     # need to clean up so that this doesn't reuse code from the above function
