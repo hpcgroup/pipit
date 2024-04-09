@@ -6,6 +6,12 @@ import pandas as pd
 import multiprocessing as mp
 
 
+# TODO: also, all the columns need to be made numeric, categorical, etc
+# TODO: compare with HTA tool reader
+# TODO: add comments
+# TODO: unit tests
+
+
 class PytorchReader:
     def __init__(self, dir_name, num_processes=None, create_cct=False):
         self.dir_name = dir_name
