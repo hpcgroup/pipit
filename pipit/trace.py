@@ -67,14 +67,6 @@ class Trace:
         return NsightReader(filename, create_cct).read()
 
     @staticmethod
-    def from_pytorch(dir_name, create_cct=False):
-        """Read an PyTorch trace (perfetto json format) into a new Trace object."""
-        # import this lazily to avoid circular dependencies
-        from .readers.pytorch_reader import PytorchReader
-
-        return PytorchReader(dir_name, create_cct).read()
-
-    @staticmethod
     def from_csv(filename):
         events_dataframe = pd.read_csv(filename, skipinitialspace=True)
 
@@ -897,11 +889,6 @@ class Trace:
                 merged_intervals.append((curr_start, curr_end))
 
         return merged_intervals
-    
-    # TODO: mean over ranks to breakdown
-    # TODO: change phase names to those in paper
-    # TODO: comments
-    # TODO: unit tests - compare with hta tool
 
     def comm_comp_breakdown(self):
         self._match_events()
@@ -910,17 +897,12 @@ class Trace:
 
         breakdown_dict = {str(p): {} for p in ranks}
 
-        # TODO: hack for now because of weird ranks - fix using definitions
-        filtered_df = self.events[
-            pd.to_numeric(self.events["Process"], errors="coerce").notnull()
-        ]
-        filtered_df = filtered_df.loc[filtered_df["Process"] < 1000]
+        process_labels_df = self.definitions.loc[self.definitions["Definition Type"] == "process_labels"]
+        cpu_processes = set(process_labels_df[process_labels_df.apply(lambda row: row["Attributes"]["args"]["labels"].startswith("CPU"), axis=1)]["Process"])
+        filtered_df = self.events.loc[(~self.events["Process"].isin(cpu_processes)) & (self.events["Process"].astype(str).str.isnumeric())]
 
         for p in ranks:
-            # TODO: in hta tool, cpu threads are -1 but how is this working?
-            gpu_df = filtered_df.loc[
-                (filtered_df["Rank"] == p) & (filtered_df["Thread"] != -1)
-            ]
+            gpu_df = filtered_df.loc[filtered_df["Rank"] == p]
 
             gpu_df = gpu_df.loc[gpu_df["Event Type"] == "Enter"]
 
