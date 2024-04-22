@@ -3,6 +3,7 @@
 #
 # SPDX-License-Identifier: MIT
 
+import numpy as np
 from pipit.graph import Graph, Node
 
 
@@ -26,24 +27,20 @@ def create_cct(events):
     # Filter the DataFrame to only Enter/Leave
     enter_leave_df = events.loc[events["Event Type"].isin(["Enter", "Leave"])]
 
-    # list of processes and/or threads to iterate over
-    if "Thread" in events.columns:
-        exec_locations = set(zip(events["Process"], events["Thread"]))
-        has_thread = True
-    else:
-        exec_locations = set(events["Process"])
-        has_thread = False
+    exec_location_names = [
+        loc_name
+        for loc_name in ["Process", "Rank", "Thread"]
+        if loc_name in events.columns
+    ]
+    exec_locations = set(
+        zip(*[events[exec_location_name] for exec_location_name in exec_location_names])
+    )
 
     for curr_loc in exec_locations:
-        # only filter by thread if the trace has a thread column
-        if has_thread:
-            curr_process, curr_thread = curr_loc
-            filtered_df = enter_leave_df.loc[
-                (enter_leave_df["Process"] == curr_process)
-                & (enter_leave_df["Thread"] == curr_thread)
-            ]
-        else:
-            filtered_df = enter_leave_df.loc[(enter_leave_df["Process"] == curr_loc)]
+        filter_mask = np.full(len(enter_leave_df), True)
+        for i in range(len(curr_loc)):
+            filter_mask &= enter_leave_df[exec_location_names[i]] == curr_loc[i]
+        filtered_df = enter_leave_df[filter_mask]
 
         curr_depth, callpath = 0, ""
 
@@ -86,9 +83,11 @@ def create_cct(events):
 
                     # add node as root or child of its
                     # parent depending on current depth
-                    graph.add_root(
-                        curr_node
-                    ) if curr_depth == 0 else parent_node.add_child(curr_node)
+                    (
+                        graph.add_root(curr_node)
+                        if curr_depth == 0
+                        else parent_node.add_child(curr_node)
+                    )
 
                 # Update nodes stack, column, and current depth
                 nodes_stack.append(curr_node)
