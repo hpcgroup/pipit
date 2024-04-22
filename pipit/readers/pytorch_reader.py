@@ -6,12 +6,8 @@ import pandas as pd
 import multiprocessing as mp
 
 
-# TODO: need to handle duration events - B and E (look at chrome trace format documentation)
-# TODO: compare with HTA tool reader
-# TODO: add comments
-# TODO: unit tests
-
-
+# TODO: comments
+# TODO: unit tests - compare with HTA
 class PytorchReader:
     def __init__(self, dir_name, num_processes=None, create_cct=False):
         self.dir_name = dir_name
@@ -28,6 +24,7 @@ class PytorchReader:
             self.num_processes = len(self.files)
 
     def events_reader(self, rank_size):
+        # TODO: this pattern is in a lot of readers now - consolidate into one function
         rank, size = rank_size[0], rank_size[1]
         per_process = int(len(self.files) // size)
         remainder = int(len(self.files) % size)
@@ -59,7 +56,10 @@ class PytorchReader:
                 temp_df["s"] = np.full(len(temp_df), np.nan)
 
                 del df["dur"]
-                df["ph"].replace({"X": "Enter", "i": "Instant"}, inplace=True)
+                df["ph"].replace(
+                    {"X": "Enter", "i": "Instant", "B": "Enter", "E": "Leave"},
+                    inplace=True,
+                )
 
                 complete_events_indices = complete_events_df.index.values
 
@@ -68,7 +68,7 @@ class PytorchReader:
                 new_df_index = np.roll(new_df_index.cumsum(), 1)
                 new_df_index[0] = 0
 
-                df.index =  df.index.values + new_df_index
+                df.index = df.index.values + new_df_index
 
                 temp_df.index = df.index.values[complete_events_indices] + 1
 
@@ -132,7 +132,9 @@ class PytorchReader:
 
         # stable sorting so that order of events with same timestamps isn't "corrupted"
         # TODO: this change needs to be made in all readers
-        events_df.sort_values(by="Timestamp (ns)", ignore_index=True, inplace=True, kind="stable")
+        events_df.sort_values(
+            by="Timestamp (ns)", ignore_index=True, inplace=True, kind="stable"
+        )
 
         definitions_df = events_df.loc[events_df["Event Type"] == "M"]
         definitions_df.reset_index(inplace=True)
