@@ -25,32 +25,6 @@ class PolarsTrace:
     def __init__(self, df: pd.DataFrame):
         self.events = pd_to_polars(df).with_row_index("index")
 
-    def _match_events_naive(self):
-        matching_events = np.full(self.events.height, -1, dtype=np.int32)
-
-        processes = self.events.select("Process").unique().to_series(0).to_list()
-        enterLeave = self.events.filter(pl.col("Event Type").is_in(["Enter", "Leave"]))
-
-        for process in processes:
-            tmp = enterLeave.filter(pl.col("Process") == process).select(
-                ["index", "Event Type"]
-            )
-            stack = []
-
-            for idx, event_type in tmp.iter_rows(named=False):
-                if event_type == "Enter":
-                    stack.append(idx)
-                elif event_type == "Leave":
-                    matching_idx = stack.pop()
-                    matching_events[idx] = matching_idx
-                    matching_events[matching_idx] = idx
-
-        self.events = self.events.with_columns(
-            pl.Series(name="_matching_event", values=matching_events)
-            .replace(-1, pl.lit(None))
-            .cast(pl.UInt32)
-        ).with_columns(pl.col("_matching_event").cast(pl.UInt32))
-
     def _match_events(self):
         matching_events = np.full(self.events.height, -1, dtype=np.int32)
 
@@ -76,7 +50,7 @@ class PolarsTrace:
             pl.Series(name="_matching_event", values=matching_events)
             .replace(-1, pl.lit(None))
             .cast(pl.UInt32)
-        ).with_columns(pl.col("_matching_event").cast(pl.UInt32))
+        )
 
     def _match_caller_callee(self):
         depth = np.full(self.events.height, -1, dtype=np.int32)
@@ -113,14 +87,14 @@ class PolarsTrace:
                 .replace(-1, pl.lit(None))
                 .cast(pl.UInt32),
             ]
-        ).with_columns(pl.col("_matching_event").cast(pl.UInt32))
+        )
 
-    def calc_inc_metrics(self):
+    def calc_inc_metrics(self, ignore=False):
         cols_to_keep = {
             "Timestamp (ns)_right": "_matching_timestamp",
         }
 
-        self.events = (
+        tmp = (
             self.events.join(
                 self.events.filter(pl.col("Event Type") == "Leave"),
                 left_on="index",
@@ -133,18 +107,51 @@ class PolarsTrace:
                 (pl.col("_matching_timestamp") - pl.col("Timestamp (ns)")).alias("time.inc")
             )
         )
+        if not ignore:
+            self.events = tmp
 
     def calc_exc_metrics(self):
-        children_times = self.events.group_by("_parent").agg(pl.col("Timestamp (ns)").sum())
-        self.events = self.events.join(
-            children_times,
-            left_on="index",
-            right_on="_parent",
-            how="left"
-        ).rename({
-            "Timestamp (ns)_right": "children_time"
-        }).with_columns(
-            (pl.col("time.inc") - pl.col("children_time"))
-            .fill_null(pl.col("time.inc"))
-            .alias("time.exc")
-        ).drop("children_time")
+        children_times = self.events.group_by("_parent").agg(pl.col("time.inc").sum())
+        self.events = (
+            self.events.join(
+                children_times,
+                left_on="index",
+                right_on="_parent",
+                how="left",
+                suffix="_children",
+            )
+            .with_columns(
+                (pl.col("time.inc") - pl.col("time.inc_children"))
+                .fill_null(pl.col("time.inc"))
+                .alias("time.exc")
+            )
+            .drop("time.inc_children")
+        )
+
+    def comm_matrix(self, output="size"):
+        message_volume = (
+            self.events.with_columns(
+                pl.col("Attributes").struct.field("receiver"),
+                pl.col("Attributes").struct.field("msg_length"),
+            )
+            .filter(pl.col("receiver").is_not_null())
+            .group_by(["Process", "receiver"])
+            .agg(pl.col("msg_length").sum() if output == "count" else pl.len())
+            .to_numpy()
+        )
+
+        ranks = self.events.select("Process").unique().to_series(0).to_list()
+        mat = np.zeros((len(ranks), len(ranks)))
+        for i, j, value in message_volume:
+            mat[i][j] += value
+
+        return mat
+
+    def message_histogram(self, bins=20):
+        return (
+            self.events.with_columns(
+                pl.col("Attributes").struct.field("msg_length"),
+            )
+            .filter(pl.col("msg_length").is_not_null())["msg_length"]
+            .hist(bin_count=bins, include_breakpoint=False)
+        )

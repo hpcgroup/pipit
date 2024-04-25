@@ -108,7 +108,7 @@ class Trace:
         dataframe: _matching_event and _matching_timestamp
         """
 
-        if "_matching_event" not in self.events.columns:
+        if True:
             matching_events = [float("nan")] * len(self.events)
             matching_times = [float("nan")] * len(self.events)
 
@@ -199,7 +199,7 @@ class Trace:
         _children is a list of dataframe indices of a row's children events.
         """
 
-        if "_children" not in self.events.columns:
+        if True:
             children = [None] * len(self.events)
             depth, parent = [float("nan")] * len(self.events), [float("nan")] * len(
                 self.events
@@ -311,7 +311,7 @@ class Trace:
             # name of column for this inclusive metric
             metric_col_name = ("time" if col == "Timestamp (ns)" else col) + ".inc"
 
-            if metric_col_name not in self.events.columns:
+            if True:
                 # calculate the inclusive metric by subtracting
                 # the values at the enter rows from the values
                 # at the corresponding leave rows
@@ -349,7 +349,7 @@ class Trace:
             # name of column for this exclusive metric
             metric_col_name = ("time" if col == "Timestamp (ns)" else col) + ".exc"
 
-            if metric_col_name not in self.events.columns:
+            if True:
                 # exc metric starts out as a copy of the inc metric values
                 exc_values = self.events[inc_col_name].to_list()
                 inc_values = self.events[inc_col_name].to_list()
