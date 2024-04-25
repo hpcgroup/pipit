@@ -82,6 +82,17 @@ def url_validator(key, value):
             ).format(value, key)
         )
 
+# Validator to check if the value entered is a valid backend
+def backend_validator(key, value):
+    if value not in ["dask", "ray", "multiprocessing", "serial"]:
+        raise ValueError(
+            (
+                'Error loading configuration: The Value "{}" for Configuration "{}"'
+                + "must be a valid backend"
+            ).format(value, key)
+        )
+    else:
+        return True
 
 registered_options = {
     "log_level": {
@@ -91,6 +102,10 @@ registered_options = {
     "notebook_url": {
         "default": "http://localhost:8888",
         "validator": url_validator,
+    },
+    "backend": {
+        "default": "ray",
+        "validator": backend_validator,
     },
 }
 

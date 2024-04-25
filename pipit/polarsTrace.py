@@ -104,7 +104,9 @@ class PolarsTrace:
             .rename(cols_to_keep)
             .drop(pl.selectors.contains("_right"))
             .with_columns(
-                (pl.col("_matching_timestamp") - pl.col("Timestamp (ns)")).alias("time.inc")
+                (pl.col("_matching_timestamp") - pl.col("Timestamp (ns)")).alias(
+                    "time.inc"
+                )
             )
         )
         if not ignore:
