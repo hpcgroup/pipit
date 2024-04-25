@@ -3,52 +3,38 @@ import numpy as np
 
 import pipit as pp
 from .util import _match_events_per_rank, _match_caller_callee_per_rank
+from dask.distributed import Client
 
 
 class DictTrace:
     def __init__(self, df: pd.DataFrame):
         ranks = df["Process"].unique().tolist()
-        self.dfs = dict()
+        self.dfs = []
 
-        for rank in ranks:
-            self.dfs[rank] = (
-                df[df["Process"] == rank]
-                .copy(deep=True)
-                .reset_index()
-                .drop("index", axis=1)
-            )
+        for rank in sorted(ranks):
+            self.dfs.append((rank,
+                (
+                    df[df["Process"] == rank]
+                    .copy(deep=True)
+                    .reset_index()
+                    .drop("index", axis=1)
+                ),
+            ))
 
-        match pp.get_option("backend"):
-            case "dask":
-                from dask.distributed import Client
+        # let's stick with dask for now for simplicity
+        # this can be easily extended to ray or multiprocessing
+        self.client = Client()
 
-                self.client = Client()
-            case "ray":
-                import ray
-
-                ray.init(ignore_reinit_error=True)
-            case "multiprocessing":
-                import concurrent.futures
-
-                self.client = concurrent.futures.ProcessPoolExecutor()
+        # scatter the dataframes to the workers
+        # this will prevent sending data for each computation
+        # see https://stackoverflow.com/a/41471249
+        self.dfs = self.client.scatter(self.dfs)
 
     def _match_events(self):
-        match pp.get_option("backend"):
-            case "dask":
-                futures = self.client.map(_match_events_per_rank.remote, self.dfs.items())
-                results = self.client.gather(futures)
-                self.dfs = {rank: df for rank, df in results}
-            case "ray":
-                import ray
+        self.dfs = self.client.map(_match_events_per_rank, self.dfs)
 
-                futures = [
-                    _match_events_per_rank.remote((rank, df))
-                    for rank, df in self.dfs.items()
-                ]
-                results = ray.get(futures)
-                self.dfs = {rank: df for rank, df in results}
-            case "multiprocessing":
-                self.executor.map(_match_caller_callee_per_rank, self.dfs.items())
+    def _match_caller_callee(self):
+        self.dfs = self.client.map(_match_caller_callee_per_rank, self.dfs)
 
     def calc_inc_metrics(self):
         pass

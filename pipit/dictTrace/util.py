@@ -1,8 +1,6 @@
 import numpy as np
-import ray
 
 
-@ray.remote
 def _match_events_per_rank(args):
     rank, df = args
     matching_events = np.full(len(df), np.nan)
@@ -25,7 +23,6 @@ def _match_events_per_rank(args):
     return rank, df
 
 
-@ray.remote
 def _match_caller_callee_per_rank(args):
     rank, df = args
 
