@@ -5,6 +5,12 @@ import pipit as pp
 from .util import _match_events_per_rank, _match_caller_callee_per_rank
 from dask.distributed import Client
 
+class Stream:
+    """
+    Contains the trace data for a single stream, whether that's a single rank or a
+    single thread. We can use Pandas DataFrame or Polars DataFrame to store the data.
+    """
+
 
 class DictTrace:
     def __init__(self, df: pd.DataFrame):
@@ -29,6 +35,9 @@ class DictTrace:
         # this will prevent sending data for each computation
         # see https://stackoverflow.com/a/41471249
         self.dfs = self.client.scatter(self.dfs)
+
+    def get(self, rank: int):
+        return self.dfs[rank]
 
     def _match_events(self):
         self.dfs = self.client.map(_match_events_per_rank, self.dfs)
