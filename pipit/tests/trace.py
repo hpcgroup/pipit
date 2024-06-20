@@ -146,10 +146,7 @@ def test_match_caller_callee(data_dir, ping_pong_otf2_trace):
     assert len(df.loc[df["_children"].notnull()]) == 2
 
 
-def test_time_profile(data_dir, ping_pong_otf2_trace):
-    trace = Trace.from_otf2(str(ping_pong_otf2_trace))
-    trace.calc_exc_metrics(["Timestamp (ns)"])
-
+def generic_test_time_profile(trace):
     time_profile = trace.time_profile(num_bins=62)
 
     # check length
@@ -182,6 +179,15 @@ def test_time_profile(data_dir, ping_pong_otf2_trace):
     norm.drop(columns=["bin_start", "bin_end"], inplace=True)
 
     assert (time_profile / exp_bin_total_duration).equals(norm)
+
+
+def test_time_profile(data_dir, ping_pong_otf2_trace):
+    trace = Trace.from_otf2(str(ping_pong_otf2_trace))
+    trace.calc_exc_metrics(["Timestamp (ns)"])
+
+    generic_test_time_profile(trace)
+    norm = trace.time_profile(num_bins=62, normalized=True)
+    norm.drop(columns=["bin_start", "bin_end"], inplace=True)
 
     # check against ground truth
     # generated using Vampir's Function Summary chart (step size=16)
