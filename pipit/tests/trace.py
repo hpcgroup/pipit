@@ -4,6 +4,7 @@
 # SPDX-License-Identifier: MIT
 
 import numpy as np
+import pandas as pd
 from pipit import Trace
 
 
@@ -216,3 +217,40 @@ def test_time_profile(data_dir, ping_pong_otf2_trace):
     assert np.isclose(norm.loc[61]["MPI_Comm_size"], 0.0)
     assert np.isclose(norm.loc[61]["MPI_Comm_rank"], 0.0)
     assert np.isclose(norm.loc[61]["MPI_Finalize"], 0.01614835)
+
+
+def generic_test_flat_profile(trace):
+    flat_profile = trace.flat_profile("time.exc")
+    flat_profile_inc = trace.flat_profile("time.inc")
+
+    # check size
+    assert len(trace.events["Name"].unique()) == len(flat_profile)
+
+    # ensure that sum of flat profile entries is length of whole program
+    total_duration = max(flat_profile_inc)
+    exc_durations = flat_profile.values
+    exc_durations = exc_durations[~np.isnan(exc_durations)]
+    assert np.isclose(sum(exc_durations), total_duration)
+
+    # check that per_process works
+    flat_profile_per = trace.flat_profile("time.exc", per_process=True)
+    assert flat_profile_per.index.names == ["Name", "Process"]
+    assert np.isclose(sum(flat_profile_per), 2 * total_duration)
+    # make sure that processes don't have exactly the same flat profile
+    assert (
+        flat_profile_per.loc[pd.IndexSlice[:, 0]]
+        != flat_profile_per.loc[pd.IndexSlice[:, 1]]
+    ).any()
+
+    # all the time should be from enter events
+    evt_profile = trace.flat_profile("time.exc", groupby_column="Event Type")
+    assert np.isclose(evt_profile["Enter"], total_duration)
+    assert np.isnan(evt_profile["Leave"])
+    if "Instant" in evt_profile:
+        assert np.isnan(evt_profile["Instant"])
+
+
+def test_flat_profile(data_dir, ping_pong_otf2_trace):
+    trace = Trace.from_otf2(str(ping_pong_otf2_trace))
+    trace.calc_exc_metrics()
+    generic_test_flat_profile(trace)
