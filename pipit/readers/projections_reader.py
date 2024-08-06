@@ -166,7 +166,7 @@ class STSReader:
             elif line_arr[0] == "CHARE":
                 id = int(line_arr[1])
                 name = line_arr[2][1 : len(line_arr[2]) - 1]
-                dimensions = int(line_arr[3])
+                dimensions = int(line_arr[-1])
                 self.chares[id] = (name, dimensions)
                 # print(int(line_arr[1]), line_arr[2][1:len(line_arr[2]) - 1])
 
