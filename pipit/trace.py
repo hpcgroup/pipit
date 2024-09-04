@@ -67,6 +67,14 @@ class Trace:
         return NsightReader(filename, create_cct).read()
 
     @staticmethod
+    def from_nsight_sqlite(filename, create_cct=False, trace_types="all"):
+        """Read an Nsight trace into a new Trace object."""
+        # import this lazily to avoid circular dependencies
+        from .readers.nsight_sqlite_reader import NSightSQLiteReader
+
+        return NSightSQLiteReader(filename, create_cct).read()
+
+    @staticmethod
     def from_csv(filename):
         events_dataframe = pd.read_csv(filename, skipinitialspace=True)
 
