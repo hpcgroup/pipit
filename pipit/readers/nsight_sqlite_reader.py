@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 
 import pipit.trace
@@ -56,7 +57,7 @@ class NSightSQLiteReader:
 
     }
     def __init__(self, filepath, create_cct=False, trace_types="all") -> None:
-        self.filepath = filepath
+        self.conn = sqlite3.connect(filepath)
         self.create_cct = create_cct
         # Get all the table names that exist
         # Sometimes, things like the GPU metrics and stuff might not
@@ -64,22 +65,26 @@ class NSightSQLiteReader:
         get_tables_query = """
         SELECT name FROM sqlite_master WHERE type='table'
         """
-        self.table_names = set(pd.read_sql_query(get_tables_query, conn).squeeze())
+        self.table_names = set(pd.read_sql_query(get_tables_query, self.conn).squeeze())
         if trace_types == "all":
-            # TODO: some traces (their tables) may not always be present
+            # Some traces (their tables, e.g. NVTX_EVENTS) may not always be present
             # in the sqlite db
-            # (e.g. this might affect the nvtx stuff?)
-            self.trace_types = ["nvtx", "cuda_api"]
+            # Make sure that all tables that we read in queries are accounted for here
+            self.trace_types = []
+            if "NVTX_EVENTS" in self.table_names:
+                self.trace_types.append("nvtx")
+            if "CUPTI_ACTIVITY_KIND_RUNTIME" in self.table_names:
+                # TODO: should we warn if this doesn't exist
+                # I feel like this table should always exist
+                self.trace_types.append("cuda_api")
         else:
             self.trace_types = trace_types
 
     def read(self) -> pipit.trace.Trace:
-        con = sqlite3.connect(self.filepath)
         traces = []
 
         for typ in self.trace_types:
-            df = pd.read_sql_query(NSightSQLiteReader._trace_queries[typ], con=con)
-            # add column so we know which trace type it came from
+            df = pd.read_sql_query(NSightSQLiteReader._trace_queries[typ], con=self.conn)
             df["Trace Type"] = typ
             traces.append(df)
 
@@ -95,6 +100,18 @@ class NSightSQLiteReader:
                 id_vars=["Name", "Process", "Thread", "Trace Type"],
                 var_name="Event Type",
                 value_name="Timestamp (ns)")
+        # Cache mapping
+        trace_df["_matching_event"] = np.concatenate([np.arange(len(trace_df) // 2, len(trace_df)), np.arange(0, len(trace_df) // 2)])
+        # Convert to numpy before assignment otherwise pandas
+        # will try to align indices, which will mess up order
+        trace_df['_matching_timestamp'] = trace_df["Timestamp (ns)"][trace_df["_matching_event"]].to_numpy()
+
+        # NSight systems does provide us with a backtrace (but it is not very useful)
+        # since we can't correlate nvtx events with stuff like CUDA API calls
+        # TODO: We might be able to show nested nvtx ranges, though
+        trace_df["_depth"] = 0
+        trace_df["_parent"] = None
+        trace_df["_children"] = None
         trace = pipit.trace.Trace(None, trace_df)
         if self.create_cct:
             trace.create_cct()
