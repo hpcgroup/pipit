@@ -72,7 +72,7 @@ class Trace:
         # import this lazily to avoid circular dependencies
         from .readers.nsight_sqlite_reader import NSightSQLiteReader
 
-        return NSightSQLiteReader(filename, create_cct).read()
+        return NSightSQLiteReader(filename, create_cct, trace_types).read()
 
     @staticmethod
     def from_csv(filename):

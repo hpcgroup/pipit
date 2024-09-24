@@ -18,7 +18,7 @@ class NSightSQLiteReader:
     # Dictionary mapping trace type
     # (e.g. NVTX,
     _trace_queries = {
-        "nvtx": """
+        "nvtx": ["""
         SELECT
             start as Enter,
             end as Leave,
@@ -35,8 +35,8 @@ class NSightSQLiteReader:
         JOIN
             StringIds AS rname2
             ON tname.nameId = rname2.id
-        """,
-        "cuda_api": """
+        """],
+        "cuda_api": ["""
         SELECT 
             start as Enter,
             end as Leave, 
@@ -53,8 +53,51 @@ class NSightSQLiteReader:
         JOIN
             StringIds AS rname2
             ON tname.nameId = rname2.id
+        """],
+        "gpu_trace": ["""
+        SELECT 
+            start as Enter,
+            end as Leave,
+            value as Name, 
+            streamId,
+            'kernel' as type,
+            null as bytes
+        FROM CUPTI_ACTIVITY_KIND_KERNEL as cuda_gpu
+        JOIN StringIds
+            ON cuda_gpu.shortName = StringIds.id
         """,
-
+        """
+        SELECT 
+            start as Enter, 
+            end as Leave, 
+            memcpy_labels.name as Name,
+            streamId, 
+            memcpy_labels.name as type, 
+            bytes
+        FROM CUPTI_ACTIVITY_KIND_MEMCPY as cuda_memcpy
+        JOIN ENUM_CUDA_MEMCPY_OPER as memcpy_labels
+            ON  cuda_memcpy.copyKind = memcpy_labels.id
+        """,
+        """
+        SELECT 
+            start as Enter, 
+            end as Leave, 
+            memset_labels.name as Name,
+            streamId,
+            memset_labels.name as type, 
+            bytes
+        FROM CUPTI_ACTIVITY_KIND_MEMSET as cuda_memset
+        JOIN ENUM_CUDA_MEM_KIND as memset_labels
+            ON cuda_memcpy.copyKind = memset_labels.id
+        """,]
+        # TODO: reading in all the gpu metrics takes up a lot of memory
+        # We should figure out which ones we want exactly
+        # "gpu_metrics": """
+        # SELECT GENERIC_EVENTS.timestamp, data
+        # FROM GPU_METRICS
+        # LEFT JOIN GENERIC_EVENTS
+        # ON GENERIC_EVENTS.typeId = GPU_METRICS.typeId
+        # """
     }
     def __init__(self, filepath, create_cct=False, trace_types="all") -> None:
         self.conn = sqlite3.connect(filepath)
@@ -66,6 +109,7 @@ class NSightSQLiteReader:
         SELECT name FROM sqlite_master WHERE type='table'
         """
         self.table_names = set(pd.read_sql_query(get_tables_query, self.conn).squeeze())
+        self.trace_queries = NSightSQLiteReader._trace_queries.copy()
         if trace_types == "all":
             # Some traces (their tables, e.g. NVTX_EVENTS) may not always be present
             # in the sqlite db
@@ -74,17 +118,36 @@ class NSightSQLiteReader:
             if "NVTX_EVENTS" in self.table_names:
                 self.trace_types.append("nvtx")
             if "CUPTI_ACTIVITY_KIND_RUNTIME" in self.table_names:
-                # TODO: should we warn if this doesn't exist
-                # I feel like this table should always exist
                 self.trace_types.append("cuda_api")
+                self.trace_types.append("gpu_trace")
+
+            # GPU metrics are disabled, see comment above
+            # if "GPU_METRICS" in self.table_names:
+            #     self.trace_types.append("gpu_metrics")
         else:
             self.trace_types = trace_types
+
+        if "gpu_trace" in self.trace_types:
+            # Check for existance of CUDA_ACTIVITY_KIND_MEMCPY/
+            # CUDA_ACTIVITY_KIND_MEMSET since those can sometimes not exist
+
+            gpu_trace_qs = []
+            gpu_trace_needed_tbls = ["CUPTI_ACTIVITY_KIND_RUNTIME", "CUPTI_ACTIVITY_KIND_MEMCPY",
+                                     "CUPTI_ACTIVITY_KIND_MEMSET"]
+
+            for req_tbl, q in zip(gpu_trace_needed_tbls, NSightSQLiteReader._trace_queries["gpu_trace"]):
+                if req_tbl in self.table_names:
+                    gpu_trace_qs.append(q)
+            self.trace_queries["gpu_trace"] = gpu_trace_qs
 
     def read(self) -> pipit.trace.Trace:
         traces = []
 
         for typ in self.trace_types:
-            df = pd.read_sql_query(NSightSQLiteReader._trace_queries[typ], con=self.conn)
+            dfs = []
+            for q in self.trace_queries[typ]:
+                dfs.append(pd.read_sql_query(q, con=self.conn))
+            df = pd.concat(dfs, axis=0)
             df["Trace Type"] = typ
             traces.append(df)
 
@@ -97,7 +160,8 @@ class NSightSQLiteReader:
         trace_df = pd.melt(trace_df,
                 # These are the columns we don't want to melt
                 # Columns not in here will be melted into a single column
-                id_vars=["Name", "Process", "Thread", "Trace Type"],
+                id_vars=set(df.columns) - {"Enter", "Leave"},
+                value_vars=["Enter", "Leave"],
                 var_name="Event Type",
                 value_name="Timestamp (ns)")
         # Cache mapping
