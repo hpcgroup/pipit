@@ -1,8 +1,9 @@
 import pandas as pd
 from typing import Set, List, Dict
-import networkx as nx
-from . import Partition, leap, Event
+# import networkx as nx
+from . import Partition, Event
 from .. import Trace
+from graphviz import Digraph
 
 class Partition_DAG:
     """
@@ -32,8 +33,8 @@ class Partition_DAG:
     
     def add_partition(self, partition: Partition, happens_after: Partition) -> None:
         # adds in the happens after relationship between partitions
-        partition.add_parent(happens_after)
-        happens_after.add_child(partition)
+        partition.parents.add(happens_after)
+        happens_after.children.add(partition)
         # keep track of leaves
         if happens_after in self.leaves:
             self.leaves.remove(happens_after)
@@ -52,11 +53,13 @@ class Partition_DAG:
     
     # All together DAG creation
     def create_dag_from_Trace(trace: Trace) -> "Partition_DAG":
+        trace._match_events()
+        trace._match_mpi();
         events_df = trace.events
 
         # Set Up Root Partition
         all_processes = set(events_df['Process'].unique())
-        intial_time = events_df['Time'].min()
+        # initial_time = events_df['Time'].min()
         root_partition = Partition(-1)
         root_partition.add_processes(all_processes)
 
@@ -64,35 +67,49 @@ class Partition_DAG:
         dag = Partition_DAG([root_partition], all_processes)
 
         # Filter DF for Communication Events
-        events_df = events_df.loc[events_df['name'].isin(['MpiSend', 'MpiRecv'])]
-        events_df = events_df.loc[events_df['Event Type'] == 'Enter'].sort_values(by=['Time'])
+        send_event_names = ["MPI_Send"]
+        recv_event_names = ["MPI_Recv"]
+        events_df = events_df.loc[events_df['Name'].isin(send_event_names + recv_event_names)]
+        events_df = events_df.loc[events_df['Event Type'] == 'Enter'].sort_values(by=['Timestamp (ns)'])
+        print('events_df', events_df.head())
 
         # Add all the communication events as partitions to the dag
         # TODO: Need to investigate if matching event/timestamp is for leave or respective MPI event
         time_col_index = events_df.columns.get_loc('Timestamp (ns)') + 1
+        matching_time_col_index = events_df.columns.get_loc('_matching_timestamp') + 1
         for process in all_processes:
+
             process_events: pd.DataFrame = events_df.loc[events_df['Process'] == process]
-            
+            # print('process_events', process_events.head())
             prev_partition = root_partition
+            prev_event = None
             for row in process_events.itertuples():
+                print('processing row', row)
                 event_id = row.Index
+                print('------------------------event_id', event_id)
                 process = row.Process
+                if row.Name in recv_event_names:
+                    print('found receive event')
                 start_time = row[time_col_index]
-                end_time = row._matching_timestamp
+                end_time = row[matching_time_col_index]
 
                 event = Event(event_id, process, start_time, end_time)
                 partition = Partition(event)
                 partition.add_processes({process})
+                print('adding partition', partition.partition_id, 'to', prev_partition.partition_id)
                 dag.add_partition(partition, prev_partition)
-                prev_event.add_matching_event(event)
-                prev_event = event
+                # if prev_event is not None:
+                #     prev_event.add_matching_event(event.event_id)
+                # prev_event = event
                 prev_partition = partition
         
         # Merge all the communication connections
-        comm_df = events_df.loc[events_df['name'] == 'MpiSend']
+        comm_df = events_df.loc[events_df['Name'].isin(send_event_names)]
+        matching_event_col_location = comm_df.columns.get_loc('_matching_event') + 1
         for row in comm_df.itertuples():
             send_event = row.Index
-            recv_event = row._matching_event
+            recv_event = row[matching_event_col_location]
+            print('adding connection from', send_event, 'to', recv_event)
             # dag.add_connection(send_event, recv_event)
             dag.merge_partitions(send_event, recv_event)
         
@@ -110,7 +127,14 @@ class Partition_DAG:
         if len(partition_1.children) == 0 and partition_1 not in self.leaves:
             self.leaves.add(partition_1)
 
-
+    def get_dot_representation(self) -> Digraph:
+        # returns a dot representation of the partition DAG
+        dot = Digraph()
+        for partition in self.partition_map.values():
+            dot.node(str(partition.partition_id))
+            for child in partition.children:
+                dot.edge(str(partition.partition_id), str(child.partition_id))
+        return dot
     # def calculate_distance(self) -> None:
     #     # calculates the distance of each partition to root and updates the df
     #     def calc_distance_helper(node: Partition):

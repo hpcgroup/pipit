@@ -5,4 +5,4 @@
 
 from .event import Event
 from .partition import Partition
-# from .partitioning import get_partition_graph
+from .partition_dag import Partition_DAG

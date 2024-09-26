@@ -5,11 +5,11 @@ class Partition:
     # Each Partition is started as a singular event consisting of an MPI operation
     # We will later add in computation events  
     
-    def __init__(self, parition_id: int):
+    def create_empty_partition(self, partition_id: int):
         """
         Constructor for empty partition 
         """
-        self.partition_id: int = parition_id
+        self.partition_id: int = partition_id
         
         # event's set 
         # each id in events correlates to the trace.events df
@@ -27,15 +27,21 @@ class Partition:
         self.distance = 0
         self.min_event_start: float = float('inf')
         self.max_event_end: 0
-        self.__calc_min_max_time()
+        # self.__calc_min_max_time()
 
         # Variables for Tarjan's algorithm
         self.visited = False
         self.index = -1
         self.low_link = -1
     
+    
+
 
     def __init__(self, event: Event):
+        # if event is an int, then we are creating an empty partition
+        if isinstance(event, int):
+            self.create_empty_partition(event)
+            return
         self.partition_id: int = event.event_id
         
         # event's set 
@@ -94,9 +100,9 @@ class Partition:
         self.processes.update(processes)
 
     def __calc_min_max_time(self):
-        if len(self.events_set) > 0:    
-            self.min_event_start = min([event.start_time for event in self.events_set])
-            self.max_event_end = max([event.end_time for event in self.events_set])
+        if len(self.events) > 0:    
+            self.min_event_start = min([event.start_time for event in self.events])
+            self.max_event_end = max([event.end_time for event in self.events])
 
     def initialize_for_tarjan(self):
         self.visited = False
@@ -106,7 +112,7 @@ class Partition:
     def add_event(self, e : Event):
         self.event_dict[e.event_id] = e
         e.add_partition(self)
-        self.events_set.add(e)
+        self.events.add(e)
         self.processes.add(e.process)
 
         if e.start_time < self.min_event_start:
