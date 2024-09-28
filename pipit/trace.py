@@ -203,59 +203,89 @@ class Trace:
         matching_events = list(self.events["_matching_event"])
         matching_times = list(self.events["_matching_timestamp"])
 
-        mpi_events = self.events[
-            self.events["Name"].isin(["MpiSend", "MpiRecv", "MpiIsend", "MpiIrecv"])
+
+        # Filter by send/receive events
+        send_events_names = ["MpiSend", "MpiISend"]
+
+        send_events = self.events[
+            self.events["Name"].isin(send_events_names)
         ]
 
-        queue = [[] for _ in range(len(self.events["Process"].unique()))]
+        receive_events_names = ["MpiRecv", "MpiIrecv"]
 
-        df_indices = list(mpi_events.index)
-        timestamps = list(mpi_events["Timestamp (ns)"])
-        names = list(mpi_events["Name"])
-        attrs = list(mpi_events["Attributes"])
-        processes = list(mpi_events["Process"])
+        receive_events = self.events[
+            self.events["Name".isin(receive_events_names)]
+        ]
 
-        # Iterate through all events
-        for i in range(len(mpi_events)):
+        # Queue is a dictionary in which each receiving process (key) will have
+        # a list of tuples that each contain information about an associated 
+        # send event
+        queue = {process: [] for process in self.events["Process"].unique()}
+
+        df_indices = list(send_events.index)
+        timestamps = list(send_events["Timestamp (ns)"])
+        names = list(send_events["Name"])
+        attrs = list(send_events["Attributes"])
+        processes = list(send_events["Process"])
+
+        # First iterate over send events, adding each event's information
+        # to the receiver's list in the dictionary
+        for i in range(len(send_events)):
             curr_df_index = df_indices[i]
             curr_timestamp = timestamps[i]
             curr_name = names[i]
             curr_attrs = attrs[i]
             curr_process = processes[i]
 
-            if curr_name == "MpiSend" or curr_name == "MpiIsend":
-                # Add current dataframe index, timestmap, and process to stack
-                if "receiver" in curr_attrs:
-                    queue[curr_attrs["receiver"]].append(
-                        (curr_df_index, curr_timestamp, curr_name, curr_process)
-                    )
-            elif curr_name == "MpiRecv" or curr_name == "MpiIrecv":
-                if "sender" in curr_attrs:
-                    send_process = None
-                    i = 0
+            # Add current dataframe index, timestamp, and process to stack
+            if "receiver" in curr_attrs:
+                queue[curr_attrs["receiver"]].append(
+                    (curr_df_index, curr_timestamp, curr_name, curr_process)
+                )
 
-                    # we want to iterate through the queue in order
-                    # until we find the corresponding "send" event
-                    while send_process != curr_attrs["sender"] and i < len(
-                        queue[curr_process]
-                    ):
-                        send_df_index, send_timestamp, send_name, send_process = queue[
-                            curr_process
-                        ][i]
-                        i += 1
 
-                    if send_process == curr_attrs["sender"] and i <= len(
-                        queue[curr_process]
-                    ):
-                        # remove matched event from queue
-                        del queue[curr_process][i - 1]
+        df_indices = list(receive_events.index)
+        timestamps = list(receive_events["Timestamp (ns)"])
+        names = list(receive_events["Name"])
+        attrs = list(receive_events["Attributes"])
+        processes = list(receive_events["Process"])
 
-                        # Fill in the lists with the matching values if event found
-                        matching_events[send_df_index] = curr_df_index
-                        matching_events[curr_df_index] = send_df_index
+        # Now iterate over receive events
+        for i in range(len(receive_events)):
+            curr_df_index = df_indices[i]
+            curr_timestamp = timestamps[i]
+            curr_name = names[i]
+            curr_attrs = attrs[i]
+            curr_process = processes[i]
 
-                        matching_times[send_df_index] = curr_timestamp
-                        matching_times[curr_df_index] = send_timestamp
+            if "sender" in curr_attrs:
+                send_process = None
+                i = 0
+
+                # We want to iterate through the queue in order
+                # until we find the corresponding "send" event
+                while send_process != curr_attrs["sender"] and i < len(
+                    queue[curr_process]
+                ):
+                    send_df_index, send_timestamp, send_name, send_process = queue[
+                        curr_process
+                    ][i]
+                    i += 1
+
+                if send_process == curr_attrs["sender"] and i <= len(
+                    queue[curr_process]
+                ):
+                    # remove matched event from queue
+                    del queue[curr_process][i - 1]
+
+                    # Fill in the lists with the matching values if event found
+                    matching_events[send_df_index] = curr_df_index
+                    matching_events[curr_df_index] = send_df_index
+
+                    matching_times[send_df_index] = curr_timestamp
+                    matching_times[curr_df_index] = send_timestamp
+
+
 
         self.events["_matching_event"] = matching_events
         self.events["_matching_timestamp"] = matching_times
