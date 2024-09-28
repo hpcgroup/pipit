@@ -203,19 +203,14 @@ class Trace:
         matching_events = list(self.events["_matching_event"])
         matching_times = list(self.events["_matching_timestamp"])
 
-
         # Filter by send/receive events
         send_events_names = ["MpiSend", "MpiISend"]
 
-        send_events = self.events[
-            self.events["Name"].isin(send_events_names)
-        ]
+        send_events = self.events[self.events["Name"].isin(send_events_names)]
 
         receive_events_names = ["MpiRecv", "MpiIrecv"]
 
-        receive_events = self.events[
-            self.events["Name".isin(receive_events_names)]
-        ]
+        receive_events = self.events[self.events["Name".isin(receive_events_names)]]
 
         # Queue is a dictionary in which each receiving process (key) will have
         # a list of tuples that each contain information about an associated 
@@ -242,7 +237,6 @@ class Trace:
                 queue[curr_attrs["receiver"]].append(
                     (curr_df_index, curr_timestamp, curr_name, curr_process)
                 )
-
 
         df_indices = list(receive_events.index)
         timestamps = list(receive_events["Timestamp (ns)"])
@@ -284,8 +278,6 @@ class Trace:
 
                     matching_times[send_df_index] = curr_timestamp
                     matching_times[curr_df_index] = send_timestamp
-
-
 
         self.events["_matching_event"] = matching_events
         self.events["_matching_timestamp"] = matching_times
