@@ -525,7 +525,7 @@ class ProjectionsReader:
                         "Message Length": msglen,
                         "Event ID": event,
                         "Send Time": send_time,
-                        "Destinatopn PEs": dest_procs,
+                        "Destinatopn PEs": destPEs,
                     }
 
                     _add_to_trace_dict(
@@ -534,7 +534,7 @@ class ProjectionsReader:
                         "Instant",
                         time,
                         pe_num,
-                        "To " + str(num_procs) + "processors",
+                        "To " + str(numPEs) + "processors",
                     )
 
                 # Processing of chare (i.e. execution) ?
