@@ -1,5 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import List, Dict
+
+import pandas as pd
+
 from ..graph import Graph, Node
 import numpy
 
@@ -16,12 +19,12 @@ class BaseTraceReader(ABC):
         self.unique_id = -1
 
         # events are indexed by process number, then thread number
-        self.events: List[Dict[List[Dict]]] = [{}] * num_processes
+        self.events: List[Dict[int, List[Dict]]] = [{}] * num_processes
 
         # stacks are indexed by process number, then thread number
-        self.stacks: List[Dict[List[int]]] = [{}] * num_processes
+        self.stacks: List[Dict[int, List[int]]] = [{}] * num_processes
 
-        self.ccts: List[Dict[Graph]] = [{}] * num_processes
+        self.ccts: List[Dict[int, Graph]] = [{}] * num_processes
 
 
 
@@ -67,6 +70,12 @@ class BaseTraceReader(ABC):
 
 
     def finalize(self) -> None:
+        # first step put everything in one list
+        all_events = []
+        for process in self.events:
+            for thread in process:
+                all_events.extend(process[thread])
+        self.dataframe = pd.DataFrame(all_events)
         pass
 
     # Helper methods
@@ -77,17 +86,19 @@ class BaseTraceReader(ABC):
         if len(stack) == 0:
             # root event
             event["parent"] = numpy.nan
-            if self.create_cct:
-                new_graph_node = Node(event["id"], None)
-                cct.add_root(new_graph_node)
-                event["Node"] = new_graph_node
+            # if self.create_cct:
+            #     new_graph_node = Node(event["id"], None)
+            #     cct.add_root(new_graph_node)
+            #     event["Node"] = new_graph_node
         else:
             parent_event = event_list[stack[-1]]
             event["parent"] = parent_event["id"]
             if self.create_cct:
-                new_graph_node = Node(event["id"], parent_event["Node"])
-                parent_event["Node"].add_child(new_graph_node)
-                event["Node"] = new_graph_node
+                parent_graph_node = parent_event["Node"]
+                # if
+                # new_graph_node = Node(event["id"], parent_event["Node"])
+                # parent_event["Node"].add_child(new_graph_node)
+                # event["Node"] = new_graph_node
 
         # update stack and event list
         stack.append(len(event_list) - 1)
