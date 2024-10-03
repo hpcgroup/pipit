@@ -3,11 +3,16 @@ from typing import List, Dict
 
 import pandas as pd
 
+from .. import Trace
 from ..graph import Graph, Node
 import numpy
 
 
 class BaseTraceReader(ABC):
+
+    @abstractmethod
+    def read(self) -> Trace:
+        pass
 
 
     # The following methods should be called by each reader class
@@ -68,6 +73,8 @@ class BaseTraceReader(ABC):
         elif event["Event Type"] == "Leave":
             self.__update_match_event(event, self.stacks[process][thread], event_list)
 
+        event_list.append(event)
+
 
     def finalize(self) -> None:
         # first step put everything in one list
@@ -75,8 +82,9 @@ class BaseTraceReader(ABC):
         for process in self.events:
             for thread in process:
                 all_events.extend(process[thread])
-        self.dataframe = pd.DataFrame(all_events)
-        pass
+        # create a dataframe
+        self.events_dataframe = pd.DataFrame(all_events)
+        self.trace =  Trace(None, self.events_dataframe, None)
 
     # Helper methods
 
@@ -101,7 +109,7 @@ class BaseTraceReader(ABC):
                 # event["Node"] = new_graph_node
 
         # update stack and event list
-        stack.append(len(event_list) - 1)
+        stack.append(len(event_list))
         # event_list.append(event)
 
     
