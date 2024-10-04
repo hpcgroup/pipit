@@ -18,6 +18,8 @@ class NSightSQLiteReader:
     # Dictionary mapping trace type
     # (e.g. NVTX,
     _trace_queries = {
+        # TODO: this is untested, find an application with nvtx
+        # support
         "nvtx": ["""
         SELECT
             start as Enter,
@@ -37,9 +39,9 @@ class NSightSQLiteReader:
             ON tname.nameId = rname2.id
         """],
         "cuda_api": ["""
-        SELECT 
+        SELECT
             start as Enter,
-            end as Leave, 
+            end as Leave,
             rname.value AS Name,
             (cuda_api.globalTid >> 24) & 0x00FFFFFF AS "Process",
             cuda_api.globalTid & 0x00FFFFFF AS "Thread"
@@ -55,10 +57,10 @@ class NSightSQLiteReader:
             ON tname.nameId = rname2.id
         """],
         "gpu_trace": ["""
-        SELECT 
+        SELECT
             start as Enter,
             end as Leave,
-            value as Name, 
+            value as Name,
             streamId,
             'kernel' as type,
             null as bytes
@@ -67,24 +69,24 @@ class NSightSQLiteReader:
             ON cuda_gpu.shortName = StringIds.id
         """,
         """
-        SELECT 
-            start as Enter, 
-            end as Leave, 
+        SELECT
+            start as Enter,
+            end as Leave,
             memcpy_labels.name as Name,
-            streamId, 
-            memcpy_labels.name as type, 
+            streamId,
+            memcpy_labels.name as type,
             bytes
         FROM CUPTI_ACTIVITY_KIND_MEMCPY as cuda_memcpy
         JOIN ENUM_CUDA_MEMCPY_OPER as memcpy_labels
             ON  cuda_memcpy.copyKind = memcpy_labels.id
         """,
         """
-        SELECT 
-            start as Enter, 
-            end as Leave, 
+        SELECT
+            start as Enter,
+            end as Leave,
             memset_labels.name as Name,
             streamId,
-            memset_labels.name as type, 
+            memset_labels.name as type,
             bytes
         FROM CUPTI_ACTIVITY_KIND_MEMSET as cuda_memset
         JOIN ENUM_CUDA_MEM_KIND as memset_labels
@@ -152,18 +154,24 @@ class NSightSQLiteReader:
             traces.append(df)
 
         # concat traces together row wise
-        # TODO: maybe we should keep these partitioned
-        # not sure if pipit is able to handle this currently, though
         trace_df = pd.concat(traces, axis=0)
 
         # Melt start/end columns into single event type column
         trace_df = pd.melt(trace_df,
                 # These are the columns we don't want to melt
                 # Columns not in here will be melted into a single column
-                id_vars=set(df.columns) - {"Enter", "Leave"},
+                id_vars=[col for col in df.columns if col not in {"Enter", "Leave"}],
                 value_vars=["Enter", "Leave"],
                 var_name="Event Type",
                 value_name="Timestamp (ns)")
+
+        if "bytes" in trace_df.columns:
+            trace_df = trace_df.astype(
+                {
+                    "bytes": "Int64",
+                }
+            )
+
         # Cache mapping
         trace_df["_matching_event"] = np.concatenate([np.arange(len(trace_df) // 2, len(trace_df)), np.arange(0, len(trace_df) // 2)])
         # Convert to numpy before assignment otherwise pandas
@@ -176,6 +184,9 @@ class NSightSQLiteReader:
         trace_df["_depth"] = 0
         trace_df["_parent"] = None
         trace_df["_children"] = None
+
+        trace_df = trace_df.sort_values(by="Timestamp (ns)", ignore_index=True)
+
         trace = pipit.trace.Trace(None, trace_df)
         if self.create_cct:
             trace.create_cct()
