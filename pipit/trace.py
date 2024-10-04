@@ -190,6 +190,77 @@ class Trace:
 
             self.events = self.events.astype({"_matching_event": "Int32"})
 
+
+    def _match_charm_messages(self):
+
+        if "_matching_event" not in self.events.columns:
+            self.events["_matching_event"] = None
+
+        if "_matching_timestamp" not in self.events.columns:
+            self.events["_matching_timestamp"] = np.nan
+
+        matching_events = list(self.events["_matching_event"])
+        matching_times = list(self.events["_matching_timestamp"])
+
+        charm_send_events = self.events[self.events["Attributes"].apply(
+            lambda x: False if not x else ("Entry Type" in  x) and (x["Entry Type"] == "Create")
+        )]
+
+        charm_receive_events = self.events[self.events["Attributes"].apply(
+            lambda x: False if not x else ("Entry Type" in x) and (x["Entry Type"] == "Processing")
+        )]
+
+        df_indices = list(charm_send_events.index)
+        timestamps = list(charm_send_events["Timestamp (ns)"])
+        attrs = list(charm_send_events["Attributes"])
+
+        queue = {}
+
+        # Add all necessary send event information to the list
+        for i in range(len(charm_send_events)):
+            curr_df_index = df_indices[i]
+            curr_timestamp = timestamps[i]
+            curr_event_id = attrs[i]["Event ID"]
+
+            queue[curr_event_id] = (curr_df_index, curr_timestamp)
+        
+
+        df_indices = list(charm_receive_events.index)
+        timestamps = list(charm_receive_events["Timestamp (ns)"])
+        attrs = list(charm_receive_events["Attributes"])
+
+        for i in range(len(charm_receive_events)):
+            curr_df_index = df_indices[i]
+            curr_timestamp = timestamps[i]
+            curr_event_id = attrs[i]["Event ID"]
+
+            if curr_event_id in queue:
+    
+                send_df_index = queue[curr_event_id][0]
+                send_timestamp = queue[curr_event_id][1]
+
+                matching_events[send_df_index] = curr_df_index
+                matching_events[curr_df_index] = send_df_index
+
+                matching_times[send_df_index] = curr_timestamp
+                matching_times[curr_df_index] = send_timestamp
+
+        self.events["_matching_event"] = matching_events
+        self.events["_matching_timestamp"] = matching_times
+
+        self.events = self.events.astype({"_matching_event": "Int32"})
+
+
+
+
+
+
+
+
+
+
+
+
     def _match_messages(self):
         """
         Matches corresponding MpiSend/MpiRecv and MpiIsend/MpiIrecv instant events
