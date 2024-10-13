@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import List, Dict
 
+import pandas
 import pandas as pd
 
 from .. import Trace
@@ -16,105 +17,128 @@ class BaseTraceReader(ABC):
 
 
     # The following methods should be called by each reader class
-    def create_empty_trace(self, num_processes: int, create_cct: bool) -> None:
-        # keep track if we want to create a CCT
-        self.create_cct = create_cct
-
+    def create_empty_trace(self, num_processes: int) -> None:
         # keep track of a unique id for each event
         self.unique_id = -1
 
         # events are indexed by process number, then thread number
-        self.events: List[Dict[int, List[Dict]]] = [{}] * num_processes
+        # stores a list of events
+        self.events: List[Dict[int, List[Dict]]] = []
+        for i in range(num_processes):
+            self.events.append({})
 
         # stacks are indexed by process number, then thread number
+        # stores indices of events in the event list
         self.stacks: List[Dict[int, List[int]]] = [{}] * num_processes
-
-        self.ccts: List[Dict[int, Graph]] = [{}] * num_processes
 
 
 
     def add_event(self, event: Dict) -> None:
 
         # get process number -- if not present, set to 0
-        if "process" in event:
-            process = event["process"]
+        if "Process" in event:
+            process = event["Process"]
         else:
+            print("something is wrong")
             process = 0
 
-        # get process number -- if not present, set to 0
-        if "thread" in event:
-            thread = event["thread"]
+        # get thread number -- if not present, set to 0
+        if "Thread" in event:
+            print("something is wrong")
+            thread = event["Thread"]
         else:
             thread = 0
+            # event["Thread"] = 0
 
         # assign a unique id to the event
-        event["id"] = self.__get_unique_id()
+        event["unique_id"] = self.__get_unique_id()
 
+
+        process_events = self.events[process]
+        process_stacks = self.stacks[process]
 
         # get event list
-        if thread not in self.events[process]:
-            self.events[process][thread] = []
-        event_list: List[Dict] = self.events[process][thread]
+        if thread not in process_events:
+            process_events[thread] = []
+        event_list = process_events[thread]
 
         # get stack
-        if thread not in self.stacks[process]:
-            self.stacks[process][thread] = []
-        stack: List[int] = self.stacks[process][thread]
+        if thread not in process_stacks:
+            process_stacks[thread] = []
+        stack: List[int] = process_stacks[thread]
 
-        # if the event is an enter event, add the event to the stack and CCT
+        # if the event is an enter event, add the event to the stack and update the parent-child relationships
         if event["Event Type"] == "Enter":
-            cct = None
-            # if we are creating a CCT, get the correct CCT
-            if self.create_cct:
-                if thread not in self.ccts[process]:
-                    self.ccts[process][thread] = Graph()
-                cct = self.ccts[process][thread]
-            self.__update_cct_and_parent_child_relationships(event, self.stacks[process][thread], event_list, cct)
+            self.__update_parent_child_relationships(event, stack, event_list)
+        # if the event is a leave event, update the matching event and pop from the stack
         elif event["Event Type"] == "Leave":
-            self.__update_match_event(event, self.stacks[process][thread], event_list)
+            self.__update_match_event(event, stack, event_list)
 
         event_list.append(event)
+        x = 0
 
-
-    def finalize(self) -> None:
+    def finalize_process(self, process: int) -> pd.DataFrame:
         # first step put everything in one list
+        # all_events = []
+        # for process in self.events:
+        #     for thread in process:
+        #         all_events.extend(process[thread])
+
+        # convert 3d list of events to 1d list
         all_events = []
-        for process in self.events:
-            for thread in process:
-                all_events.extend(process[thread])
+        for thread_id in self.events[process]:
+            all_events.extend(self.events[process][thread_id])
+                # df = pd.DataFrame(self.events[proc_id][thread_id])
+                # just_for_break = 0
+
+                # for i in range(len(self.events[proc_id][thread_id])):
+                #     all_events.append(self.events[proc_id][thread_id][i])
+                #     pass
+                    # print(self.events[i][j][k]['Process'])
+
+        # print('all_events has length: ' + str(len(all_events)))
+        # for i in range(len(self.events)):
+        #     print(f'self.events[{i}] has length', len(self.events[i].keys()))
+        #     # print(type(self.events[i]))
+        #     # print (self.events[i].keys())
+        #     for j in self.events[i]:
+        #         # print(j)
+        #         # print (j in self.events[i])
+        #         # print(self.events[i][j])
+        #         print(f'self.events[{i}][{j}] has length', len(self.events[i][j]))
+
+        # df_list = []
+        # for process in self.events:
+        #     for thread in process:
+        #         df_list.append(pd.DataFrame(process[thread]))
+        # all_events = pd.concat(df_list)
+
         # create a dataframe
-        self.events_dataframe = pd.DataFrame(all_events)
-        self.trace =  Trace(None, self.events_dataframe, None)
+        df = pd.DataFrame(all_events)
+        # print(df.head())
+        # print(self.events_dataframe["unique_id"].value_counts())
+        return df
+        # self.events_dataframe = pandas.DataFrame(all_events)
+        # print number of events per id
+        # print(self.events_dataframe.sort_values(by=["unique_id"]))
+        # self.trace =  Trace(None, self.events_dataframe, None)
 
     # Helper methods
 
     # This method can be thought of the update upon an "Enter" event
     # It adds to the stack and CCT
-    def __update_cct_and_parent_child_relationships(self, event: Dict, stack: List[int], event_list: List[Dict], cct: Graph) -> None:
+    def __update_parent_child_relationships(self, event: Dict, stack: List[int], event_list: List[Dict]) -> None:
         if len(stack) == 0:
             # root event
             event["parent"] = numpy.nan
-            # if self.create_cct:
-            #     new_graph_node = Node(event["id"], None)
-            #     cct.add_root(new_graph_node)
-            #     event["Node"] = new_graph_node
         else:
             parent_event = event_list[stack[-1]]
-            event["parent"] = parent_event["id"]
-            if self.create_cct:
-                parent_graph_node = parent_event["Node"]
-                # if
-                # new_graph_node = Node(event["id"], parent_event["Node"])
-                # parent_event["Node"].add_child(new_graph_node)
-                # event["Node"] = new_graph_node
+            event["parent"] = parent_event["unique_id"]
 
-        # update stack and event list
+
+        # update stack
         stack.append(len(event_list))
-        # event_list.append(event)
 
-    
-    # def __update_cct(self, event: Dict, process: int, thread: int) -> None:
-    #     pass
 
     # This method can be thought of the update upon a "Leave" event
     # It pops from the stack and updates the event list
@@ -122,23 +146,20 @@ class BaseTraceReader(ABC):
     def __update_match_event(self, leave_event: Dict, stack: List[int], event_list: List[Dict]) -> None:
 
         while len(stack) > 0:
-            enter_event = event_list[stack[-1]]
+
+            # popping matched events from the stack
+            enter_event = event_list[stack.pop(-1)]
+
 
             if enter_event["Name"] == leave_event["Name"]:
                 # matching event found
 
                 # update matching event ids
-                leave_event["_matching_event"] = enter_event["id"]
-                enter_event["_matching_event"] = leave_event["id"]
+                leave_event["_matching_event"] = enter_event["unique_id"]
+                enter_event["_matching_event"] = leave_event["unique_id"]
 
-                # popping matched events from the stack
-                stack.pop()
                 break
-            else:
-                # popping unmatched events from the stack
-                stack.pop()
 
-        # event_list.append(leave_event)
 
     def __get_unique_id(self) -> int:
         self.unique_id += 1
