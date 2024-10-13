@@ -83,8 +83,6 @@ class ProjectionsConstants:
 
 class STSReader:
     def __init__(self, file_location):
-        self.sts_file = open(file_location, "r")  # self.chares = {}
-
         # In 'self.entries', each entry stores (entry_name: str, chare_id: int)
         self.entries = {}
 
@@ -94,7 +92,7 @@ class STSReader:
         # Stores user stat names: {user_event_id: user stat name}
         self.user_stats = {}
 
-        self.read_sts_file()
+        self.read_sts_file(file_location)
 
     # to get name of entry print <name of chare + :: + name of entry>>
     def get_entry_name(self, entry_id):
@@ -132,95 +130,94 @@ class STSReader:
     def get_event_name(self, event_id):
         return self.user_events[event_id]
 
-    def read_sts_file(self):
-        for line in self.sts_file:
-            line_arr = line.split()
+    def read_sts_file(self, file_path):
+        with open(file_path, "r") as sts_file:
+            for line in sts_file:
+                line_arr = line.split()
 
-            # Note: I'm disregarding TOTAL_STATS and TOTAL_EVENTS, because
-            #   projections reader disregards them
+                # Note: I'm disregarding TOTAL_STATS and TOTAL_EVENTS, because
+                #   projections reader disregards them
 
-            # Note: currently not reading/storing VERSION, MACHINE, SMPMODE,
-            #   COMMANDLINE, CHARMVERSION, USERNAME, HOSTNAME
+                # Note: currently not reading/storing VERSION, MACHINE, SMPMODE,
+                #   COMMANDLINE, CHARMVERSION, USERNAME, HOSTNAME
 
-            # create chares array
-            # In 'self.chares', each entry stores (chare_name: str, dimension: int)
-            if line_arr[0] == "TOTAL_CHARES":
-                total_chares = int(line_arr[1])
-                self.chares = [None] * total_chares
+                # create chares array
+                # In 'self.chares', each entry stores (chare_name: str, dimension: int)
+                if line_arr[0] == "TOTAL_CHARES":
+                    total_chares = int(line_arr[1])
+                    self.chares = [None] * total_chares
 
-            elif line_arr[0] == "TOTAL_EPS":
-                self.num_eps = int(line_arr[1])
+                elif line_arr[0] == "TOTAL_EPS":
+                    self.num_eps = int(line_arr[1])
 
-            # get num processors
-            elif line_arr[0] == "PROCESSORS":
-                self.num_pes = int(line_arr[1])
+                # get num processors
+                elif line_arr[0] == "PROCESSORS":
+                    self.num_pes = int(line_arr[1])
 
-            # create message array
-            elif line_arr[0] == "TOTAL_MSGS":
-                total_messages = int(line_arr[1])
-                self.message_table = [None] * total_messages
-            elif line_arr[0] == "TIMESTAMP":
-                self.timestamp_string = line_arr[1]
+                # create message array
+                elif line_arr[0] == "TOTAL_MSGS":
+                    total_messages = int(line_arr[1])
+                    self.message_table = [None] * total_messages
+                elif line_arr[0] == "TIMESTAMP":
+                    self.timestamp_string = line_arr[1]
 
-            # Add to self.chares
-            elif line_arr[0] == "CHARE":
-                id = int(line_arr[1])
-                name = line_arr[2][1 : len(line_arr[2]) - 1]
-                dimensions = int(line_arr[3])
-                self.chares[id] = (name, dimensions)
-                # print(int(line_arr[1]), line_arr[2][1:len(line_arr[2]) - 1])
+                # Add to self.chares
+                elif line_arr[0] == "CHARE":
+                    id = int(line_arr[1])
+                    name = line_arr[2][1 : len(line_arr[2]) - 1]
+                    dimensions = int(line_arr[3])
+                    self.chares[id] = (name, dimensions)
+                    # print(int(line_arr[1]), line_arr[2][1:len(line_arr[2]) - 1])
 
-            # add to self.entries
-            elif line_arr[0] == "ENTRY":
-                # Need to concat entry_name
-                while not line_arr[3].endswith('"'):
-                    line_arr[3] = line_arr[3] + " " + line_arr[4]
-                    del line_arr[4]
+                # add to self.entries
+                elif line_arr[0] == "ENTRY":
+                    # Need to concat entry_name
+                    while not line_arr[3].endswith('"'):
+                        line_arr[3] = line_arr[3] + " " + line_arr[4]
+                        del line_arr[4]
 
-                id = int(line_arr[2])
-                entry_name = line_arr[3][1 : len(line_arr[3]) - 1]
-                chare_id = int(line_arr[4])
-                # name = self.chares[chare_id][0] + '::' + entry_name
-                self.entries[id] = (entry_name, chare_id)
+                    id = int(line_arr[2])
+                    entry_name = line_arr[3][1 : len(line_arr[3]) - 1]
+                    chare_id = int(line_arr[4])
+                    # name = self.chares[chare_id][0] + '::' + entry_name
+                    self.entries[id] = (entry_name, chare_id)
 
-            # Add to message_table
-            # Need clarification on this, as message_table is never referenced in
-            # projections
-            elif line_arr[0] == "MESSAGE":
-                id = int(line_arr[1])
-                message_size = int(line_arr[2])
-                self.message_table[id] = message_size
+                # Add to message_table
+                # Need clarification on this, as message_table is never referenced in
+                # projections
+                elif line_arr[0] == "MESSAGE":
+                    id = int(line_arr[1])
+                    message_size = int(line_arr[2])
+                    self.message_table[id] = message_size
 
-            # Read/store event
-            elif line_arr[0] == "EVENT":
-                id = int(line_arr[1])
-                event_name = ""
-                # rest of line is the event name
-                for i in range(2, len(line_arr)):
-                    event_name = event_name + line_arr[i] + " "
-                self.user_events[id] = event_name
+                # Read/store event
+                elif line_arr[0] == "EVENT":
+                    id = int(line_arr[1])
+                    event_name = ""
+                    # rest of line is the event name
+                    for i in range(2, len(line_arr)):
+                        event_name = event_name + line_arr[i] + " "
+                    self.user_events[id] = event_name
 
-            # Read/store user stat
-            elif line_arr[0] == "STAT":
-                id = int(line_arr[1])
-                event_name = ""
-                # rest of line is the stat
-                for i in range(2, len(line_arr)):
-                    event_name = event_name + line_arr[i] + " "
-                self.user_stats[id] = event_name
+                # Read/store user stat
+                elif line_arr[0] == "STAT":
+                    id = int(line_arr[1])
+                    event_name = ""
+                    # rest of line is the stat
+                    for i in range(2, len(line_arr)):
+                        event_name = event_name + line_arr[i] + " "
+                    self.user_stats[id] = event_name
 
-            # create papi array
-            elif line_arr[0] == "TOTAL_PAPI_EVENTS":
-                num_papi_events = int(line_arr[1])
-                self.papi_event_names = [None] * num_papi_events
+                # create papi array
+                elif line_arr[0] == "TOTAL_PAPI_EVENTS":
+                    num_papi_events = int(line_arr[1])
+                    self.papi_event_names = [None] * num_papi_events
 
-            # Unsure of what these are for
-            elif line_arr[0] == "PAPI_EVENT":
-                id = int(line_arr[1])
-                papi_event = line_arr[2]
-                self.papi_event_names[id] = papi_event
-
-        self.sts_file.close()
+                # Unsure of what these are for
+                elif line_arr[0] == "PAPI_EVENT":
+                    id = int(line_arr[1])
+                    papi_event = line_arr[2]
+                    self.papi_event_names[id] = papi_event
 
 
 class ProjectionsReader:
@@ -247,7 +244,8 @@ class ProjectionsReader:
         if not hasattr(self, "executable_location"):
             raise ValueError("Invalid directory for projections - no sts files found.")
 
-        self.num_pes = STSReader(self.executable_location + ".sts").num_pes
+        self.sts_reader = STSReader(self.executable_location + ".sts")
+        self.num_pes = self.sts_reader.num_pes
 
         # make sure all the log files exist
         for i in range(self.num_pes):
@@ -328,7 +326,7 @@ class ProjectionsReader:
 
     def _read_log_file(self, rank_size) -> pd.DataFrame:
         # has information needed in sts file
-        sts_reader = STSReader(self.executable_location + ".sts")
+        sts_reader = self.sts_reader
 
         rank, size = rank_size[0], rank_size[1]
         per_process = int(self.num_pes // size)
