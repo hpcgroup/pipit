@@ -1,4 +1,3 @@
-from abc import ABC, abstractmethod
 from typing import List, Dict
 
 import pandas
@@ -8,15 +7,16 @@ from pipit.trace import Trace
 
 class CoreTraceReader:
     """
-    Helper Object to read traces from different sources and convert them into a common format
+    Helper Object to read traces from different sources and convert them into a common
+    format
     """
 
     def __init__(self, start: int = 0, stride: int = 1):
         """
-            Should be called by each process to create an empty trace per process in the reader. Creates the following
-            data structures to represent an empty trace:
-            - events: Dict[int, Dict[int, List[Dict]]]
-            - stacks: Dict[int, Dict[int, List[int]]]
+        Should be called by each process to create an empty trace per process in the
+        reader. Creates the following data structures to represent an empty trace:
+        - events: Dict[int, Dict[int, List[Dict]]]
+        - stacks: Dict[int, Dict[int, List[int]]]
         """
         # keep stride for how much unique id should be incremented
         self.stride = stride
@@ -34,7 +34,8 @@ class CoreTraceReader:
 
     def add_event(self, event: Dict) -> None:
         """
-            Should be called to add each event to the trace. Will update the event lists and stacks accordingly.
+        Should be called to add each event to the trace. Will update the event lists and
+        stacks accordingly.
         """
         # get process number -- if not present, set to 0
         if "Process" in event:
@@ -66,12 +67,14 @@ class CoreTraceReader:
             self.stacks[process][thread] = []
         stack: List[int] = self.stacks[process][thread]
 
-        # if the event is an enter event, add the event to the stack and update the parent-child relationships
+        # if the event is an enter event, add the event to the stack and update the
+        # parent-child relationships
         if event["Event Type"] == "Enter":
             self.__update_parent_child_relationships(event, stack, event_list, False)
         elif event["Event Type"] == "Instant":
             self.__update_parent_child_relationships(event, stack, event_list, True)
-        # if the event is a leave event, update the matching event and pop from the stack
+        # if the event is a leave event, update the matching event and pop from the
+        # stack
         elif event["Event Type"] == "Leave":
             self.__update_match_event(event, stack, event_list)
 
@@ -103,9 +106,12 @@ class CoreTraceReader:
         )
         return trace_df
 
-    def __update_parent_child_relationships(self, event: Dict, stack: List[int], event_list: List[Dict],is_instant: bool) -> None:
+    def __update_parent_child_relationships(
+        self, event: Dict, stack: List[int], event_list: List[Dict], is_instant: bool
+    ) -> None:
         """
-        This method can be thought of the update upon an "Enter" event. It adds to the stack and CCT
+        This method can be thought of the update upon an "Enter" event. It adds to the
+        stack and CCT
         """
         if len(stack) == 0:
             # root event
@@ -118,10 +124,13 @@ class CoreTraceReader:
         if not is_instant:
             stack.append(len(event_list))
 
-    def __update_match_event(self, leave_event: Dict, stack: List[int], event_list: List[Dict]) -> None:
+    def __update_match_event(
+        self, leave_event: Dict, stack: List[int], event_list: List[Dict]
+    ) -> None:
         """
-        This method can be thought of the update upon a "Leave" event. It pops from the stack and updates the event list.
-        We should look into using this function to add artificial "Leave" events for unmatched "Enter" events
+        This method can be thought of the update upon a "Leave" event. It pops from the
+        stack and updates the event list. We should look into using this function to add
+        artificial "Leave" events for unmatched "Enter" events
         """
 
         while len(stack) > 0:
@@ -145,6 +154,7 @@ class CoreTraceReader:
     def __get_unique_id(self) -> int:
         self.unique_id += self.stride
         return self.unique_id
+
 
 def concat_trace_data(data_list):
     """
