@@ -276,17 +276,6 @@ class ProjectionsReader:
 
         self.create_cct = create_cct
 
-    # Returns an empty dict, used for reading log file into dataframe
-    @staticmethod
-    def _create_empty_dict() -> dict:
-        return {
-            "Name": [],
-            "Event Type": [],
-            "Timestamp (ns)": [],
-            "Process": [],
-            "Attributes": [],
-        }
-
     def read(self):
         if self.num_pes < 1:
             return None
