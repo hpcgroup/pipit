@@ -511,10 +511,10 @@ class ProjectionsReader:
                     pe = int(line_arr[5])
                     msglen = int(line_arr[6])
                     send_time = int(line_arr[7]) * 1000
-                    numPEs = int(line_arr[8])
-                    destPEs = []
-                    for i in (0, numPEs):
-                        destPEs.append(int(line_arr[9 + i]))
+                    num_procs = int(line_arr[8])
+                    dest_procs = []
+                    for i in (0, num_procs):
+                        dest_procs.append(int(line_arr[9 + i]))
 
                     details = {
                         "From PE": pe,
@@ -523,7 +523,7 @@ class ProjectionsReader:
                         "Message Length": msglen,
                         "Event ID": event,
                         "Send Time": send_time,
-                        "Destination PEs": destPEs,
+                        "Destinatopn PEs": dest_procs,
                     }
 
                     _add_to_trace_dict(
@@ -532,7 +532,7 @@ class ProjectionsReader:
                         "Instant",
                         time,
                         pe_num,
-                        "To " + str(numPEs) + "processors",
+                        "To " + str(num_procs) + "processors",
                     )
 
                 # Processing of chare (i.e. execution) ?
