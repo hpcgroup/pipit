@@ -5,9 +5,14 @@
 
 import os
 import gzip
+
+from numba.cuda import event
+
 import pipit.trace
 import pandas as pd
 import multiprocessing as mp
+
+from pipit.readers.core_reader import CoreTraceReader, concat_trace_data
 
 
 class ProjectionsConstants:
@@ -83,8 +88,6 @@ class ProjectionsConstants:
 
 class STSReader:
     def __init__(self, file_location):
-        self.sts_file = open(file_location, "r")  # self.chares = {}
-
         # In 'self.entries', each entry stores (entry_name: str, chare_id: int)
         self.entries = {}
 
@@ -94,7 +97,7 @@ class STSReader:
         # Stores user stat names: {user_event_id: user stat name}
         self.user_stats = {}
 
-        self.read_sts_file()
+        self.read_sts_file(file_location)
 
     # to get name of entry print <name of chare + :: + name of entry>>
     def get_entry_name(self, entry_id):
@@ -132,95 +135,94 @@ class STSReader:
     def get_event_name(self, event_id):
         return self.user_events[event_id]
 
-    def read_sts_file(self):
-        for line in self.sts_file:
-            line_arr = line.split()
+    def read_sts_file(self, file_path):
+        with open(file_path, "r") as sts_file:
+            for line in sts_file:
+                line_arr = line.split()
 
-            # Note: I'm disregarding TOTAL_STATS and TOTAL_EVENTS, because
-            #   projections reader disregards them
+                # Note: I'm disregarding TOTAL_STATS and TOTAL_EVENTS, because
+                #   projections reader disregards them
 
-            # Note: currently not reading/storing VERSION, MACHINE, SMPMODE,
-            #   COMMANDLINE, CHARMVERSION, USERNAME, HOSTNAME
+                # Note: currently not reading/storing VERSION, MACHINE, SMPMODE,
+                #   COMMANDLINE, CHARMVERSION, USERNAME, HOSTNAME
 
-            # create chares array
-            # In 'self.chares', each entry stores (chare_name: str, dimension: int)
-            if line_arr[0] == "TOTAL_CHARES":
-                total_chares = int(line_arr[1])
-                self.chares = [None] * total_chares
+                # create chares array
+                # In 'self.chares', each entry stores (chare_name: str, dimension: int)
+                if line_arr[0] == "TOTAL_CHARES":
+                    total_chares = int(line_arr[1])
+                    self.chares = [None] * total_chares
 
-            elif line_arr[0] == "TOTAL_EPS":
-                self.num_eps = int(line_arr[1])
+                elif line_arr[0] == "TOTAL_EPS":
+                    self.num_eps = int(line_arr[1])
 
-            # get num processors
-            elif line_arr[0] == "PROCESSORS":
-                self.num_pes = int(line_arr[1])
+                # get num processors
+                elif line_arr[0] == "PROCESSORS":
+                    self.num_pes = int(line_arr[1])
 
-            # create message array
-            elif line_arr[0] == "TOTAL_MSGS":
-                total_messages = int(line_arr[1])
-                self.message_table = [None] * total_messages
-            elif line_arr[0] == "TIMESTAMP":
-                self.timestamp_string = line_arr[1]
+                # create message array
+                elif line_arr[0] == "TOTAL_MSGS":
+                    total_messages = int(line_arr[1])
+                    self.message_table = [None] * total_messages
+                elif line_arr[0] == "TIMESTAMP":
+                    self.timestamp_string = line_arr[1]
 
-            # Add to self.chares
-            elif line_arr[0] == "CHARE":
-                id = int(line_arr[1])
-                name = line_arr[2][1 : len(line_arr[2]) - 1]
-                dimensions = int(line_arr[3])
-                self.chares[id] = (name, dimensions)
-                # print(int(line_arr[1]), line_arr[2][1:len(line_arr[2]) - 1])
+                # Add to self.chares
+                elif line_arr[0] == "CHARE":
+                    id = int(line_arr[1])
+                    name = line_arr[2][1 : len(line_arr[2]) - 1]
+                    dimensions = int(line_arr[3])
+                    self.chares[id] = (name, dimensions)
+                    # print(int(line_arr[1]), line_arr[2][1:len(line_arr[2]) - 1])
 
-            # add to self.entries
-            elif line_arr[0] == "ENTRY":
-                # Need to concat entry_name
-                while not line_arr[3].endswith('"'):
-                    line_arr[3] = line_arr[3] + " " + line_arr[4]
-                    del line_arr[4]
+                # add to self.entries
+                elif line_arr[0] == "ENTRY":
+                    # Need to concat entry_name
+                    while not line_arr[3].endswith('"'):
+                        line_arr[3] = line_arr[3] + " " + line_arr[4]
+                        del line_arr[4]
 
-                id = int(line_arr[2])
-                entry_name = line_arr[3][1 : len(line_arr[3]) - 1]
-                chare_id = int(line_arr[4])
-                # name = self.chares[chare_id][0] + '::' + entry_name
-                self.entries[id] = (entry_name, chare_id)
+                    id = int(line_arr[2])
+                    entry_name = line_arr[3][1 : len(line_arr[3]) - 1]
+                    chare_id = int(line_arr[4])
+                    # name = self.chares[chare_id][0] + '::' + entry_name
+                    self.entries[id] = (entry_name, chare_id)
 
-            # Add to message_table
-            # Need clarification on this, as message_table is never referenced in
-            # projections
-            elif line_arr[0] == "MESSAGE":
-                id = int(line_arr[1])
-                message_size = int(line_arr[2])
-                self.message_table[id] = message_size
+                # Add to message_table
+                # Need clarification on this, as message_table is never referenced in
+                # projections
+                elif line_arr[0] == "MESSAGE":
+                    id = int(line_arr[1])
+                    message_size = int(line_arr[2])
+                    self.message_table[id] = message_size
 
-            # Read/store event
-            elif line_arr[0] == "EVENT":
-                id = int(line_arr[1])
-                event_name = ""
-                # rest of line is the event name
-                for i in range(2, len(line_arr)):
-                    event_name = event_name + line_arr[i] + " "
-                self.user_events[id] = event_name
+                # Read/store event
+                elif line_arr[0] == "EVENT":
+                    id = int(line_arr[1])
+                    event_name = ""
+                    # rest of line is the event name
+                    for i in range(2, len(line_arr)):
+                        event_name = event_name + line_arr[i] + " "
+                    self.user_events[id] = event_name
 
-            # Read/store user stat
-            elif line_arr[0] == "STAT":
-                id = int(line_arr[1])
-                event_name = ""
-                # rest of line is the stat
-                for i in range(2, len(line_arr)):
-                    event_name = event_name + line_arr[i] + " "
-                self.user_stats[id] = event_name
+                # Read/store user stat
+                elif line_arr[0] == "STAT":
+                    id = int(line_arr[1])
+                    event_name = ""
+                    # rest of line is the stat
+                    for i in range(2, len(line_arr)):
+                        event_name = event_name + line_arr[i] + " "
+                    self.user_stats[id] = event_name
 
-            # create papi array
-            elif line_arr[0] == "TOTAL_PAPI_EVENTS":
-                num_papi_events = int(line_arr[1])
-                self.papi_event_names = [None] * num_papi_events
+                # create papi array
+                elif line_arr[0] == "TOTAL_PAPI_EVENTS":
+                    num_papi_events = int(line_arr[1])
+                    self.papi_event_names = [None] * num_papi_events
 
-            # Unsure of what these are for
-            elif line_arr[0] == "PAPI_EVENT":
-                id = int(line_arr[1])
-                papi_event = line_arr[2]
-                self.papi_event_names[id] = papi_event
-
-        self.sts_file.close()
+                # Unsure of what these are for
+                elif line_arr[0] == "PAPI_EVENT":
+                    id = int(line_arr[1])
+                    papi_event = line_arr[2]
+                    self.papi_event_names[id] = papi_event
 
 
 class ProjectionsReader:
@@ -247,7 +249,8 @@ class ProjectionsReader:
         if not hasattr(self, "executable_location"):
             raise ValueError("Invalid directory for projections - no sts files found.")
 
-        self.num_pes = STSReader(self.executable_location + ".sts").num_pes
+        self.sts_reader = STSReader(self.executable_location + ".sts")
+        self.num_pes = self.sts_reader.num_pes
 
         # make sure all the log files exist
         for i in range(self.num_pes):
@@ -273,17 +276,6 @@ class ProjectionsReader:
 
         self.create_cct = create_cct
 
-    # Returns an empty dict, used for reading log file into dataframe
-    @staticmethod
-    def _create_empty_dict() -> dict:
-        return {
-            "Name": [],
-            "Event Type": [],
-            "Timestamp (ns)": [],
-            "Process": [],
-            "Attributes": [],
-        }
-
     def read(self):
         if self.num_pes < 1:
             return None
@@ -294,45 +286,27 @@ class ProjectionsReader:
         pool_size, pool = self.num_processes, mp.Pool(self.num_processes)
 
         # Read each log file and store as list of dataframes
-        dataframes_list = pool.map(
+        data_list = pool.map(
             self._read_log_file, [(rank, pool_size) for rank in range(pool_size)]
         )
 
         pool.close()
 
         # Concatenate the dataframes list into dataframe containing entire trace
-        trace_df = pd.concat(dataframes_list, ignore_index=True)
-        trace_df.sort_values(
-            by="Timestamp (ns)", axis=0, ascending=True, inplace=True, ignore_index=True
-        )
 
-        # categorical for memory savings
-        trace_df = trace_df.astype(
-            {
-                "Name": "category",
-                "Event Type": "category",
-                "Process": "category",
-            }
-        )
-
-        # re-order columns
-        trace_df = trace_df[
-            ["Timestamp (ns)", "Event Type", "Name", "Process", "Attributes"]
-        ]
-
-        trace = pipit.trace.Trace(None, trace_df)
-        if self.create_cct:
-            trace.create_cct()
-
-        return trace
+        return concat_trace_data(data_list)
 
     def _read_log_file(self, rank_size) -> pd.DataFrame:
+
         # has information needed in sts file
-        sts_reader = STSReader(self.executable_location + ".sts")
+        sts_reader = self.sts_reader
 
         rank, size = rank_size[0], rank_size[1]
         per_process = int(self.num_pes // size)
         remainder = int(self.num_pes % size)
+
+        # Start Core Reader
+        core_reader = CoreTraceReader(rank, size)
 
         if rank < remainder:
             begin_int = rank * (per_process + 1)
@@ -341,10 +315,7 @@ class ProjectionsReader:
             begin_int = (rank * per_process) + remainder
             end_int = ((rank + 1) * per_process) + remainder
 
-        dfs = []
         for pe_num in range(begin_int, end_int, 1):
-            # create an empty dict to append to
-            data = self._create_empty_dict()
 
             # opening the log file we need to read
             log_file = gzip.open(
@@ -365,7 +336,7 @@ class ProjectionsReader:
 
                     details = {"From PE": pe}
 
-                    _add_to_trace_dict(data, "Idle", "Enter", time, pe_num, details)
+                    _add_to_trace(core_reader, "Idle", "Enter", time, pe_num, details)
 
                 elif int(line_arr[0]) == ProjectionsConstants.END_IDLE:
                     time = int(line_arr[1]) * 1000
@@ -373,7 +344,7 @@ class ProjectionsReader:
 
                     details = {"From PE": pe}
 
-                    _add_to_trace_dict(data, "Idle", "Leave", time, pe_num, details)
+                    _add_to_trace(core_reader, "Idle", "Leave", time, pe_num, details)
 
                 # Pack message to be sent
                 elif int(line_arr[0]) == ProjectionsConstants.BEGIN_PACK:
@@ -382,7 +353,7 @@ class ProjectionsReader:
 
                     details = {"From PE": pe}
 
-                    _add_to_trace_dict(data, "Pack", "Enter", time, pe_num, details)
+                    _add_to_trace(core_reader, "Pack", "Enter", time, pe_num, details)
 
                 elif int(line_arr[0]) == ProjectionsConstants.END_PACK:
                     time = int(line_arr[1]) * 1000
@@ -390,7 +361,7 @@ class ProjectionsReader:
 
                     details = {"From PE": pe}
 
-                    _add_to_trace_dict(data, "Pack", "Leave", time, pe_num, details)
+                    _add_to_trace(core_reader, "Pack", "Leave", time, pe_num, details)
 
                 # Unpacking a received message
                 elif int(line_arr[0]) == ProjectionsConstants.BEGIN_UNPACK:
@@ -399,7 +370,7 @@ class ProjectionsReader:
 
                     details = {"From PE": pe}
 
-                    _add_to_trace_dict(data, "Unpack", "Enter", time, pe_num, details)
+                    _add_to_trace(core_reader, "Unpack", "Enter", time, pe_num, details)
 
                 elif int(line_arr[0]) == ProjectionsConstants.END_UNPACK:
                     time = int(line_arr[1]) * 1000
@@ -407,14 +378,14 @@ class ProjectionsReader:
 
                     details = {"From PE": pe}
 
-                    _add_to_trace_dict(data, "Unpack", "Leave", time, pe_num, details)
+                    _add_to_trace(core_reader, "Unpack", "Leave", time, pe_num, details)
 
                 elif int(line_arr[0]) == ProjectionsConstants.USER_SUPPLIED:
                     user_supplied = line_arr[1]
                     details = {"User Supplied": user_supplied}
 
-                    _add_to_trace_dict(
-                        data, "User Supplied", "Instant", -1, pe_num, details
+                    _add_to_trace(
+                        core_reader, "User Supplied", "Instant", -1, pe_num, details
                     )
 
                 elif int(line_arr[0]) == ProjectionsConstants.USER_SUPPLIED_NOTE:
@@ -425,8 +396,8 @@ class ProjectionsReader:
 
                     details = {"Note": note}
 
-                    _add_to_trace_dict(
-                        data, "User Supplied Note", "Instant", time, pe_num, details
+                    _add_to_trace(
+                        core_reader, "User Supplied Note", "Instant", time, pe_num, details
                     )
 
                 # Not sure if this should be instant or enter/leave
@@ -448,8 +419,8 @@ class ProjectionsReader:
                         "Note": note,
                     }
 
-                    _add_to_trace_dict(
-                        data,
+                    _add_to_trace(
+                        core_reader,
                         "User Supplied Bracketed Note",
                         "Enter",
                         time,
@@ -457,8 +428,8 @@ class ProjectionsReader:
                         details,
                     )
 
-                    _add_to_trace_dict(
-                        data,
+                    _add_to_trace(
+                        core_reader,
                         "User Supplied Bracketed Note",
                         "Leave",
                         end_time,
@@ -473,8 +444,8 @@ class ProjectionsReader:
 
                     details = {"Memory Usage": memory_usage}
 
-                    _add_to_trace_dict(
-                        data, "Memory Usage", "Instant", time, pe_num, details
+                    _add_to_trace(
+                        core_reader, "Memory Usage", "Instant", time, pe_num, details
                     )
 
                 # New chare create message being sent
@@ -496,8 +467,8 @@ class ProjectionsReader:
                         "Send Time": send_time,
                     }
 
-                    _add_to_trace_dict(
-                        data,
+                    _add_to_trace(
+                        core_reader,
                         sts_reader.get_entry_name(entry),
                         "Instant",
                         time,
@@ -528,8 +499,8 @@ class ProjectionsReader:
                         "Destinatopn PEs": dest_procs,
                     }
 
-                    _add_to_trace_dict(
-                        data,
+                    _add_to_trace(
+                        core_reader,
                         sts_reader.get_entry_name(entry),
                         "Instant",
                         time,
@@ -569,8 +540,8 @@ class ProjectionsReader:
                         "perf counts list": perf_counts,
                     }
 
-                    _add_to_trace_dict(
-                        data,
+                    _add_to_trace(
+                        core_reader,
                         sts_reader.get_entry_name(entry),
                         "Enter",
                         time,
@@ -601,8 +572,8 @@ class ProjectionsReader:
                         "perf counts list": perf_counts,
                     }
 
-                    _add_to_trace_dict(
-                        data,
+                    _add_to_trace(
+                        core_reader,
                         sts_reader.get_entry_name(entry),
                         "Leave",
                         time,
@@ -614,12 +585,12 @@ class ProjectionsReader:
                 elif int(line_arr[0]) == ProjectionsConstants.BEGIN_TRACE:
                     time = int(line_arr[1]) * 1000
 
-                    _add_to_trace_dict(data, "Trace", "Enter", time, pe_num, None)
+                    _add_to_trace(core_reader, "Trace", "Enter", time, pe_num, None)
 
                 elif int(line_arr[0]) == ProjectionsConstants.END_TRACE:
                     time = int(line_arr[1]) * 1000
 
-                    _add_to_trace_dict(data, "Trace", "Leave", time, pe_num, None)
+                    _add_to_trace(core_reader, "Trace", "Leave", time, pe_num, None)
 
                 # Message Receive ?
                 elif int(line_arr[0]) == ProjectionsConstants.MESSAGE_RECV:
@@ -636,8 +607,8 @@ class ProjectionsReader:
                         "Message Length": message_length,
                     }
 
-                    _add_to_trace_dict(
-                        data, "Message Receive", "Instant", time, pe_num, details
+                    _add_to_trace(
+                        core_reader, "Message Receive", "Instant", time, pe_num, details
                     )
 
                 # queueing creation ?
@@ -649,7 +620,7 @@ class ProjectionsReader:
 
                     details = {"From PE": pe, "Message Type": mtype, "Event ID": event}
 
-                    _add_to_trace_dict(data, "Enque", "Instant", time, pe_num, details)
+                    _add_to_trace(core_reader, "Enque", "Instant", time, pe_num, details)
 
                 elif int(line_arr[0]) == ProjectionsConstants.DEQUEUE:
                     mtype = int(line_arr[1])
@@ -659,7 +630,7 @@ class ProjectionsReader:
 
                     details = {"From PE": pe, "Message Type": mtype, "Event ID": event}
 
-                    _add_to_trace_dict(data, "Deque", "Instant", time, pe_num, details)
+                    _add_to_trace(core_reader, "Deque", "Instant", time, pe_num, details)
 
                 # Interrupt from different chare ?
                 elif int(line_arr[0]) == ProjectionsConstants.BEGIN_INTERRUPT:
@@ -669,8 +640,8 @@ class ProjectionsReader:
 
                     details = {"From PE": pe, "Event ID": event}
 
-                    _add_to_trace_dict(
-                        data, "Interrupt", "Enter", time, pe_num, details
+                    _add_to_trace(
+                        core_reader, "Interrupt", "Enter", time, pe_num, details
                     )
 
                 elif int(line_arr[0]) == ProjectionsConstants.END_INTERRUPT:
@@ -680,20 +651,20 @@ class ProjectionsReader:
 
                     details = {"From PE": pe, "Event ID": event}
 
-                    _add_to_trace_dict(
-                        data, "Interrupt", "Leave", time, pe_num, details
+                    _add_to_trace(
+                        core_reader, "Interrupt", "Leave", time, pe_num, details
                     )
 
                 # Very start of the program - encapsulates every other event
                 elif int(line_arr[0]) == ProjectionsConstants.BEGIN_COMPUTATION:
                     time = int(line_arr[1]) * 1000
 
-                    _add_to_trace_dict(data, "Computation", "Enter", time, pe_num, None)
+                    _add_to_trace(core_reader, "Computation", "Enter", time, pe_num, None)
 
                 elif int(line_arr[0]) == ProjectionsConstants.END_COMPUTATION:
                     time = int(line_arr[1]) * 1000
 
-                    _add_to_trace_dict(data, "Computation", "Leave", time, pe_num, None)
+                    _add_to_trace(core_reader, "Computation", "Leave", time, pe_num, None)
 
                 # User event (in code)
                 elif int(line_arr[0]) == ProjectionsConstants.USER_EVENT:
@@ -710,8 +681,8 @@ class ProjectionsReader:
                         "Event Type": "User Event",
                     }
 
-                    _add_to_trace_dict(
-                        data, user_event_name, "Instant", time, pe_num, details
+                    _add_to_trace(
+                        core_reader, user_event_name, "Instant", time, pe_num, details
                     )
 
                 elif int(line_arr[0]) == ProjectionsConstants.USER_EVENT_PAIR:
@@ -730,8 +701,8 @@ class ProjectionsReader:
                         "Event Type": "User Event Pair",
                     }
 
-                    _add_to_trace_dict(
-                        data, user_event_name, "Instant", time, pe_num, details
+                    _add_to_trace(
+                        core_reader, user_event_name, "Instant", time, pe_num, details
                     )
 
                 elif int(line_arr[0]) == ProjectionsConstants.BEGIN_USER_EVENT_PAIR:
@@ -748,8 +719,8 @@ class ProjectionsReader:
                         "User Event Name": sts_reader.get_user_event(user_event_id),
                     }
 
-                    _add_to_trace_dict(
-                        data, "User Event Pair", "Enter", time, pe_num, details
+                    _add_to_trace(
+                        core_reader, "User Event Pair", "Enter", time, pe_num, details
                     )
 
                 elif int(line_arr[0]) == ProjectionsConstants.END_USER_EVENT_PAIR:
@@ -766,7 +737,7 @@ class ProjectionsReader:
                         "User Event Name": sts_reader.get_user_event(user_event_id),
                     }
 
-                    _add_to_trace_dict(
+                    _add_to_trace(
                         "User Event Pair", "Leave", time, pe_num, details
                     )
 
@@ -787,24 +758,23 @@ class ProjectionsReader:
                         "Event Type": "User Stat",
                     }
 
-                    _add_to_trace_dict(
-                        data, user_stat_name, "Instant", time, pe_num, details
+                    _add_to_trace(
+                        core_reader, user_stat_name, "Instant", time, pe_num, details
                     )
 
-            # Making sure that the log file ends with END_COMPUTATION
-            if len(data["Name"]) > 0 and data["Name"][-1] != "Computation":
-                time = data["Timestamp (ns)"][-1] * 1000
-                _add_to_trace_dict(data, "Computation", "Leave", time, pe_num, None)
 
             log_file.close()
-            dfs.append(pd.DataFrame(data))
-
-        return pd.concat(dfs)
 
 
-def _add_to_trace_dict(data, name, evt_type, time, process, attributes):
-    data["Name"].append(name)
-    data["Event Type"].append(evt_type)
-    data["Timestamp (ns)"].append(time)
-    data["Process"].append(process)
-    data["Attributes"].append(attributes)
+        return core_reader.finalize()
+
+
+def _add_to_trace(core_reader: CoreTraceReader, name, evt_type, time, process, attributes):
+    new_event = {
+        "Name": name,
+        "Event Type": evt_type,
+        "Timestamp (ns)": time,
+        "Process": process,
+        "Attributes": attributes,
+    }
+    core_reader.add_event(new_event)
