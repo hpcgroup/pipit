@@ -193,14 +193,14 @@ class Trace:
 
     def _match_charm_messages(self):
 
-        if "_matching_event" not in self.events.columns:
-            self.events["_matching_event"] = None
+        if "_matching_message" not in self.events.columns:
+            self.events["_matching_message"] = None
 
         if "_matching_timestamp" not in self.events.columns:
-            self.events["_matching_timestamp"] = np.nan
+            self.events["_matching_message_timestamp"] = np.nan
 
-        matching_events = list(self.events["_matching_event"])
-        matching_times = list(self.events["_matching_timestamp"])
+        matching_events = list(self.events["_matching_message"])
+        matching_times = list(self.events["_matching_message_timestamp"])
 
         charm_events = self.events[self.events["Attributes"].apply(
             lambda x: False if not x else ("Entry Type" in x) and (x["Entry Type"] == "Processing" 
@@ -235,34 +235,27 @@ class Trace:
                 matching_times[curr_df_index] = send_timestamp
                 
         
-        self.events["_matching_event"] = matching_events
-        self.events["_matching_timestamp"] = matching_times
+        self.events["_matching_message"] = matching_events
+        self.events["_matching_message_timestamp"] = matching_times
 
-        self.events = self.events.astype({"_matching_event": "Int32"})
-
-
-
-
-
-
-
-
+        self.events = self.events.astype({"_matching_message": "Int32"})
 
 
 
 
     def _match_messages(self):
         """
-        Matches corresponding MpiSend/MpiRecv and MpiIsend/MpiIrecv instant events
+        Matches corresponding MpiSend/MpiRecv and MpiIsend/MpiIrecv instant events.
+        Creates new columns _matching_message and _matching_message_timestamp.
         """
-        if "_matching_event" not in self.events.columns:
-            self.events["_matching_event"] = None
+        if "_matching_message" not in self.events.columns:
+            self.events["_matching_message"] = None
 
-        if "_matching_timestamp" not in self.events.columns:
-            self.events["_matching_timestamp"] = np.nan
+        if "_matching_message_timestamp" not in self.events.columns:
+            self.events["_matching_message_timestamp"] = np.nan
 
-        matching_events = list(self.events["_matching_event"])
-        matching_times = list(self.events["_matching_timestamp"])
+        matching_events = list(self.events["_matching_message"])
+        matching_times = list(self.events["_matching_message_timestamp"])
 
         # Filter by send/receive events
         send_events_names = ["MpiSend", "MpiISend"]
@@ -277,6 +270,7 @@ class Trace:
         # another dictionary of sending processes (key) that will have a list of
         # tuple that each contain information about an associated send event
         queue: dict[int, dict[int, (int, int)]] = {}
+
         df_indices = list(send_events.index)
         timestamps = list(send_events["Timestamp (ns)"])
         attrs = list(send_events["Attributes"])
@@ -336,10 +330,10 @@ class Trace:
                     matching_times[send_df_index] = curr_timestamp
                     matching_times[curr_df_index] = send_timestamp
 
-        self.events["_matching_event"] = matching_events
-        self.events["_matching_timestamp"] = matching_times
+        self.events["_matching_message"] = matching_events
+        self.events["_matching_message_timestamp"] = matching_times
 
-        self.events = self.events.astype({"_matching_event": "Int32"})
+        self.events = self.events.astype({"_matching_message": "Int32"})
 
     def _match_caller_callee(self):
         """Matches callers (parents) to callees (children) and adds three
