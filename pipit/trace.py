@@ -548,7 +548,7 @@ class Trace:
                 self.events.loc[self.events["Event Type"] == "Enter"]
                 .groupby([groupby_column, "Process"], observed=True)[metrics]
                 .sum()
-                .groupby(groupby_column)
+                .groupby(groupby_column, observed=True)
                 .mean()
             )
 
@@ -861,3 +861,21 @@ class Trace:
             patterns.append(match_original)
 
         return patterns
+
+    def plot_comm_matrix(self, output="size", *args, **kwargs):
+        from .vis import plot_comm_matrix
+
+        # Generate the data
+        data = self.comm_matrix(output=output)
+
+        # Return the Bokeh plot
+        return plot_comm_matrix(data, output=output, *args, **kwargs)
+
+    def plot_message_histogram(self, bins=20, *args, **kwargs):
+        from .vis import plot_message_histogram
+
+        # Generate the data
+        data = self.message_histogram(bins=bins)
+
+        # Return the Bokeh plot
+        return plot_message_histogram(data, *args, **kwargs)
