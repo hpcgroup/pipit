@@ -57,6 +57,13 @@ class Trace:
         from .readers.projections_reader import ProjectionsReader
 
         return ProjectionsReader(dirname, num_processes, create_cct).read()
+    @staticmethod
+    def from_projections_old(dirname, num_processes=None, create_cct=False):
+        """Read a Projections trace into a new Trace object."""
+        # import this lazily to avoid circular dependencies
+        from .readers.projections_old_reader import ProjectionsReader
+
+        return ProjectionsReader(dirname, num_processes, create_cct).read()
 
     @staticmethod
     def from_nsight(filename, create_cct=False):
