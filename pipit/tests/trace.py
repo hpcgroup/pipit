@@ -67,6 +67,7 @@ def test_comm_by_process(data_dir, ping_pong_otf2_trace):
     assert counts.loc[1]["Sent"] == 8
     assert counts.loc[1]["Received"] == 8
 
+
 def test_match_charm_messages(ping_pong_projections_trace):
     trace = Trace.from_projections(str(ping_pong_projections_trace))
     trace._match_charm_messages()
@@ -104,11 +105,6 @@ def test_match_charm_messages(ping_pong_projections_trace):
             exceptions = [541, 549, 553, 1120, 1124, 1305, 1306, 1320, 1882, 1893, 1894]
             if receive_index >= 360 and receive_index not in exceptions:
                 assert receive_process[i] != corresponding_send["Process"]
-        
-
-
-            
-
 
 
 def test_match_events(data_dir, ping_pong_otf2_trace):
