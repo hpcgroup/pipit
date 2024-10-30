@@ -193,19 +193,22 @@ class Trace:
     def _match_messages(self):
         """
         Matches corresponding MpiSend/MpiRecv and MpiIsend/MpiIrecv instant events
+        in a new column _matching_message_event
         """
         if "_matching_message_event" not in self.events.columns:
             self.events["_matching_message_event"] = None
+        else:
+            return
 
         matching_events = list(self.events["_matching_message_event"])
 
         # Filter by send/receive events
+        send_event_wrapper_names = ["MPI_Send"]
         send_events_names = ["MpiSend", "MpiISend"]
-
         send_events = self.events[self.events["Name"].isin(send_events_names)]
 
+        receive_event_wrapper_names = ["MPI_Recv"]
         receive_events_names = ["MpiRecv", "MpiIrecv"]
-
         receive_events = self.events[self.events["Name"].isin(receive_events_names)]
 
         # Queue is a dictionary in which each receiving process (key) will have
@@ -243,14 +246,12 @@ class Trace:
                 )
 
         df_indices = list(receive_events.index)
-        timestamps = list(receive_events["Timestamp (ns)"])
         attrs = list(receive_events["Attributes"])
         processes = list(receive_events["Process"])
 
         # Now iterate over receive events
         for i in range(len(receive_events)):
             curr_df_index = df_indices[i]
-            curr_timestamp = timestamps[i]
             curr_attrs = attrs[i]
             curr_process = processes[i]
 
@@ -267,9 +268,32 @@ class Trace:
                     # Fill in the lists with the matching values
                     matching_events[send_df_index] = curr_df_index
                     matching_events[curr_df_index] = send_df_index
-
-
+        # update matched message event for instant events
         self.events["_matching_message_event"] = matching_events
+
+        # match send enter/leave events with their corresponding instant events
+        self.events.loc[
+            (self.events["Name"].isin(send_event_wrapper_names))
+            & (self.events["Event Type"] == "Enter"),
+            "_matching_message_event",
+        ] = send_events.index
+        self.events.loc[
+            (self.events["Name"].isin(send_event_wrapper_names))
+            & (self.events["Event Type"] == "Leave"),
+            "_matching_message_event",
+        ] = send_events.index
+        # match receive enter/leave events with their corresponding instant events
+        self.events.loc[
+            (self.events["Name"].isin(receive_event_wrapper_names))
+            & (self.events["Event Type"] == "Enter"),
+            "_matching_message_event",
+        ] = receive_events.index
+        self.events.loc[
+            (self.events["Name"].isin(receive_event_wrapper_names))
+            & (self.events["Event Type"] == "Leave"),
+            "_matching_message_event",
+        ] = receive_events.index
+
         self.events = self.events.astype({"_matching_message_event": "Int32"})
 
     def _match_caller_callee(self):
