@@ -194,14 +194,10 @@ class Trace:
         """
         Matches corresponding MpiSend/MpiRecv and MpiIsend/MpiIrecv instant events
         """
-        if "_matching_event" not in self.events.columns:
-            self.events["_matching_event"] = None
+        if "_matching_message_event" not in self.events.columns:
+            self.events["_matching_message_event"] = None
 
-        if "_matching_timestamp" not in self.events.columns:
-            self.events["_matching_timestamp"] = np.nan
-
-        matching_events = list(self.events["_matching_event"])
-        matching_times = list(self.events["_matching_timestamp"])
+        matching_events = list(self.events["_matching_message_event"])
 
         # Filter by send/receive events
         send_events_names = ["MpiSend", "MpiISend"]
@@ -272,13 +268,9 @@ class Trace:
                     matching_events[send_df_index] = curr_df_index
                     matching_events[curr_df_index] = send_df_index
 
-                    matching_times[send_df_index] = curr_timestamp
-                    matching_times[curr_df_index] = send_timestamp
 
-        self.events["_matching_event"] = matching_events
-        self.events["_matching_timestamp"] = matching_times
-
-        self.events = self.events.astype({"_matching_event": "Int32"})
+        self.events["_matching_message_event"] = matching_events
+        self.events = self.events.astype({"_matching_message_event": "Int32"})
 
     def _match_caller_callee(self):
         """Matches callers (parents) to callees (children) and adds three
