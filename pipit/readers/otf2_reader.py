@@ -273,7 +273,7 @@ class OTF2Reader:
                             # if the event is not paired with any metric, then
                             # add placeholders for all the metric lists
                             for metric in metric_names:
-                                metrics_dict[metric] = float("nan")
+                                new_event[metric] = float("nan")
                         else:
                             for metric, metric_value in metrics_dict.items():
                             # only add columns of metrics which are populated with
