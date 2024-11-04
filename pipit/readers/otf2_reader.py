@@ -281,6 +281,7 @@ class OTF2Reader:
 
                         # reset this as a metric event was not read
                         prev_metric_time = -1
+                        metrics_dict = {metric_name: float("nan") for metric_name in metric_names}
 
                         """
                         Below is code to read the primary information about the
