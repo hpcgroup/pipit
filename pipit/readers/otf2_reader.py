@@ -226,7 +226,7 @@ class OTF2Reader:
             )
 
             # maps each metric to a list of its values
-            metrics_dict = {metric_name: None for metric_name in metric_names}
+            metrics_dict = {metric_name: float("nan") for metric_name in metric_names}
 
             # used to keep track of time that the
             # most recent metrics that were read at
@@ -276,11 +276,7 @@ class OTF2Reader:
                                 new_event[metric] = float("nan")
                         else:
                             for metric, metric_value in metrics_dict.items():
-                            # only add columns of metrics which are populated with
-                            # some values (sometimes a metric could be defined but not
-                            # appear in the trace itself)
-                                if not np.isnan(metric_value):
-                                    new_event[metric] = metric_value
+                                new_event[metric] = metric_value
 
 
                         # reset this as a metric event was not read
