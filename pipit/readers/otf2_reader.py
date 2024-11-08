@@ -452,8 +452,8 @@ class OTF2Reader:
         pool.close()
 
         # merges the dataframe into one events dataframe
-        events_dataframe = concat_trace_data(events_dataframes)
-        del events_dataframes
+        trace = concat_trace_data(events_dataframes)
+        events_dataframe = trace.events
 
         # accessing the clock properties of the trace using the definitions
         clock_properties = self.definitions.loc[
