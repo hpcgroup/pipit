@@ -1,9 +1,13 @@
 from typing import List, Dict
 
+import numpy as np
 import pandas
 import numpy
-from pipit.trace import Trace
 
+from pipit.trace import Trace
+import narwhals as nw
+from narwhals.typing import IntoDataFrameT, FrameT
+import narwhals.selectors as ncs
 
 class CoreTraceReader:
     """
@@ -11,7 +15,7 @@ class CoreTraceReader:
     format
     """
 
-    def __init__(self, start: int = 0, stride: int = 1):
+    def __init__(self, start: int = 0, stride: int = 1, frame_backend=pandas.DataFrame):
         """
         Should be called by each process to create an empty trace per process in the
         reader. Creates the following data structures to represent an empty trace:
@@ -31,6 +35,9 @@ class CoreTraceReader:
         # stacks are indexed by process number, then thread number
         # stores indices of events in the event list
         self.stacks: Dict[int, Dict[int, List[int]]] = {}
+
+        # Set the frame backend
+        self.frame_backend = frame_backend
 
     def add_event(self, event: Dict) -> None:
         """
@@ -81,7 +88,7 @@ class CoreTraceReader:
         # Finally add the event to the event list
         event_list.append(event)
 
-    def finalize(self):
+    def finalize(self) -> IntoDataFrameT :
         """
         Converts the events data structure into a pandas dataframe and returns it
         """
@@ -90,25 +97,23 @@ class CoreTraceReader:
             for thread in self.events[process]:
                 all_events.extend(self.events[process][thread])
 
-        # create a dataframe
-        trace_df = pandas.DataFrame(all_events)
+        # Create a trace_frame
+        trace_frame = nw.from_native(self.frame_backend(all_events))
 
-        trace_df["_matching_event"].fillna(-1, inplace=True)
-        trace_df["_parent"].fillna(-1, inplace=True)
-        trace_df["_matching_timestamp"].fillna(-1, inplace=True)
+        # Fill null with -1 (since int32 does not allow nan)
+        trace_frame = trace_frame.with_columns([
+            nw.col(['_matching_event', '_parent', '_matching_timestamp']).fill_null(-1),
+        ])
 
-        # categorical for memory savings
-        trace_df = trace_df.astype(
-            {
-                "Name": "category",
-                "Event Type": "category",
-                "Process": "category",
-                "_matching_event": "int32",
-                "_parent": "int32",
-                "_matching_timestamp": "int32",
-            }
-        )
-        return trace_df
+        # Convert Name, Event Type, and Process to categorical memory savings
+        # Convert _matching_event, _parent, and _matching_timestamp to int, since they are indices
+        trace_frame = trace_frame.with_columns([
+            nw.col(['Name', 'Event Type', 'Process']).cast(nw.dtypes.Categorical),
+            nw.col(['_matching_event', '_parent', '_matching_timestamp']).cast(nw.dtypes.Int32),
+        ])
+
+        # Return native because multiprocessing fails with narwhal frames
+        return trace_frame.to_native()
 
     def __update_parent_child_relationships(
         self, event: Dict, stack: List[int], event_list: List[Dict], is_instant: bool
@@ -159,15 +164,21 @@ class CoreTraceReader:
         self.unique_id += self.stride
         return self.unique_id
 
-
-def concat_trace_data(data_list):
+def concat_trace_data(data_list: List[IntoDataFrameT]) -> FrameT:
     """
     Concatenates the data from multiple trace readers into a single trace reader
     """
-    trace_data = pandas.concat(data_list, ignore_index=True)
-    # set index to unique_id
-    trace_data.set_index("unique_id", inplace=True)
-    trace_data.sort_values(
-        by="Timestamp (ns)", axis=0, ascending=True, inplace=True, ignore_index=True
-    )
-    return Trace(None, trace_data, None)
+    # Converting into nw frames
+    nw_frames = [nw.from_native(df) for df in data_list]
+
+    # Concatenating into a single frame
+    trace_frame: nw.DataFrame = nw.concat(nw_frames)
+
+    # Set index to unique_id
+    nw.maybe_set_index(trace_frame, "unique_id")
+
+    # Sort by timestamp and unique_id
+    trace_frame.sort("Timestamp (ns)", "unique_id")
+
+    # Return Narwhals frame
+    return trace_frame
