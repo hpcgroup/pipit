@@ -9,15 +9,18 @@ import pandas as pd
 import multiprocessing as mp
 import pipit.trace
 from pipit.readers.core_reader import CoreTraceReader, concat_trace_data
+import narwhals as nw
+from narwhals.typing import FrameT, IntoFrameT
 
 
 class OTF2Reader:
     """Reader for OTF2 trace files"""
 
-    def __init__(self, dir_name, num_processes=None, create_cct=False):
+    def __init__(self, dir_name, num_processes=1, create_cct=False, frame_backend=pd.DataFrame):
         self.dir_name = dir_name  # directory of otf2 file being read
         self.file_name = self.dir_name + "/traces.otf2"
         self.create_cct = create_cct
+        self.frame_backend = frame_backend
 
         num_cpus = mp.cpu_count()
         if num_processes is None or num_processes < 1 or num_processes > num_cpus:
@@ -439,7 +442,7 @@ class OTF2Reader:
         using the multiprocessing library and the events_reader
         function
         """
-
+        self.num_processes = 1
         # parallelizes the reading of events
         # using the multiprocessing library
         pool_size, pool = self.num_processes, mp.Pool(self.num_processes)
@@ -452,8 +455,7 @@ class OTF2Reader:
         pool.close()
 
         # merges the dataframe into one events dataframe
-        trace = concat_trace_data(events_dataframes)
-        events_dataframe = trace.events
+        trace_frame: FrameT = concat_trace_data(events_dataframes)
 
         # accessing the clock properties of the trace using the definitions
         clock_properties = self.definitions.loc[
@@ -467,29 +469,28 @@ class OTF2Reader:
         # shifting the timestamps by the global offset
         # and dividing by the resolution to convert to nanoseconds
         # as per OTF2's website
-        events_dataframe["Timestamp (ns)"] -= offset
-        events_dataframe["Timestamp (ns)"] *= (10**9) / resolution
+        trace_frame.with_columns(nw.col('Timestamp (ns)') - offset)
+        trace_frame.with_columns(nw.col('Timestamp (ns)') * ((10**9) / resolution))
 
 
         # convert these to ints
         # (sometimes they get converted to floats
         #  while concatenating dataframes)
-        events_dataframe = events_dataframe.astype(
-            {"Thread": "int32", "Process": "int32"}
+        trace_frame = trace_frame.with_columns(
+            nw.col(['Thread', 'Process']).cast(nw.dtypes.Int32)
         )
 
         # using categorical dtypes for memory optimization
         # (only efficient when used for categorical data)
-        events_dataframe = events_dataframe.astype(
-            {
-                "Event Type": "category",
-                "Name": "category",
-                "Thread": "category",
-                "Process": "category",
-            }
-        )
+        trace_frame = trace_frame.with_columns(
+            nw.col([
+                'Event Type',
+                'Name',
+                'Thread',
+                'Process'
+            ]).cast(nw.dtypes.Categorical))
 
-        return events_dataframe
+        return trace_frame
 
     def read(self):
         """
