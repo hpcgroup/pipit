@@ -6,6 +6,9 @@
 import numpy as np
 import pandas as pd
 from pipit.util.cct import create_cct
+import narwhals as nw
+import narwhals.selectors as ncs
+from narwhals.typing import FrameT
 
 
 class Trace:
@@ -14,16 +17,14 @@ class Trace:
     includes one or more dataframes and a calling context tree.
     """
 
-    def __init__(self, definitions, events, cct=None):
+    def __init__(self, definitions, events: FrameT, cct=None):
         """Create a new Trace object."""
         self.definitions = definitions
-        self.events = events
+        self.events: FrameT = events
         self.cct = cct
 
         # list of numeric columns which we can calculate inc/exc metrics with
-        self.numeric_cols = list(
-            self.events.select_dtypes(include=[np.number]).columns.values
-        )
+        self.numeric_cols = self.events.select(ncs.numeric())
 
         # will store columns names for inc/exc metrics
         self.inc_metrics = []
