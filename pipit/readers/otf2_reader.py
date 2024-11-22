@@ -442,7 +442,7 @@ class OTF2Reader:
         using the multiprocessing library and the events_reader
         function
         """
-        self.num_processes = 1
+
         # parallelizes the reading of events
         # using the multiprocessing library
         pool_size, pool = self.num_processes, mp.Pool(self.num_processes)
