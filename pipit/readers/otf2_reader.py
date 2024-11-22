@@ -16,7 +16,7 @@ from narwhals.typing import FrameT, IntoFrameT
 class OTF2Reader:
     """Reader for OTF2 trace files"""
 
-    def __init__(self, dir_name, num_processes=1, create_cct=False, frame_backend=pd.DataFrame):
+    def __init__(self, dir_name, num_processes=None, create_cct=False, frame_backend=pd.DataFrame):
         self.dir_name = dir_name  # directory of otf2 file being read
         self.file_name = self.dir_name + "/traces.otf2"
         self.create_cct = create_cct
