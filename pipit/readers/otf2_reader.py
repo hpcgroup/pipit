@@ -469,8 +469,13 @@ class OTF2Reader:
         # shifting the timestamps by the global offset
         # and dividing by the resolution to convert to nanoseconds
         # as per OTF2's website
-        trace_frame.with_columns(nw.col('Timestamp (ns)') - offset)
-        trace_frame.with_columns(nw.col('Timestamp (ns)') * ((10**9) / resolution))
+        ts_scalar = ((10**9) / resolution)
+        trace_frame = trace_frame.with_columns(nw.col('Timestamp (ns)') - offset)
+        trace_frame = trace_frame.with_columns(nw.col('Timestamp (ns)') * ts_scalar)
+        # also shift the matching timestamps
+        trace_frame = trace_frame.with_columns(nw.when(nw.col('_matching_timestamp') != -1).then(nw.col('_matching_timestamp') - offset).otherwise(nw.col('_matching_timestamp')))
+        trace_frame = trace_frame.with_columns(nw.when(nw.col('_matching_timestamp') != -1).then(nw.col('_matching_timestamp') * ts_scalar).otherwise(nw.col('_matching_timestamp')))
+
 
 
         # convert these to ints
