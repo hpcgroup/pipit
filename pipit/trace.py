@@ -24,7 +24,11 @@ class Trace:
         self.cct = cct
 
         # list of numeric columns which we can calculate inc/exc metrics with
-        self.numeric_cols = self.events.select(ncs.numeric())
+        self.numeric_cols = self.events.select(ncs.numeric()).columns
+        self.numeric_cols.remove("unique_id")
+        self.numeric_cols.remove("_parent")
+        self.numeric_cols.remove("_matching_event")
+        self.numeric_cols.remove("_matching_timestamp")
 
         # will store columns names for inc/exc metrics
         self.inc_metrics = []
@@ -262,39 +266,48 @@ class Trace:
             }, native_namespace=nw.get_native_namespace(self.events)), how='left', on="unique_id")
 
     def calc_inc_metrics(self, columns=None):
-        # if no columns are specified by the user, then we calculate
-        # inclusive metrics for all the numeric columns in the trace
-        columns = self.numeric_cols if columns is None else columns
-
         # pair enter and leave rows
         if "_matching_event" not in self.events.columns:
             self._match_events()
 
-        # only filter to enters that have a matching event
-        enter_df = self.events.loc[
-            (self.events["Event Type"] == "Enter")
-            & (self.events["_matching_event"].notnull())
-        ]
+        # if no columns are specified by the user, then we calculate
+        # inclusive metrics for all the numeric columns in the trace
+        columns = self.numeric_cols if columns is None else columns
+
+        # get the corresponding metric column name for columns provided,
+        # ignoring the columns that have already been calculated
+        metric_col_names = []
+        for col_name in columns:
+            metric_col_name = ("time" if col_name == "Timestamp (ns)" else col_name) + ".inc"
+            if metric_col_name in self.events.columns:
+                columns.remove(col_name)
+            else:
+                metric_col_names.append(metric_col_name)
+
+        # separate enter and leave events
+        enter_frame = self.events.filter(nw.col("Event Type") == "Enter").filter(~nw.col("_matching_event").is_null())
+        leave_frame = self.events.filter(nw.col("Event Type") == "Leave").filter(~nw.col("_matching_event").is_null())
+        # create a copy of each metric column with enter/leave prefixes
+        enter_frame = enter_frame.select(nw.col(columns+["unique_id","_matching_event"]).name.prefix("enter_"))
+        leave_frame = leave_frame.select(nw.col(columns + ["unique_id", "_matching_event"]).name.prefix("leave_"))
+
+        # join the enter and leave frames on the matching event column
+        enter_joined_to_leave_df = enter_frame.join(leave_frame, left_on="enter__matching_event",
+                                                    right_on="leave_unique_id", how="left")
 
         # calculate inclusive metric for each column specified
         for col in columns:
             # name of column for this inclusive metric
-            metric_col_name = ("time" if col == "Timestamp (ns)" else col) + ".inc"
+            metric_col_name = ("time" if col == "Timestamp (ns)" else col_name) + ".inc"
 
-            if metric_col_name not in self.events.columns:
-                # calculate the inclusive metric by subtracting
-                # the values at the enter rows from the values
-                # at the corresponding leave rows
-                self.events.loc[
-                    (self.events["_matching_event"].notnull())
-                    & (self.events["Event Type"] == "Enter"),
-                    metric_col_name,
-                ] = (
-                    self.events[col][enter_df["_matching_event"]].values
-                    - enter_df[col].values
-                )
-
-                self.inc_metrics.append(metric_col_name)
+            # calculate the inclusive metric column
+            enter_joined_to_leave_df = enter_joined_to_leave_df.with_columns(
+                (nw.col("leave_"+col) - nw.col("enter_"+col)).alias(metric_col_name)
+            )
+        # select only the enter unique id and the metric columns
+        enter_joined_to_leave_df = enter_joined_to_leave_df.select(["enter_unique_id"]+metric_col_names)
+        # qdo a join on unique_id to add the inc metrics to the original dataframe
+        self.events = self.events.join(enter_joined_to_leave_df, left_on="unique_id", right_on="enter_unique_id", how="left")
 
     def calc_exc_metrics(self, columns=None):
         # calculate exc metrics for all numeric columns if not specified
