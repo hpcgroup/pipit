@@ -109,7 +109,7 @@ class CoreTraceReader:
         # Convert _matching_event, _parent, and _matching_timestamp to int, since they are indices
         trace_frame = trace_frame.with_columns([
             nw.col(['Name', 'Event Type', 'Process']).cast(nw.dtypes.Categorical),
-            nw.col(['_matching_event', '_parent', '_matching_timestamp']).cast(nw.dtypes.Int32),
+            nw.col(['_matching_event', '_parent']).cast(nw.dtypes.Int32),
         ])
 
         # Return native because multiprocessing fails with narwhal frames
