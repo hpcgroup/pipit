@@ -110,13 +110,11 @@ class Trace:
         """
 
         if "_matching_event" not in self.events.columns:
-            matching_events = [float("nan")] * len(self.events)
-            matching_times = [float("nan")] * len(self.events)
+            matching_events = [-1] * len(self.events)
+            matching_times = [-1] * len(self.events)
 
             # only pairing enter and leave rows
-            enter_leave_df = self.events.loc[
-                self.events["Event Type"].isin(["Enter", "Leave"])
-            ]
+            enter_leave_df = self.events.filter(nw.col("Event Type").is_in(["Enter", "Leave"]))
 
             # list of processes and/or threads to iterate over
             if "Thread" in self.events.columns:
@@ -130,14 +128,9 @@ class Trace:
                 # only filter by thread if the trace has a thread column
                 if has_thread:
                     curr_process, curr_thread = curr_loc
-                    filtered_df = enter_leave_df.loc[
-                        (enter_leave_df["Process"] == curr_process)
-                        & (enter_leave_df["Thread"] == curr_thread)
-                    ]
+                    filtered_df = enter_leave_df.filter(nw.col("Process") == curr_process).filter(nw.col("Thread") == curr_thread)
                 else:
-                    filtered_df = enter_leave_df.loc[
-                        (enter_leave_df["Process"] == curr_loc)
-                    ]
+                    filtered_df = enter_leave_df.filter(nw.col("Process") == curr_loc)
 
                 stack = []
 
@@ -148,9 +141,9 @@ class Trace:
 
                 event_types = list(filtered_df["Event Type"])
                 df_indices, timestamps, names = (
-                    list(filtered_df.index),
+                    list(filtered_df["unique_id"]),
                     list(filtered_df["Timestamp (ns)"]),
-                    list(filtered_df.Name),
+                    list(filtered_df["Name"]),
                 )
 
                 # Iterate through all events of filtered DataFrame
@@ -169,14 +162,10 @@ class Trace:
                         # we want to iterate through the stack in reverse order
                         # until we find the corresponding "Enter" Event
                         enter_name, i = None, len(stack) - 1
-                        while enter_name != curr_name and i > -1:
-                            enter_df_index, enter_timestamp, enter_name = stack[i]
-                            i -= 1
+                        while enter_name != curr_name and len(stack) > 0:
+                            enter_df_index, enter_timestamp, enter_name = stack.pop()
 
                         if enter_name == curr_name:
-                            # remove matched event from the stack
-                            del stack[i + 1]
-
                             # Fill in the lists with the matching values if event found
                             matching_events[enter_df_index] = curr_df_index
                             matching_events[curr_df_index] = enter_df_index
@@ -186,10 +175,17 @@ class Trace:
                         else:
                             continue
 
-            self.events["_matching_event"] = matching_events
-            self.events["_matching_timestamp"] = matching_times
+            # since narwhals doesn't guarantee the order of the rows,
+            # we do a join on the unique_id column to ensure that the
+            # matching events and timestamps are in the correct order
+            self.events = self.events.join(
+                nw.from_dict({
+                    "_matching_event": matching_events,
+                    "_matching_timestamp": matching_times,
+                    "unique_id": list(range(len(self.events)))
+                }, native_namespace=nw.get_native_namespace(self.events)),
+                on="unique_id")
 
-            self.events = self.events.astype({"_matching_event": "Int32"})
 
     def _match_caller_callee(self):
         """Matches callers (parents) to callees (children) and adds three
