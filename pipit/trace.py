@@ -2,13 +2,14 @@
 # Maryland. See the top-level LICENSE file for details.
 #
 # SPDX-License-Identifier: MIT
-
+import numpy
 import numpy as np
 import pandas as pd
 from pipit.util.cct import create_cct
 import narwhals as nw
 import narwhals.selectors as ncs
 from narwhals.typing import FrameT
+import math as math
 
 
 class Trace:
@@ -273,6 +274,7 @@ class Trace:
         # if no columns are specified by the user, then we calculate
         # inclusive metrics for all the numeric columns in the trace
         columns = self.numeric_cols if columns is None else columns
+        columns = columns.copy()
 
         # get the corresponding metric column name for columns provided,
         # ignoring the columns that have already been calculated
@@ -283,6 +285,8 @@ class Trace:
                 columns.remove(col_name)
             else:
                 metric_col_names.append(metric_col_name)
+        if(len(columns) == 0):
+            return
 
         # separate enter and leave events
         enter_frame = self.events.filter(nw.col("Event Type") == "Enter").filter(~nw.col("_matching_event").is_null())
@@ -307,7 +311,8 @@ class Trace:
         # select only the enter unique id and the metric columns
         enter_joined_to_leave_df = enter_joined_to_leave_df.select(["enter_unique_id"]+metric_col_names)
         # qdo a join on unique_id to add the inc metrics to the original dataframe
-        self.events = self.events.join(enter_joined_to_leave_df, left_on="unique_id", right_on="enter_unique_id", how="left")
+        self.events = self.events.join(enter_joined_to_leave_df, left_on="unique_id", right_on="enter_unique_id",
+                                       how="left")
 
     def calc_exc_metrics(self, columns=None):
         # calculate exc metrics for all numeric columns if not specified
@@ -316,36 +321,45 @@ class Trace:
         # match caller and callee rows
         self._match_caller_callee()
 
-        # exclusive metrics only change for rows that have children
-        filtered_df = self.events.loc[self.events["_children"].notnull()]
-        parent_df_indices, children = (
-            list(filtered_df.index),
-            filtered_df["_children"].to_list(),
+        # calculate inclusive metrics if needed
+        self.calc_inc_metrics(columns)
+
+
+        # Create list of aggregations to do (each metric)
+        exp_list = []
+        # create list of new column names for the sum of inclusive metrics
+        metric_col_inc_names = []
+        for col_name in columns:
+            metric_col_inc_name = ("time" if col_name == "Timestamp (ns)" else col_name) + ".inc"
+            exp_list.append(nw.col(metric_col_inc_name).sum().alias('child_' + metric_col_inc_name))
+            metric_col_inc_names.append(metric_col_inc_name)
+        # get the enter events
+        enter_frame = self.events.filter(nw.col('Event Type') == 'Enter')
+
+        # group by the parent unique id and aggregate the sum of the inclusive metrics
+        grouped_parents_sum_frame = (enter_frame.group_by('_parent').agg(exp_list)
+                                     .select(['_parent'] + ['child_' + col_name for col_name in metric_col_inc_names])
+                                     .filter(nw.col('_parent') != -1))
+
+        # join with enter events, connecting each parent with the sum of the inclusive metrics of its children
+        enter_frame = enter_frame.join(grouped_parents_sum_frame, left_on='unique_id', right_on='_parent', how='left')
+
+        # make list of expressions to calculate the exclusive metrics (inclusive - sum of children)
+        exp_list = []
+        metric_col_exc_names = []
+        for col_name in columns:
+            metric_col_inc_name = ("time" if col_name == "Timestamp (ns)" else col_name) + ".inc"
+            metric_col_exc_name = ("time" if col_name == "Timestamp (ns)" else col_name) + ".inc"
+            exp_list.append((nw.col(metric_col_inc_name) - nw.col('child_' + metric_col_inc_name).
+                             fill_null(0)).alias(metric_col_exc_name))
+            metric_col_exc_names.append(metric_col_exc_name)
+
+        enter_frame = enter_frame.with_columns(
+            exp_list
         )
+        self.events = self.events.join(enter_frame.select(['unique_id'] + metric_col_exc_names),
+                                       on='unique_id', how='left')
 
-        for col in columns:
-            # get the corresponding inclusive column name for this metric
-            inc_col_name = ("time" if col == "Timestamp (ns)" else col) + ".inc"
-            if inc_col_name not in self.events.columns:
-                self.calc_inc_metrics([col])
-
-            # name of column for this exclusive metric
-            metric_col_name = ("time" if col == "Timestamp (ns)" else col) + ".exc"
-
-            if metric_col_name not in self.events.columns:
-                # exc metric starts out as a copy of the inc metric values
-                exc_values = self.events[inc_col_name].to_list()
-                inc_values = self.events[inc_col_name].to_list()
-
-                for i in range(len(filtered_df)):
-                    curr_parent_idx, curr_children = parent_df_indices[i], children[i]
-                    for child_idx in curr_children:
-                        # subtract each child's inclusive metric from the total
-                        # to calculate the exclusive metric for the parent
-                        exc_values[curr_parent_idx] -= inc_values[child_idx]
-
-                self.events[metric_col_name] = exc_values
-                self.exc_metrics.append(metric_col_name)
 
     def comm_matrix(self, output="size"):
         """
