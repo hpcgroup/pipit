@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 import multiprocessing as mp
 import pipit.trace
+from pipit.readers.core_reader import CoreTraceReader, concat_trace_data
 
 
 class OTF2Reader:
@@ -162,6 +163,9 @@ class OTF2Reader:
             locations = list(trace.definitions._locations)
             num_locations = len(locations)
 
+            # start core reader
+            core_reader = CoreTraceReader(rank, size)
+
             # base number of locations read by each process
             per_process = int(num_locations // size)
 
@@ -190,11 +194,6 @@ class OTF2Reader:
             # select the locations to read based on above calculations
             loc_events = list(trace.events(locations[begin_int:end_int]).__iter__())
 
-            # columns of the DataFrame
-            timestamps, event_types, event_attributes, names = [], [], [], []
-
-            # note: the below lists are for storing logical ids
-            process_ids, thread_ids = [], []
 
             """
             Relevant Documentation for Metrics:
@@ -227,7 +226,7 @@ class OTF2Reader:
             )
 
             # maps each metric to a list of its values
-            metrics_dict = {metric_name: [] for metric_name in metric_names}
+            metrics_dict = {metric_name: float("nan") for metric_name in metric_names}
 
             # used to keep track of time that the
             # most recent metrics that were read at
@@ -238,6 +237,10 @@ class OTF2Reader:
                 # extracts the location and event
                 # location could be thread, process, etc
                 loc, event = loc_event[0], loc_event[1]
+
+                timestamp, event_t, event_attribute, name = None, None, None, None
+
+                process_id, thread_id = None, None
 
                 # To Do:
                 # Support for GPU events has to be
@@ -254,25 +257,30 @@ class OTF2Reader:
                         )
                         metric_values = event.values
 
-                        # append the values for the metrics
-                        # to their appropriate lists
+                        # Set the values for the metrics
                         for i in range(len(metrics)):
-                            metrics_dict[metrics[i]].append(metric_values[i])
+                            metrics_dict[metrics[i]] = metric_values[i]
 
                         # store the metrics and their timestamp
                         prev_metric_time = event.time
                     else:
+                        new_event = {}
                         # MetricClass metric events are synchronous
                         # and coupled with an enter or leave event that
                         # has the same timestamp
                         if event.time != prev_metric_time:
                             # if the event is not paired with any metric, then
-                            # add placeholders for all the metric lists
+                            # add placeholder
                             for metric in metric_names:
-                                metrics_dict[metric].append(float("nan"))
+                                new_event[metric] = float("nan")
+                        else:
+                            for metric, metric_value in metrics_dict.items():
+                                new_event[metric] = metric_value
+
 
                         # reset this as a metric event was not read
                         prev_metric_time = -1
+                        metrics_dict = {metric_name: float("nan") for metric_name in metric_names}
 
                         """
                         Below is code to read the primary information about the
@@ -280,28 +288,25 @@ class OTF2Reader:
                         """
 
                         process_id = loc.group._ref
-                        process_ids.append(process_id)
 
                         # subtract the minimum location number of a process
                         # from the location number to get threads numbered
                         # 0 to (num_threads per process - 1) for each process.
-                        thread_ids.append(
-                            loc._ref - self.process_threads_map[process_id]
-                        )
+                        thread_id = loc._ref - self.process_threads_map[process_id]
 
                         # type of event - enter, leave, or other types
                         event_type = str(type(event))[20:-2]
                         if event_type == "Enter" or event_type == "Leave":
-                            event_types.append(event_type)
+                            event_t = event_type
                         else:
-                            event_types.append("Instant")
+                            event_t = "Instant"
 
                         if event_type in ["Enter", "Leave"]:
-                            names.append(event.region.name)
+                            name = event.region.name
                         else:
-                            names.append(event_type)
+                            name = event_type
 
-                        timestamps.append(event.time)
+                        timestamp = event.time
 
                         # only add attributes for non-leave rows so that
                         # there aren't duplicate attributes for a single event
@@ -319,34 +324,28 @@ class OTF2Reader:
                                     attributes_dict[self.field_to_val(key)] = (
                                         self.handle_data(value)
                                     )
-                            event_attributes.append(attributes_dict)
+                            event_attribute = attributes_dict
                         else:
                             # nan attributes for leave rows
                             # attributes column is of object dtype
-                            event_attributes.append(None)
+                            event_attribute = None
+                        
+                        columns = {
+                            "Name": name,
+                            "Event Type": event_t,
+                            "Timestamp (ns)": timestamp,
+                            "Thread": thread_id,
+                            "Process": process_id,
+                            "Attributes": event_attribute,
+                        }
+
+                        new_event.update(columns)
+                        core_reader.add_event(new_event)
 
             trace.close()  # close event files
 
-        # returns dataframe with all events and their fields
-        trace_df = pd.DataFrame(
-            {
-                "Timestamp (ns)": timestamps,
-                "Event Type": event_types,
-                "Name": names,
-                "Thread": thread_ids,
-                "Process": process_ids,
-                "Attributes": event_attributes,
-            }
-        )
 
-        for metric, metric_values in metrics_dict.items():
-            # only add columns of metrics which are populated with
-            # some values (sometimes a metric could be defined but not
-            # appear in the trace itself)
-            if not np.isnan(metric_values).all():
-                trace_df[metric] = metric_values
-
-        return trace_df
+        return core_reader.finalize()
 
     def read_definitions(self, trace):
         """
@@ -452,8 +451,8 @@ class OTF2Reader:
         pool.close()
 
         # merges the dataframe into one events dataframe
-        events_dataframe = pd.concat(events_dataframes)
-        del events_dataframes
+        trace = concat_trace_data(events_dataframes)
+        events_dataframe = trace.events
 
         # accessing the clock properties of the trace using the definitions
         clock_properties = self.definitions.loc[
@@ -470,10 +469,6 @@ class OTF2Reader:
         events_dataframe["Timestamp (ns)"] -= offset
         events_dataframe["Timestamp (ns)"] *= (10**9) / resolution
 
-        # ensures the DataFrame is in order of increasing timestamp
-        events_dataframe.sort_values(
-            by="Timestamp (ns)", axis=0, ascending=True, inplace=True, ignore_index=True
-        )
 
         # convert these to ints
         # (sometimes they get converted to floats
