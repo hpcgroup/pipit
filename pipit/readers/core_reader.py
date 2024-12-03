@@ -102,14 +102,14 @@ class CoreTraceReader:
 
         # Fill null with -1 (since int32 does not allow nan)
         trace_frame = trace_frame.with_columns([
-            nw.col(['_matching_event_id', '_parent', '_matching_timestamp']).fill_null(-1),
+            nw.col(['_matching_event', '_parent', '_matching_timestamp']).fill_null(-1),
         ])
 
         # Convert Name, Event Type, and Process to categorical memory savings
-        # Convert _matching_event_id, _parent, and _matching_timestamp to int, since they are indices
+        # Convert _matching_event, _parent, and _matching_timestamp to int, since they are indices
         trace_frame = trace_frame.with_columns([
             nw.col(['Name', 'Event Type', 'Process']).cast(nw.dtypes.Categorical),
-            nw.col(['_matching_event_id', '_parent']).cast(nw.dtypes.Int32),
+            nw.col(['_matching_event', '_parent']).cast(nw.dtypes.Int32),
         ])
 
         # Return native because multiprocessing fails with narwhal frames
@@ -151,8 +151,8 @@ class CoreTraceReader:
                 # matching event found
 
                 # update matching event ids
-                leave_event["_matching_event_id"] = enter_event["unique_id"]
-                enter_event["_matching_event_id"] = enter_event["unique_id"]
+                leave_event["_matching_event"] = enter_event["unique_id"]
+                enter_event["_matching_event"] = leave_event["unique_id"]
 
                 # update matching timestamps
                 leave_event["_matching_timestamp"] = enter_event["Timestamp (ns)"]

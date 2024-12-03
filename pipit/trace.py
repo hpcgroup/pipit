@@ -28,7 +28,7 @@ class Trace:
         self.numeric_cols = self.events.select(ncs.numeric()).columns
         self.numeric_cols.remove("unique_id")
         self.numeric_cols.remove("_parent")
-        self.numeric_cols.remove("_matching_event_id")
+        self.numeric_cols.remove("_matching_event")
         self.numeric_cols.remove("_matching_timestamp")
 
         # will store columns names for inc/exc metrics
@@ -269,7 +269,7 @@ class Trace:
 
     def calc_inc_metrics(self, columns=None):
         # pair enter and leave rows
-        if "_matching_event_id" not in self.events.columns:
+        if "_matching_event" not in self.events.columns:
             self._match_events()
 
         # if no columns are specified by the user, then we calculate
@@ -279,26 +279,34 @@ class Trace:
 
         # get the corresponding metric column name for columns provided,
         # ignoring the columns that have already been calculated
-        metric_col_names = []
+        tmp_leave_col_names = []
         for col_name in columns:
             metric_col_name = ("time" if col_name == "Timestamp (ns)" else col_name) + ".inc"
             if metric_col_name in self.events.columns:
                 columns.remove(col_name)
             else:
-                metric_col_names.append(metric_col_name)
-        if(len(columns) == 0):
+                tmp_leave_col_names.append("leave_" + col_name)
+        if len(columns) == 0:
             return
 
-        final_cols = self.events.columns + metric_col_names
-        sum_list = []
+        # Get only leave events
+        leave_frame = self.events.filter(nw.col('Event Type') == 'Leave')
+        # Select only the needed columns (metric columns and matching event)
+        leave_frame = leave_frame.rename({col_name: "leave_" + col_name for col_name in columns}).select(
+            ["_matching_event"] + tmp_leave_col_names
+        )
+
+        # Join the leave events with the original events, creating a new column for each metric
+        # populated with the value of the metric at the leave event
+        self.events = self.events.join(leave_frame, left_on='unique_id', right_on='_matching_event',
+                                       how="left")
+        # Create list of expressions to calculate the inclusive metrics
+        # Each expression is (metric_value_at_leave - metric_value_at_enter)
+        exp_list = []
         for col_name in columns:
-            self.events = self.events.with_columns([
-                nw.when(nw.col("Event Type") == "Enter").then(nw.col(col_name)).otherwise(0).alias("enter_"+col_name),
-                nw.when(nw.col("Event Type") == "Leave").then(nw.col(col_name)).otherwise(0).alias("leave_"+col_name)
-            ])
-            sum_list.append((nw.col("leave_"+col_name).sum() - nw.col("enter_"+col_name).sum()).alias(("time" if col_name == "Timestamp (ns)" else col_name) + ".inc"))
-        temp = self.events.group_by("_matching_event_id").agg(sum_list).filter(nw.col('_matching_event_id') != -1)
-        self.events = self.events.join(temp, on="_matching_event_id", how="left").select(final_cols)
+            metric_col_inc_name = ("time" if col_name == "Timestamp (ns)" else col_name) + ".inc"
+            exp_list.append((nw.col("leave_"+col_name) - nw.col(col_name)).alias(metric_col_inc_name))
+        self.events = self.events.with_columns(exp_list).drop(tmp_leave_col_names)
 
 
     def calc_exc_metrics(self, columns=None):
