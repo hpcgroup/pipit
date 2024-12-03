@@ -28,7 +28,7 @@ class Trace:
         self.numeric_cols = self.events.select(ncs.numeric()).columns
         self.numeric_cols.remove("unique_id")
         self.numeric_cols.remove("_parent")
-        self.numeric_cols.remove("_matching_event")
+        self.numeric_cols.remove("_matching_event_id")
         self.numeric_cols.remove("_matching_timestamp")
 
         # will store columns names for inc/exc metrics
@@ -266,9 +266,10 @@ class Trace:
                 "unique_id": list(range(max_unique_id))
             }, native_namespace=nw.get_native_namespace(self.events)), how='left', on="unique_id")
 
+
     def calc_inc_metrics(self, columns=None):
         # pair enter and leave rows
-        if "_matching_event" not in self.events.columns:
+        if "_matching_event_id" not in self.events.columns:
             self._match_events()
 
         # if no columns are specified by the user, then we calculate
@@ -288,31 +289,17 @@ class Trace:
         if(len(columns) == 0):
             return
 
-        # separate enter and leave events
-        enter_frame = self.events.filter(nw.col("Event Type") == "Enter").filter(~nw.col("_matching_event").is_null())
-        leave_frame = self.events.filter(nw.col("Event Type") == "Leave").filter(~nw.col("_matching_event").is_null())
-        # create a copy of each metric column with enter/leave prefixes
-        enter_frame = enter_frame.select(nw.col(columns+["unique_id","_matching_event"]).name.prefix("enter_"))
-        leave_frame = leave_frame.select(nw.col(columns + ["unique_id", "_matching_event"]).name.prefix("leave_"))
+        final_cols = self.events.columns + metric_col_names
+        sum_list = []
+        for col_name in columns:
+            self.events = self.events.with_columns([
+                nw.when(nw.col("Event Type") == "Enter").then(nw.col(col_name)).otherwise(0).alias("enter_"+col_name),
+                nw.when(nw.col("Event Type") == "Leave").then(nw.col(col_name)).otherwise(0).alias("leave_"+col_name)
+            ])
+            sum_list.append((nw.col("leave_"+col_name).sum() - nw.col("enter_"+col_name).sum()).alias(("time" if col_name == "Timestamp (ns)" else col_name) + ".inc"))
+        temp = self.events.group_by("_matching_event_id").agg(sum_list).filter(nw.col('_matching_event_id') != -1)
+        self.events = self.events.join(temp, on="_matching_event_id", how="left").select(final_cols)
 
-        # join the enter and leave frames on the matching event column
-        enter_joined_to_leave_df = enter_frame.join(leave_frame, left_on="enter__matching_event",
-                                                    right_on="leave_unique_id", how="left")
-
-        # calculate inclusive metric for each column specified
-        for col in columns:
-            # name of column for this inclusive metric
-            metric_col_name = ("time" if col == "Timestamp (ns)" else col_name) + ".inc"
-
-            # calculate the inclusive metric column
-            enter_joined_to_leave_df = enter_joined_to_leave_df.with_columns(
-                (nw.col("leave_"+col) - nw.col("enter_"+col)).alias(metric_col_name)
-            )
-        # select only the enter unique id and the metric columns
-        enter_joined_to_leave_df = enter_joined_to_leave_df.select(["enter_unique_id"]+metric_col_names)
-        # qdo a join on unique_id to add the inc metrics to the original dataframe
-        self.events = self.events.join(enter_joined_to_leave_df, left_on="unique_id", right_on="enter_unique_id",
-                                       how="left")
 
     def calc_exc_metrics(self, columns=None):
         # calculate exc metrics for all numeric columns if not specified
