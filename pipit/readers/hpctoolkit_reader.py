@@ -7,6 +7,7 @@
 import pandas as pd
 import pipit.trace
 from pipit.graph import Graph, Node
+from pipit.readers.core_reader import CoreTraceReader
 
 
 class MetaReader:
@@ -1034,6 +1035,8 @@ class TraceReader:
         self.signed = False
         self.encoding = "ASCII"
 
+        self.core_reader = CoreTraceReader(0, 1)
+
         # The trace.db header consists of the common .db header and n sections.
         # We're going to do a little set up work, so that's easy to change if
         # any revisions change the orders.
@@ -1150,20 +1153,6 @@ class TraceReader:
             self.file.read(8), byteorder=self.byte_order, signed=self.signed
         )
 
-        self.data = {
-            "Timestamp (ns)": [],
-            "Event Type": [],
-            "Name": [],
-            "Thread": [],
-            "Process": [],
-            "Core": [],
-            "Host": [],
-            "Node": [],
-            "Source File Name": [],
-            "Source File Line Number": [],
-            "Calling Context ID": [],
-        }
-
         for i in range(num_trace_headers):
             header_pointer = trace_headers_pointer + (i * trace_header_size)
             self.__read_single_trace_header(header_pointer)
@@ -1247,24 +1236,25 @@ class TraceReader:
                         self.meta_reader.get_information_from_context_id(curr_ctx_id)
                     )
 
-                    self.data["Name"].append(str(context_information["function"]))
+                    event = {}
+                    event["Name"] = str(context_information["function"])
                     if context_information["loop_type"]:
                         # HPCViewer only puts loops in CCT, but not trace view, so
                         # we use a special Loop Enter/Leave event type
-                        self.data["Event Type"].append("Loop Leave")
+                        event["Event Type"] = "Loop Leave"
                     else:
-                        self.data["Event Type"].append("Leave")
-                    self.data["Timestamp (ns)"].append(timestamp)
-                    self.data["Process"].append(hit["RANK"])
-                    self.data["Thread"].append(hit["THREAD"])
-                    self.data["Host"].append(hit["NODE"])
-                    self.data["Core"].append(hit["CORE"])
-                    self.data["Node"].append(last_node)
-                    self.data["Source File Name"].append(context_information["file"])
-                    self.data["Source File Line Number"].append(
-                        context_information["line"]
-                    )
-                    self.data["Calling Context ID"].append(curr_ctx_id)
+                        event["Event Type"] = "Leave"
+                    event["Timestamp (ns)"] = timestamp
+                    event["Process"] = hit["RANK"]
+                    event["Thread"] = hit["THREAD"]
+                    event["Host"] = hit["NODE"]
+                    event["Core"] = hit["CORE"]
+                    event["Node"] = last_node
+                    event["Source File Name"] = context_information["file"]
+                    event["Source File Line Number"] = context_information["line"]
+                    event["Calling Context ID"] = curr_ctx_id
+                    
+                    self.core_reader.add_event(event)
 
                     last_node = last_node.parent
             # Now we want to add all the new "enter" events after
@@ -1282,24 +1272,26 @@ class TraceReader:
                         self.meta_reader.get_information_from_context_id(curr_ctx_id)
                     )
 
-                    self.data["Name"].append(str(context_information["function"]))
+                    event = {}
+
+                    event["Name"] = str(context_information["function"])
                     if context_information["loop_type"]:
                         # HPCViewer only puts loops in CCT, but not trace view, so
                         # we use a special Loop Enter/Leave event type
-                        self.data["Event Type"].append("Loop Enter")
+                        event["Event Type"] = "Loop Enter"
                     else:
-                        self.data["Event Type"].append("Enter")
-                    self.data["Timestamp (ns)"].append(timestamp)
-                    self.data["Process"].append(hit["RANK"])
-                    self.data["Thread"].append(hit["THREAD"])
-                    self.data["Host"].append(hit["NODE"])
-                    self.data["Core"].append(hit["CORE"])
-                    self.data["Node"].append(entry_node)
-                    self.data["Source File Name"].append(context_information["file"])
-                    self.data["Source File Line Number"].append(
-                        context_information["line"]
-                    )
-                    self.data["Calling Context ID"].append(curr_ctx_id)
+                        event["Event Type"] = "Enter"
+                    event["Timestamp (ns)"] = timestamp
+                    event["Process"] = hit["RANK"]
+                    event["Thread"] = hit["THREAD"]
+                    event["Host"] = hit["NODE"]
+                    event["Core"] = hit["CORE"]
+                    event["Node"] = entry_node
+                    event["Source File Name"] = context_information["file"]
+                    event["Source File Line Number"] = context_information["line"]
+                    event["Calling Context ID"] = curr_ctx_id
+
+                    self.core_reader.add_event(event)
 
             last_node = current_node
             last_id = context_id
@@ -1320,20 +1312,25 @@ class TraceReader:
                     curr_ctx_id
                 )
 
-                self.data["Name"].append(str(context_information["function"]))
+                event = {}
+
+                event["Name"] = str(context_information["function"])
                 if context_information["loop_type"]:
-                    self.data["Event Type"].append("Loop Leave")
+                    event["Event Type"]= "Loop Leave"
                 else:
-                    self.data["Event Type"].append("Leave")
-                self.data["Timestamp (ns)"].append(timestamp)
-                self.data["Process"].append(hit["RANK"])
-                self.data["Thread"].append(hit["THREAD"])
-                self.data["Host"].append(hit["NODE"])
-                self.data["Core"].append(hit["CORE"])
-                self.data["Node"].append(last_node)
-                self.data["Source File Name"].append(context_information["file"])
-                self.data["Source File Line Number"].append(context_information["line"])
-                self.data["Calling Context ID"].append(curr_ctx_id)
+                    event["Event Type"] = "Leave"
+                event["Timestamp (ns)"]= timestamp
+                event["Process"] = hit["RANK"]
+                event["Thread"] = hit["THREAD"]
+                event["Host"] = hit["NODE"]
+                event["Core"] = hit["CORE"]
+                event["Node"] = last_node
+                event["Source File Name"] = context_information["file"]
+                event["Source File Line Number"] = context_information["line"]
+                event["Calling Context ID"] = curr_ctx_id
+
+                self.core_reader.add_event(event)
+
                 last_node = last_node.parent
 
 
@@ -1346,7 +1343,8 @@ class HPCToolkitReader:
         )
 
     def read(self) -> pipit.trace.Trace:
-        trace_df = pd.DataFrame(self.trace_reader.data)
+        trace_df = self.trace_reader.core_reader.finalize()
+
         # Need to sort df by timestamp then index
         # (since many events occur at the same timestamp)
 
