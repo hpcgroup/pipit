@@ -324,7 +324,6 @@ class Trace:
         # calculate inclusive metrics if needed
         self.calc_inc_metrics(columns)
 
-
         # Create list of aggregations to do (each metric)
         exp_list = []
         # create list of new column names for the sum of inclusive metrics
@@ -342,24 +341,21 @@ class Trace:
                                      .filter(nw.col('_parent') != -1))
 
         # join with enter events, connecting each parent with the sum of the inclusive metrics of its children
-        enter_frame = enter_frame.join(grouped_parents_sum_frame, left_on='unique_id', right_on='_parent', how='left')
+        self.events = self.events.join(grouped_parents_sum_frame, left_on='unique_id', right_on='_parent', how='left')
 
         # make list of expressions to calculate the exclusive metrics (inclusive - sum of children)
         exp_list = []
-        metric_col_exc_names = []
+        tmp_metric_col_inc_names = []
         for col_name in columns:
             metric_col_inc_name = ("time" if col_name == "Timestamp (ns)" else col_name) + ".inc"
-            metric_col_exc_name = ("time" if col_name == "Timestamp (ns)" else col_name) + ".inc"
+            metric_col_exc_name = ("time" if col_name == "Timestamp (ns)" else col_name) + ".exc"
             exp_list.append((nw.col(metric_col_inc_name) - nw.col('child_' + metric_col_inc_name).
                              fill_null(0)).alias(metric_col_exc_name))
-            metric_col_exc_names.append(metric_col_exc_name)
+            tmp_metric_col_inc_names.append('child_' + metric_col_inc_name)
 
-        enter_frame = enter_frame.with_columns(
+        self.events = self.events.with_columns(
             exp_list
-        )
-        self.events = self.events.join(enter_frame.select(['unique_id'] + metric_col_exc_names),
-                                       on='unique_id', how='left')
-
+        ).drop(tmp_metric_col_inc_names)
 
     def comm_matrix(self, output="size"):
         """
