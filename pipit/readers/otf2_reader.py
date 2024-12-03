@@ -257,8 +257,7 @@ class OTF2Reader:
                         )
                         metric_values = event.values
 
-                        # append the values for the metrics
-                        # to their appropriate lists
+                        # Set the values for the metrics
                         for i in range(len(metrics)):
                             metrics_dict[metrics[i]] = metric_values[i]
 
@@ -271,7 +270,7 @@ class OTF2Reader:
                         # has the same timestamp
                         if event.time != prev_metric_time:
                             # if the event is not paired with any metric, then
-                            # add placeholders for all the metric lists
+                            # add placeholder
                             for metric in metric_names:
                                 new_event[metric] = float("nan")
                         else:
