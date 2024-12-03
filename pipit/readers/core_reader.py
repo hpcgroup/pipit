@@ -93,19 +93,15 @@ class CoreTraceReader:
         # create a dataframe
         trace_df = pandas.DataFrame(all_events)
 
-        trace_df["_matching_event"].fillna(-1, inplace=True)
-        trace_df["_parent"].fillna(-1, inplace=True)
-        trace_df["_matching_timestamp"].fillna(-1, inplace=True)
-
         # categorical for memory savings
         trace_df = trace_df.astype(
             {
                 "Name": "category",
                 "Event Type": "category",
                 "Process": "category",
-                "_matching_event": "int32",
-                "_parent": "int32",
-                "_matching_timestamp": "int32",
+                "_matching_event": "Int32",
+                "_parent": "Int32",
+                "_matching_timestamp": "Int32",
             }
         )
         return trace_df
@@ -119,7 +115,7 @@ class CoreTraceReader:
         """
         if len(stack) == 0:
             # root event
-            event["_parent"] = -1
+            event["_parent"] = numpy.nan
         else:
             parent_event = event_list[stack[-1]]
             event["_parent"] = parent_event["unique_id"]
