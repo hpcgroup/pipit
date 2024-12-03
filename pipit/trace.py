@@ -115,8 +115,9 @@ class Trace:
         """
 
         if "_matching_event" not in self.events.columns:
-            matching_events = [-1] * len(self.events)
-            matching_times = [-1] * len(self.events)
+            max_unique_id = self.events['unique_id'].max()
+            matching_events = [-1] * len(range(max_unique_id))
+            matching_times = [-1] * len(range(max_unique_id))
 
             # only pairing enter and leave rows
             enter_leave_df = self.events.filter(nw.col("Event Type").is_in(["Enter", "Leave"]))
@@ -187,7 +188,7 @@ class Trace:
                 nw.from_dict({
                     "_matching_event": matching_events,
                     "_matching_timestamp": matching_times,
-                    "unique_id": list(range(len(self.events)))
+                    "unique_id": list(range(max_unique_id))
                 }, native_namespace=nw.get_native_namespace(self.events)),
                 on="unique_id")
 
@@ -202,9 +203,8 @@ class Trace:
         """
 
         if "_parent" not in self.events.columns:
-            depth, parent = [-1] * len(self.events), [-1] * len(
-                self.events
-            )
+            max_unique_id = self.events['unique_id'].max()
+            depth, parent = [-1] * max_unique_id, [-1] * max_unique_id
 
             # match events so we can
             # ignore unmatched ones
@@ -263,7 +263,7 @@ class Trace:
             self.events = self.events.join(nw.from_dict({
                 "_depth": depth,
                 "_parent": parent,
-                "unique_id": list(range(len(self.events)))
+                "unique_id": list(range(max_unique_id))
             }, native_namespace=nw.get_native_namespace(self.events)), how='left', on="unique_id")
 
     def calc_inc_metrics(self, columns=None):
