@@ -586,37 +586,24 @@ class Trace:
         return imbalance_df
 
     def idle_time(self, idle_functions=["Idle"], mpi_events=False):
-        # dict for creating a new dataframe
-        idle_times = {"Process": [], "Idle Time": []}
 
-        for process in set(self.events["Process"]):
-            idle_times["Process"].append(process)
-            idle_times["Idle Time"].append(
-                self._calculate_idle_time_for_process(
-                    process, idle_functions, mpi_events
-                )
-            )
-        return pd.DataFrame(idle_times)
-
-    def _calculate_idle_time_for_process(
-        self, process, idle_functions=["Idle"], mpi_events=False
-    ):
-        # calculate inclusive metrics
+        # Calculate inclusive time metric if not present
         if "time.inc" not in self.events.columns:
             self.calc_inc_metrics()
 
+        # Update idle functions if mpi_events is True
         if mpi_events:
             idle_functions += ["MPI_Wait", "MPI_Waitall", "MPI_Recv"]
-        # filter the dataframe to include only 'Enter' events within the specified
-        # process with the specified function names
-        df = self.events
-        filtered_df = (
-            df.loc[df["Event Type"] == "Enter"]
-            .loc[df["Process"] == process]
-            .loc[df["Name"].isin(idle_functions)]
-        )
-        # get the sum of the inclusive times of these events
-        return filtered_df["time.inc"].sum()
+
+        # Filter for Enter row of "idle" functions
+        filtered_frame = self.events.filter([
+            nw.col("Event Type") == "Enter",
+            nw.col("Name").is_in(idle_functions)
+        ])
+
+        # Group by process and sum the inclusive time
+        return filtered_frame.group_by("Process").agg(nw.sum("time.inc"))
+
 
     def time_profile(self, num_bins=50, normalized=False):
         """Computes time contributed by each function per time interval.
