@@ -386,22 +386,20 @@ class Trace:
         communication_matrix = np.zeros(shape=(len(ranks), len(ranks)))
 
         # filter the dataframe by MPI Send and Isend events
-        sender_dataframe = self.events.loc[
-            self.events["Name"].isin(["MpiSend", "MpiIsend"]),
-            ["Process", "Attributes"],
-        ]
+        sender_frame = self.events.filter(
+            nw.col("Name").is_in(["MpiSend", "MpiIsend"])
+        )
 
         # get the mpi ranks of all the sender processes
         # the length of the list is the total number of messages sent
-        sender_ranks = sender_dataframe["Process"].to_list()
+        sender_ranks = sender_frame["Process"].to_list()
+
+        # get attributes dicts of all the sender processes
+        attributes_list = sender_frame["Attributes"].to_list()
 
         # get the corresponding mpi ranks of the receivers
         # the length of the list is the total number of messages sent
-        receiver_ranks = (
-            sender_dataframe["Attributes"]
-            .apply(lambda attrDict: attrDict["receiver"])
-            .to_list()
-        )
+        receiver_ranks = [attrDict["receiver"] for attrDict in attributes_list]
 
         # the length of the message_volume list created below
         # is the total number of messages sent
@@ -409,15 +407,12 @@ class Trace:
         # number of bytes communicated for each message sent
         if output == "size":
             # (1 communication is a single row in the sender dataframe)
-            message_volume = (
-                sender_dataframe["Attributes"]
-                .apply(lambda attrDict: attrDict["msg_length"])
-                .to_list()
-            )
+            message_volume = [attrDict["msg_length"] for attrDict in attributes_list]
+
         elif output == "count":
             # 1 message between the pairs of processes
             # for each row in the sender dataframe
-            message_volume = np.full(len(sender_dataframe), 1)
+            message_volume = np.full(len(sender_frame), 1)
 
         for i in range(len(sender_ranks)):
             """
