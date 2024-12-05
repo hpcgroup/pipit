@@ -5,6 +5,8 @@
 import numpy
 import numpy as np
 import pandas as pd
+from pandas.core.interchange.dataframe_protocol import DataFrame
+
 from pipit.util.cct import create_cct
 import narwhals as nw
 import narwhals.selectors as ncs
@@ -618,8 +620,8 @@ class Trace:
         self.calc_inc_metrics(["Timestamp (ns)"])
 
         # Filter by Enter rows
-        events = self.events[self.events["Event Type"] == "Enter"].copy(deep=False)
-        names = events["Name"].unique().tolist()
+        events = self.events.filter(nw.col('Event Type') == 'Enter')
+        names = events["Name"].unique().to_list()
 
         # Create equal-sized bins
         edges = np.linspace(
@@ -633,39 +635,24 @@ class Trace:
 
         profile = []
 
-        def calc_exc_time_in_bin(events):
-            # TODO: check if the numpy equivalent of the below code is faster
-            dfx_to_idx = {
-                dfx: idx
-                for (dfx, idx) in zip(events.index, [i for i in range(len(events))])
-            }
+        def calc_exc_time_in_bin(events_frame: FrameT):
+            # Assume events_frame is only the enter events that belong in the bin
 
-            # start out with exc times being a copy of inc times
-            exc_times = list(events["inc_time_in_bin"].copy(deep=False))
+            # Group by the parent and sum the inclusive time
+            # Filter out the -1 parent (root)
+            grouped_parents_sum_frame = (events_frame.group_by('_parent')
+                                         .agg(nw.sum('inc_time_in_bin').alias('child_inc_time_in_bin'))
+                                         .select(['_parent', 'child_inc_time_in_bin'])
+                                         .filter(nw.col('_parent') != -1))
 
-            # filter to events that have children
-            filtered_df = events.loc[events["_children"].notnull()]
-
-            parent_df_indices, children = (
-                list(filtered_df.index),
-                filtered_df["_children"].to_list(),
-            )
-
-            # Iterate through the events that are parents
-            for i in range(len(filtered_df)):
-                curr_parent_idx, curr_children = (
-                    dfx_to_idx[parent_df_indices[i]],
-                    children[i],
-                )
-
-                # Only consider inc times of children in current bin
-                for child_df_idx in curr_children:
-                    if child_df_idx in dfx_to_idx:
-                        exc_times[curr_parent_idx] -= exc_times[
-                            dfx_to_idx[child_df_idx]
-                        ]
-
-            events["exc_time_in_bin"] = exc_times
+            # join with the grouped parents sum frame
+            # connecting each parent with the sum of the inclusive metrics of its children
+            events_frame = events_frame.join(grouped_parents_sum_frame, left_on='unique_id',
+                                             right_on='_parent', how='left')
+            # Calculate the exclusive time in the bin and select only the necessary columns
+            events_frame = events_frame.with_columns((nw.col('inc_time_in_bin') - nw.col('child_inc_time_in_bin'))
+                                                     .alias('exc_time_in_bin')).select(['Name', 'exc_time_in_bin'])
+            return events_frame
 
         # For each bin, determine each function's time contribution
         for i in range(num_bins):
@@ -673,65 +660,86 @@ class Trace:
             end = edges[i + 1]
 
             # Find functions that belong in this bin
-            in_bin = events[
-                (events["_matching_timestamp"] > start)
-                & (events["Timestamp (ns)"] < end)
-            ].copy(deep=False)
+            in_bin_frame: FrameT = events.filter([
+                (nw.col('_matching_timestamp') > start),
+                (nw.col('Timestamp (ns)') < end)
+            ])
 
-            # Calculate inc_time_in_bin for each function
-            # Case 1 - Function starts in bin
-            in_bin.loc[in_bin["Timestamp (ns)"] >= start, "inc_time_in_bin"] = (
-                end - in_bin["Timestamp (ns)"]
-            )
+            # We have 4 cases to how a function is in a bin
+            # ---------------------------------------------
+            # Case 1: (>= start) & (> end)
+            #   (Function starts in bin and extends)
+            # Case 2: (< start) & (<= end)
+            #   (Function ends in bin and started before)
+            # Case 3: (< start) & (> end)
+            #   (Function spans bin)
+            # Case 4: (>= start) & (<= end)
+            #   (Function contained in bin)
 
-            # Case 2 - Function ends in bin
-            in_bin.loc[in_bin["_matching_timestamp"] <= end, "inc_time_in_bin"] = (
-                in_bin["_matching_timestamp"] - start
-            )
+            # Now we convert these case to nested conditionals
+            # ------------------------------------------------
+            # If (< start)
+            #   If (> end)
+            #       Case 3
+            #   Else (<= end)
+            #       Case 2
+            # Else (>= start)
+            #   If (> end)
+            #       Case 1
+            #   Else (<= end)
+            #       Case 4
+            #
 
-            # Case 3 - Function spans bin
-            in_bin.loc[
-                (in_bin["Timestamp (ns)"] < start)
-                & (in_bin["_matching_timestamp"] > end),
-                "inc_time_in_bin",
-            ] = (
-                end - start
-            )
-
-            # Case 4 - Function contained in bin
-            in_bin.loc[
-                (in_bin["Timestamp (ns)"] >= start)
-                & (in_bin["_matching_timestamp"] <= end),
-                "inc_time_in_bin",
-            ] = (
-                in_bin["_matching_timestamp"] - in_bin["Timestamp (ns)"]
+            # We convert the nested conditionals into when.then.otherwise expression
+            # ----------------------------------------------------------------------
+            in_bin_frame = in_bin_frame.with_columns(
+                nw.when(nw.col('Timestamp (ns)') < start).then(
+                    nw.when(nw.col('_matching_timestamp') > end)
+                    .then(end - start) # Case 3
+                    .otherwise(nw.col('_matching_timestamp') - start) #Case 2
+                ).otherwise(
+                    nw.when(nw.col('_matching_timestamp') > end)
+                    .then(end - nw.col('Timestamp (ns)')) # Case 1
+                    .otherwise(nw.col('_matching_timestamp') - nw.col('Timestamp (ns)')) # Case 4
+                ).alias('inc_time_in_bin')
             )
 
             # Calculate exc_time_in_bin by subtracting inc_time_in_bin for all children
-            calc_exc_time_in_bin(in_bin)
+            in_bin_frame = calc_exc_time_in_bin(in_bin_frame)
 
-            # Sum across all processes
-            agg = in_bin.groupby("Name")["exc_time_in_bin"].sum()
-            profile.append(agg.to_dict())
+            # Add bin_id column to act as index and keep track of the bin
+            agg = in_bin_frame.group_by('Name').agg(nw.sum('exc_time_in_bin')).with_columns(nw.lit(i).alias('bin_id'))
 
-        # Convert to DataFrame
-        df = pd.DataFrame(profile, columns=names)
+            # idle_time = total_bin_duration - agg['exc_time_in_bin'].sum()
+            # agg = agg.with_columns(nw.lit(idle_time).alias('idle_time'))
+
+            profile.append(agg)
+
+
+        # Pivot on Name, making the Name values the columns, the bin_id the index,
+        # and the exc_time_in_bin the values
+        frame = nw.concat(profile).pivot(on='Name', index='bin_id', values='exc_time_in_bin')
+
+        # Fill in missing columns with 0
+        frame = frame.with_columns(nw.col(names).fill_null(0))
 
         # Add idle_time column
-        df.insert(0, "idle_time", total_bin_duration - df.sum(axis=1))
+        frame = frame.with_columns((total_bin_duration - nw.sum_horizontal(names)).alias('idle_time'))
 
         # Threshold for zero
-        df.mask(df < 0.01, 0, inplace=True)
+        # df.mask(df < 0.01, 0, inplace=True)
 
         # Normalize
         if normalized:
-            df /= total_bin_duration
+            frame = frame.with_columns((nw.col(names) / total_bin_duration))
 
         # Add bin_start and bin_end
-        df.insert(0, "bin_start", edges[:-1])
-        df.insert(0, "bin_end", edges[1:])
+        frame = frame.with_columns([
+            (nw.col('bin_id') * bin_size).alias('bin_start'),
+            (nw.col('bin_id')* bin_size + bin_size).alias('bin_end')
+        ])
 
-        return df
+        return frame
 
     @staticmethod
     def multirun_analysis(
