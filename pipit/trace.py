@@ -521,20 +521,13 @@ class Trace:
         # This first groups by both the process and the specified groupby
         # column (like name). It then sums up the metrics for each combination
         # of the process and the groupby column.
+        per_process_flat_profile = (self.events.filter(nw.col("Event Type") == "Enter")
+                                    .group_by([groupby_column, "Process"])
+                                    .agg([nw.sum(metric) for metric in metrics]))
         if per_process:
-            return (
-                self.events.loc[self.events["Event Type"] == "Enter"]
-                .groupby([groupby_column, "Process"], observed=True)[metrics]
-                .sum()
-            )
+            return per_process_flat_profile
         else:
-            return (
-                self.events.loc[self.events["Event Type"] == "Enter"]
-                .groupby([groupby_column, "Process"], observed=True)[metrics]
-                .sum()
-                .groupby(groupby_column)
-                .mean()
-            )
+            return per_process_flat_profile.group_by(groupby_column).agg([nw.mean(metric) for metric in metrics])
 
     def load_imbalance(self, metric="time.exc", num_processes=1):
         """
