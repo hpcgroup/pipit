@@ -613,7 +613,6 @@ class Trace:
 
         # Filter by Enter rows
         events = self.events.filter(nw.col('Event Type') == 'Enter')
-        names = events["Name"].unique().to_list()
 
         # Create equal-sized bins
         edges = np.linspace(
@@ -713,6 +712,10 @@ class Trace:
         # and the exc_time_in_bin the values
         frame = nw.concat(profile).pivot(on='Name', index='bin_id', values='exc_time_in_bin')
 
+        # Get the column names (function names)
+        names = frame.columns
+        names.remove('bin_id')
+
         # Fill in missing columns with 0
         frame = frame.with_columns(nw.col(names).fill_null(0))
 
@@ -724,7 +727,8 @@ class Trace:
 
         # Normalize
         if normalized:
-            frame = frame.with_columns((nw.col(names) / total_bin_duration))
+            frame = frame.with_columns((nw.col(names + ['idle_time']) / total_bin_duration))
+            bin_size = bin_size / total_bin_duration
 
         # Add bin_start and bin_end
         frame = frame.with_columns([
