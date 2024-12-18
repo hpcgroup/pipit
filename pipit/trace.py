@@ -5,7 +5,6 @@
 import numpy
 import numpy as np
 import pandas as pd
-from pandas.core.interchange.dataframe_protocol import DataFrame
 
 from pipit.util.cct import create_cct
 import narwhals as nw
@@ -649,6 +648,8 @@ class Trace:
             # connecting each parent with the sum of the inclusive metrics of its children
             events_frame = events_frame.join(grouped_parents_sum_frame, left_on='unique_id',
                                              right_on='_parent', how='left')
+            # Fill in the null values (i.e. no children) with 0
+            events_frame = events_frame.with_columns(nw.col('child_inc_time_in_bin').fill_null(0))
             # Calculate the exclusive time in the bin and select only the necessary columns
             events_frame = events_frame.with_columns((nw.col('inc_time_in_bin') - nw.col('child_inc_time_in_bin'))
                                                      .alias('exc_time_in_bin')).select(['Name', 'exc_time_in_bin'])
@@ -660,10 +661,9 @@ class Trace:
             end = edges[i + 1]
 
             # Find functions that belong in this bin
-            in_bin_frame: FrameT = events.filter([
-                (nw.col('_matching_timestamp') > start),
-                (nw.col('Timestamp (ns)') < end)
-            ])
+            in_bin_frame: FrameT = events.filter(
+                (nw.col('_matching_timestamp') > start) & (nw.col('Timestamp (ns)') < end)
+            )
 
             # We have 4 cases to how a function is in a bin
             # ---------------------------------------------
