@@ -433,11 +433,10 @@ class Trace:
     def message_histogram(self, bins=20, **kwargs):
         """Generates histogram of message frequency by size."""
 
-        # Filter by send events
-        messages = self.events[self.events["Name"].isin(["MpiSend", "MpiIsend"])]
-
+        # Get message attributes
+        messages = list(self.events.filter(nw.col('Name').is_in(["MpiSend", "MpiIsend"]))['Attributes'])
         # Get message sizes
-        sizes = messages["Attributes"].map(lambda x: x["msg_length"])
+        sizes = [message['msg_length'] for message in messages]
 
         return np.histogram(sizes, bins=bins, **kwargs)
 
