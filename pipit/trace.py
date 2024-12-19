@@ -32,6 +32,9 @@ class Trace:
         self.numeric_cols.remove("_matching_event")
         self.numeric_cols.remove("_matching_timestamp")
 
+        # Native Namespace is the backend
+        self.native_namespace = nw.get_native_namespace(self.events)
+
         # will store columns names for inc/exc metrics
         self.inc_metrics = []
         self.exc_metrics = []
@@ -546,7 +549,8 @@ class Trace:
         num_ranks = len(set(self.events["Process"]))
         num_display = num_ranks if num_processes > num_ranks else num_processes
 
-        flat_profile = self.flat_profile(metrics=metric, per_process=True)
+        flat_profile = (self.flat_profile(metrics=metric, per_process=True)
+                        .sort(by=metric, descending=True, nulls_last=True))
 
         imbalance_dict = dict()
 
@@ -558,21 +562,28 @@ class Trace:
         imbalance_dict[imb_ranks] = []
         imbalance_dict[mean_metric] = []
 
-        functions = set(self.events.loc[self.events["Event Type"] == "Enter"]["Name"])
+        functions = list(self.events.filter(nw.col("Event Type") == "Enter")["Name"].unique())
+
         for function in functions:
-            curr_series = flat_profile.loc[function]
 
-            top_n = curr_series.sort_values(ascending=False).iloc[0:num_display]
+            # Already sorted from most to least of the metric
+            filtered_fp = flat_profile.filter(nw.col('Name') == function)
 
-            imbalance_dict[mean_metric].append(curr_series.mean())
-            imbalance_dict[imb_metric].append(top_n.values[0] / curr_series.mean())
-            imbalance_dict[imb_ranks].append(list(top_n.index))
+            top_metric_value = filtered_fp[metric][0]
 
-        imbalance_df = pd.DataFrame(imbalance_dict)
-        imbalance_df.index = functions
-        imbalance_df.sort_values(by=mean_metric, axis=0, inplace=True, ascending=False)
+            top_n_ranks = list(filtered_fp["Process"][0:num_display])
 
-        return imbalance_df
+            function_avg = filtered_fp[metric].mean()
+
+            imbalance_dict[mean_metric].append(function_avg)
+            imbalance_dict[imb_metric].append(top_metric_value / function_avg)
+            imbalance_dict[imb_ranks].append(top_n_ranks)
+
+        imbalance_dict['Name'] = functions
+
+        imbalance_frame = nw.from_dict(imbalance_dict, native_namespace=self.native_namespace)
+
+        return imbalance_frame
 
     def idle_time(self, idle_functions=["Idle"], mpi_events=False):
 
