@@ -279,24 +279,23 @@ class Trace:
         # if no columns are specified by the user, then we calculate
         # inclusive metrics for all the numeric columns in the trace
         columns = self.numeric_cols if columns is None else columns
-        columns = columns.copy()
+        columns_to_compute = []
 
         # get the corresponding metric column name for columns provided,
         # ignoring the columns that have already been calculated
         tmp_leave_col_names = []
         for col_name in columns:
             metric_col_name = ("time" if col_name == "Timestamp (ns)" else col_name) + ".inc"
-            if metric_col_name in self.events.columns:
-                columns.remove(col_name)
-            else:
+            if metric_col_name not in self.events.columns:
                 tmp_leave_col_names.append("leave_" + col_name)
-        if len(columns) == 0:
+                columns_to_compute.append(col_name)
+        if len(columns_to_compute) == 0:
             return
 
         # Get only leave events
         leave_frame = self.events.filter(nw.col('Event Type') == 'Leave')
         # Select only the needed columns (metric columns and matching event)
-        leave_frame = leave_frame.rename({col_name: "leave_" + col_name for col_name in columns}).select(
+        leave_frame = leave_frame.rename({col_name: "leave_" + col_name for col_name in columns_to_compute}).select(
             ["_matching_event"] + tmp_leave_col_names
         )
 
@@ -307,7 +306,7 @@ class Trace:
         # Create list of expressions to calculate the inclusive metrics
         # Each expression is (metric_value_at_leave - metric_value_at_enter)
         exp_list = []
-        for col_name in columns:
+        for col_name in columns_to_compute:
             metric_col_inc_name = ("time" if col_name == "Timestamp (ns)" else col_name) + ".inc"
             exp_list.append((nw.col("leave_"+col_name) - nw.col(col_name)).alias(metric_col_inc_name))
         self.events = self.events.with_columns(exp_list).drop(tmp_leave_col_names)
@@ -317,20 +316,28 @@ class Trace:
         # calculate exc metrics for all numeric columns if not specified
         columns = self.numeric_cols if columns is None else columns
 
-        # match caller and callee rows
-        self._match_caller_callee()
 
-        # calculate inclusive metrics if needed
-        self.calc_inc_metrics(columns)
-
+        # Filter out already calculated columns
+        columns_to_compute = []
         # Create list of aggregations to do (each metric)
         exp_list = []
         # create list of new column names for the sum of inclusive metrics
         metric_col_inc_names = []
         for col_name in columns:
+            metric_col_exc_name = ("time" if col_name == "Timestamp (ns)" else col_name) + ".exc"
             metric_col_inc_name = ("time" if col_name == "Timestamp (ns)" else col_name) + ".inc"
-            exp_list.append(nw.col(metric_col_inc_name).sum().alias('child_' + metric_col_inc_name))
-            metric_col_inc_names.append(metric_col_inc_name)
+            if metric_col_exc_name not in self.events.columns:
+                columns_to_compute.append(col_name)
+                exp_list.append(nw.col(metric_col_inc_name).sum().alias('child_' + metric_col_inc_name))
+                metric_col_inc_names.append(metric_col_inc_name)
+
+
+        # match caller and callee rows
+        self._match_caller_callee()
+
+        # calculate inclusive metrics if needed
+        self.calc_inc_metrics(columns_to_compute)
+
         # get the enter events
         enter_frame = self.events.filter(nw.col('Event Type') == 'Enter')
 
@@ -345,7 +352,7 @@ class Trace:
         # make list of expressions to calculate the exclusive metrics (inclusive - sum of children)
         exp_list = []
         tmp_metric_col_inc_names = []
-        for col_name in columns:
+        for col_name in columns_to_compute:
             metric_col_inc_name = ("time" if col_name == "Timestamp (ns)" else col_name) + ".inc"
             metric_col_exc_name = ("time" if col_name == "Timestamp (ns)" else col_name) + ".exc"
             exp_list.append((nw.col(metric_col_inc_name) - nw.col('child_' + metric_col_inc_name).
@@ -465,6 +472,8 @@ class Trace:
                 else ["MpiRecv", "MpiIrecv"]
             )
         ]
+
+        events = self.events.filter(nw.col('Name').is_in(["MpiSend", "MpiIsend"]))
 
         # Get timestamps and sizes
         timestamps = events["Timestamp (ns)"]
