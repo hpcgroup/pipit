@@ -467,24 +467,21 @@ class Trace:
             edges: Edges of time intervals
         """
         # Filter by send or receive events
-        events = self.events[
-            self.events["Name"].isin(
-                ["MpiSend", "MpiIsend"]
-                if message_type == "send"
-                else ["MpiRecv", "MpiIrecv"]
-            )
-        ]
+        if message_type == "send":
+            events = self.events.filter(nw.col('Name').is_in(["MpiSend", "MpiIsend"]))
+        else:
+            events = self.events.filter(nw.col('Name').is_in(["MpiRecv", "MpiIrecv"]))
 
-        events = self.events.filter(nw.col('Name').is_in(["MpiSend", "MpiIsend"]))
 
         # Get timestamps and sizes
-        timestamps = events["Timestamp (ns)"]
-        sizes = events["Attributes"].apply(lambda x: x["msg_length"])
+        timestamps = list(events["Timestamp (ns)"])
+        attributes = list(events["Attributes"])
+        sizes = [attr["msg_length"] for attr in attributes]
 
         return np.histogram(
             timestamps,
             bins=bins,
-            weights=sizes.tolist() if output == "size" else None,
+            weights=sizes if output == "size" else None,
             range=[
                 self.events["Timestamp (ns)"].min(),
                 self.events["Timestamp (ns)"].max(),
