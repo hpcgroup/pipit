@@ -330,6 +330,8 @@ class Trace:
                 columns_to_compute.append(col_name)
                 exp_list.append(nw.col(metric_col_inc_name).sum().alias('child_' + metric_col_inc_name))
                 metric_col_inc_names.append(metric_col_inc_name)
+        if len(columns_to_compute) == 0:
+            return
 
 
         # match caller and callee rows
