@@ -45,12 +45,12 @@ class Trace:
         self.cct = create_cct(self.events)
 
     @staticmethod
-    def from_otf2(dirname, num_processes=None, create_cct=False):
+    def from_otf2(dirname, num_processes=None, frame_backend=pd.DataFrame, create_cct=False):
         """Read an OTF2 trace into a new Trace object."""
         # import this lazily to avoid circular dependencies
         from .readers.otf2_reader import OTF2Reader
 
-        return OTF2Reader(dirname, num_processes, create_cct).read()
+        return OTF2Reader(dirname, num_processes, frame_backend, create_cct).read()
 
     @staticmethod
     def from_hpctoolkit(dirname):
