@@ -12,16 +12,20 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest]
-        python-version: ["3.7", "3.8", "3.9", "3.10", "3.11"]
-        include:
-        - python-version: "3.6"
-          os: ubuntu-20.04
+        python-version: ["3.6", "3.7", "3.8", "3.9", "3.10", "3.11"]
+        # include:
+        # - python-version: "3.6"
+        #   os: ubuntu-20.04
 
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/setup-python@v2
+      - uses: mamba-org/setup-micromamba@v2
         with:
-          python-version: ${{ matrix.python-version }}
+          # the create command looks like this:
+          # `micromamba create -n test-env python=3.10 numpy`
+          environment-name: test-env
+          create-args: >-
+            python=${{ matrix.python_version }}
 
       - name: Install Python packages
         run: |
