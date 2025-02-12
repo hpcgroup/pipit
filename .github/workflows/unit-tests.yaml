@@ -19,9 +19,14 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/setup-python@v2
+      # use over setup python since this allows us to use older
+      # Pythons
+      - uses: mamba-org/setup-micromamba@v2
         with:
-          python-version: ${{ matrix.python-version }}
+          # the create command looks like this:
+          # `micromamba create -n test-env python=(version)`
+          environment-name: test-env
+          create-args: python=${{ matrix.python-version }}
 
       - name: Install Python packages
         run: |
