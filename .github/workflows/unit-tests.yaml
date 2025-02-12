@@ -26,7 +26,7 @@ jobs:
           # the create command looks like this:
           # `micromamba create -n test-env python=(version)`
           environment-name: test-env
-          create-args: python=${{ matrix.python_version }}
+          create-args: python=${{ matrix.python-version }}
 
       - name: Install Python packages
         run: |
