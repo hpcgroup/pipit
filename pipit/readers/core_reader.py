@@ -1,7 +1,6 @@
 from typing import List, Dict
 
 import pandas
-import numpy
 from pipit.trace import Trace
 
 
