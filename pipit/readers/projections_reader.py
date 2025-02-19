@@ -6,9 +6,6 @@
 import os
 import gzip
 
-from numba.cuda import event
-
-import pipit.trace
 import pandas as pd
 import multiprocessing as mp
 
