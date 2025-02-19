@@ -86,9 +86,11 @@ def create_cct(events):
 
                     # add node as root or child of its
                     # parent depending on current depth
-                    graph.add_root(
-                        curr_node
-                    ) if curr_depth == 0 else parent_node.add_child(curr_node)
+                    (
+                        graph.add_root(curr_node)
+                        if curr_depth == 0
+                        else parent_node.add_child(curr_node)
+                    )
 
                 # Update nodes stack, column, and current depth
                 nodes_stack.append(curr_node)
