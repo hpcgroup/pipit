@@ -394,7 +394,12 @@ class ProjectionsReader:
                     details = {"Note": note}
 
                     _add_to_trace(
-                        core_reader, "User Supplied Note", "Instant", time, pe_num, details
+                        core_reader,
+                        "User Supplied Note",
+                        "Instant",
+                        time,
+                        pe_num,
+                        details,
                     )
 
                 # Not sure if this should be instant or enter/leave
@@ -617,7 +622,9 @@ class ProjectionsReader:
 
                     details = {"From PE": pe, "Message Type": mtype, "Event ID": event}
 
-                    _add_to_trace(core_reader, "Enque", "Instant", time, pe_num, details)
+                    _add_to_trace(
+                        core_reader, "Enque", "Instant", time, pe_num, details
+                    )
 
                 elif int(line_arr[0]) == ProjectionsConstants.DEQUEUE:
                     mtype = int(line_arr[1])
@@ -627,7 +634,9 @@ class ProjectionsReader:
 
                     details = {"From PE": pe, "Message Type": mtype, "Event ID": event}
 
-                    _add_to_trace(core_reader, "Deque", "Instant", time, pe_num, details)
+                    _add_to_trace(
+                        core_reader, "Deque", "Instant", time, pe_num, details
+                    )
 
                 # Interrupt from different chare ?
                 elif int(line_arr[0]) == ProjectionsConstants.BEGIN_INTERRUPT:
@@ -656,12 +665,16 @@ class ProjectionsReader:
                 elif int(line_arr[0]) == ProjectionsConstants.BEGIN_COMPUTATION:
                     time = int(line_arr[1]) * 1000
 
-                    _add_to_trace(core_reader, "Computation", "Enter", time, pe_num, None)
+                    _add_to_trace(
+                        core_reader, "Computation", "Enter", time, pe_num, None
+                    )
 
                 elif int(line_arr[0]) == ProjectionsConstants.END_COMPUTATION:
                     time = int(line_arr[1]) * 1000
 
-                    _add_to_trace(core_reader, "Computation", "Leave", time, pe_num, None)
+                    _add_to_trace(
+                        core_reader, "Computation", "Leave", time, pe_num, None
+                    )
 
                 # User event (in code)
                 elif int(line_arr[0]) == ProjectionsConstants.USER_EVENT:
@@ -734,9 +747,7 @@ class ProjectionsReader:
                         "User Event Name": sts_reader.get_user_event(user_event_id),
                     }
 
-                    _add_to_trace(
-                        "User Event Pair", "Leave", time, pe_num, details
-                    )
+                    _add_to_trace("User Event Pair", "Leave", time, pe_num, details)
 
                 # User stat (in code)
                 elif int(line_arr[0]) == ProjectionsConstants.USER_STAT:
@@ -759,14 +770,14 @@ class ProjectionsReader:
                         core_reader, user_stat_name, "Instant", time, pe_num, details
                     )
 
-
             log_file.close()
-
 
         return core_reader.finalize()
 
 
-def _add_to_trace(core_reader: CoreTraceReader, name, evt_type, time, process, attributes):
+def _add_to_trace(
+    core_reader: CoreTraceReader, name, evt_type, time, process, attributes
+):
     new_event = {
         "Name": name,
         "Event Type": evt_type,

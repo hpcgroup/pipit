@@ -110,7 +110,6 @@ class CoreTraceReader:
         )
         return trace_df
 
-
     def __update_parent_child_relationships(
         self, event: Dict, stack: List[int], event_list: List[Dict], is_instant: bool
     ) -> None:
