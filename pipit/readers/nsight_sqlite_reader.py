@@ -14,6 +14,8 @@ import sqlite3
 
 Times are in nanoseconds
 """
+
+
 class NSightSQLiteReader:
     # Dictionary mapping trace type
     # (e.g. NVTX,
@@ -40,7 +42,8 @@ class NSightSQLiteReader:
         #     StringIds AS rname2
         #     ON tname.nameId = rname2.id
         # """],
-        "nvtx": ["""
+        "nvtx": [
+            """
         SELECT
             start as Enter,
             end as Leave,
@@ -53,10 +56,12 @@ class NSightSQLiteReader:
             NVTX_EVENTS as ne
         LEFT JOIN StringIds
             ON StringIds.id = ne.textId
-        """],
+        """
+        ],
         # TODO: verify that the code for extracting process and
         # thread id is correct
-        "cuda_api": ["""
+        "cuda_api": [
+            """
         SELECT
             start as Enter,
             end as Leave,
@@ -75,8 +80,10 @@ class NSightSQLiteReader:
         JOIN
             StringIds AS rname2
             ON tname.nameId = rname2.id
-        """],
-        "gpu_trace": ["""
+        """
+        ],
+        "gpu_trace": [
+            """
         SELECT
             cuda_gpu.start as Enter,
             cuda_gpu.end as Leave,
@@ -94,7 +101,7 @@ class NSightSQLiteReader:
         JOIN CUPTI_ACTIVITY_KIND_RUNTIME as cuda_api
             ON cuda_gpu.correlationId = cuda_api.correlationId
         """,
-        """
+            """
         SELECT
             cuda_memcpy.start as Enter,
             cuda_memcpy.end as Leave,
@@ -112,7 +119,7 @@ class NSightSQLiteReader:
         JOIN CUPTI_ACTIVITY_KIND_RUNTIME as cuda_api
             ON cuda_memcpy.correlationId = cuda_api.correlationId
         """,
-        """
+            """
         SELECT
             cuda_memset.start as Enter,
             cuda_memset.end as Leave,
@@ -130,7 +137,7 @@ class NSightSQLiteReader:
         JOIN CUPTI_ACTIVITY_KIND_RUNTIME as cuda_api
             ON cuda_memset.correlationId = cuda_api.correlationId
         """,
-        """
+            """
         SELECT
             cuda_sync.start as Enter,
             cuda_sync.end as Leave,
@@ -148,7 +155,7 @@ class NSightSQLiteReader:
         JOIN CUPTI_ACTIVITY_KIND_RUNTIME as cuda_api
             ON cuda_sync.correlationId = cuda_api.correlationId
         """,
-        """
+            """
         SELECT
             cuda_graph.start as Enter,
             cuda_graph.end as Leave,
@@ -166,7 +173,7 @@ class NSightSQLiteReader:
         JOIN CUPTI_ACTIVITY_KIND_RUNTIME as cuda_api
             ON cuda_graph.correlationId = cuda_api.correlationId
         """,
-        ]
+        ],
         # TODO: reading in all the gpu metrics takes up a lot of memory
         # We should figure out which ones we want exactly
         # "gpu_metrics": """
@@ -176,6 +183,7 @@ class NSightSQLiteReader:
         #     ON GENERIC_EVENTS.typeId = GPU_METRICS.typeId
         # """
     }
+
     def __init__(self, filepath, create_cct=False, trace_types="all") -> None:
         self.conn = sqlite3.connect(filepath)
         self.create_cct = create_cct
@@ -213,11 +221,19 @@ class NSightSQLiteReader:
             # CUDA_ACTIVITY_KIND_MEMSET since those can sometimes not exist
 
             gpu_trace_qs = []
-            gpu_trace_needed_tbls = ["CUPTI_ACTIVITY_KIND_RUNTIME", "CUPTI_ACTIVITY_KIND_MEMCPY",
-                                     "CUPTI_ACTIVITY_KIND_MEMSET", "CUPTI_ACTIVITY_KIND_SYNCHRONIZATION",
-                                     "CUPTI_ACTIVITY_KIND_GRAPH_TRACE"]
+            gpu_trace_needed_tbls = [
+                "CUPTI_ACTIVITY_KIND_RUNTIME",
+                "CUPTI_ACTIVITY_KIND_MEMCPY",
+                "CUPTI_ACTIVITY_KIND_MEMSET",
+                "CUPTI_ACTIVITY_KIND_SYNCHRONIZATION",
+                "CUPTI_ACTIVITY_KIND_GRAPH_TRACE",
+            ]
 
-            for req_tbl, q in zip(gpu_trace_needed_tbls, NSightSQLiteReader._trace_queries["gpu_trace"], strict=True):
+            for req_tbl, q in zip(
+                gpu_trace_needed_tbls,
+                NSightSQLiteReader._trace_queries["gpu_trace"],
+                strict=True,
+            ):
                 if req_tbl in self.table_names:
                     gpu_trace_qs.append(q)
             self.trace_queries["gpu_trace"] = gpu_trace_qs
@@ -237,13 +253,15 @@ class NSightSQLiteReader:
         trace_df = pd.concat(traces, axis=0)
 
         # Melt start/end columns into single event type column
-        trace_df = pd.melt(trace_df,
-                # These are the columns we don't want to melt
-                # Columns not in here will be melted into a single column
-                id_vars=[col for col in df.columns if col not in {"Enter", "Leave"}],
-                value_vars=["Enter", "Leave"],
-                var_name="Event Type",
-                value_name="Timestamp (ns)")
+        trace_df = pd.melt(
+            trace_df,
+            # These are the columns we don't want to melt
+            # Columns not in here will be melted into a single column
+            id_vars=[col for col in df.columns if col not in {"Enter", "Leave"}],
+            value_vars=["Enter", "Leave"],
+            var_name="Event Type",
+            value_name="Timestamp (ns)",
+        )
 
         if "bytes" in trace_df.columns:
             trace_df = trace_df.astype(
@@ -253,10 +271,17 @@ class NSightSQLiteReader:
             )
 
         # Cache mapping
-        trace_df["_matching_event"] = np.concatenate([np.arange(len(trace_df) // 2, len(trace_df)), np.arange(0, len(trace_df) // 2)])
+        trace_df["_matching_event"] = np.concatenate(
+            [
+                np.arange(len(trace_df) // 2, len(trace_df)),
+                np.arange(0, len(trace_df) // 2),
+            ]
+        )
         # Convert to numpy before assignment otherwise pandas
         # will try to align indices, which will mess up order
-        trace_df['_matching_timestamp'] = trace_df["Timestamp (ns)"][trace_df["_matching_event"]].to_numpy()
+        trace_df["_matching_timestamp"] = trace_df["Timestamp (ns)"][
+            trace_df["_matching_event"]
+        ].to_numpy()
 
         trace_df["_depth"] = 0
         trace_df["_parent"] = None
@@ -270,22 +295,30 @@ class NSightSQLiteReader:
 
         enter_mask = trace_df["Event Type"] == "Enter"
         cuda_api_mask = trace_df["Trace Type"] == "cuda_api"
-        calls_that_launch = trace_df.loc[cuda_api_mask & enter_mask].reset_index().merge(
-            trace_df.loc[~cuda_api_mask & enter_mask].reset_index(), on="id", how="inner"
+        calls_that_launch = (
+            trace_df.loc[cuda_api_mask & enter_mask]
+            .reset_index()
+            .merge(
+                trace_df.loc[~cuda_api_mask & enter_mask].reset_index(),
+                on="id",
+                how="inner",
+            )
         )
         # TODO: can get rid of the apply if we use an Arrow ListDtype for children
         # globally
         children = calls_that_launch["index_y"].apply(lambda x: [x])
         # Convert to numpy otherwise the index messes stuff up
-        trace_df.loc[calls_that_launch["index_x"].to_numpy(), "_children"] = children.to_numpy()
-        trace_df.loc[calls_that_launch["index_y"].to_numpy(), "_parent"] = calls_that_launch["index_x"].to_numpy()
+        trace_df.loc[calls_that_launch["index_x"].to_numpy(), "_children"] = (
+            children.to_numpy()
+        )
+        trace_df.loc[calls_that_launch["index_y"].to_numpy(), "_parent"] = (
+            calls_that_launch["index_x"].to_numpy()
+        )
 
         # Follow _match_caller_callee
         # _match_caller_callee also converts to a categorical of Int32
         trace_df = trace_df.astype({"_depth": "Int32", "_parent": "Int32"})
-        trace_df = trace_df.astype(
-            {"_depth": "category", "_parent": "category"}
-        )
+        trace_df = trace_df.astype({"_depth": "category", "_parent": "category"})
 
         # Cannot use ignore_index = True since that breaks the
         # _matching_event col

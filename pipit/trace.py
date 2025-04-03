@@ -551,13 +551,17 @@ class Trace:
         if per_process:
             return (
                 self.events.loc[self.events["Event Type"] == "Enter"]
-                .groupby([groupby_column] + self.parallelism_levels, observed=True)[metrics]
+                .groupby([groupby_column] + self.parallelism_levels, observed=True)[
+                    metrics
+                ]
                 .sum()
             )
         else:
             return (
                 self.events.loc[self.events["Event Type"] == "Enter"]
-                .groupby([groupby_column] + self.parallelism_levels, observed=True)[metrics]
+                .groupby([groupby_column] + self.parallelism_levels, observed=True)[
+                    metrics
+                ]
                 .sum()
                 .groupby(groupby_column)
                 .mean()
