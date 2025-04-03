@@ -6,7 +6,7 @@ import sqlite3
 
 class NSightSQLiteReader:
     # Dictionary mapping trace type
-    # (e.g. NVTX,
+    # (e.g. NVTX, CUDA API to SQL queries)
     _trace_queries = {
         "nvtx": [
             """

@@ -14,7 +14,8 @@ class Trace:
     includes one or more dataframes and a calling context tree.
     """
 
-    # TODO: default should be empty list for parallelism levels, we should update other readers
+    # TODO: default should be empty list for parallelism levels,
+    # we should update other readers
     def __init__(self, definitions, events, cct=None, parallelism_levels=["Process"]):
         """Create a new Trace object."""
         self.definitions = definitions
