@@ -1,46 +1,13 @@
 import numpy as np
 import pandas as pd
-
 import pipit.trace
 import sqlite3
-
-"""Need to read from the following tables:
-- CUPTI_ACTIVITY_KIND_RUNTIME
-- CUPTI_ACTIVITY_KIND_KERNEL
-- CUPTI_ACTIVITY_KIND_MEMSET
-- CUPTI_ACTIVITY_KIND_MEMCPY
-- NVTX_EVENTS
-
-Times are in nanoseconds
-"""
 
 
 class NSightSQLiteReader:
     # Dictionary mapping trace type
     # (e.g. NVTX,
     _trace_queries = {
-        # TODO: this is untested, find an application with nvtx
-        # support
-        # also likely broken from recent changes to this reader
-        # "nvtx": ["""
-        # SELECT
-        #     start as Enter,
-        #     end as Leave,
-        #     'annotation' as type,
-        #     rname.value AS Name,
-        #     (ne.globalTid >> 24) & 0x00FFFFFF AS "Process",
-        #     ne.globalTid & 0x00FFFFFF AS "Thread"
-        # FROM
-        #     NVTX_EVENTS as ne
-        # JOIN ThreadNames AS tname
-        #     ON ne.globalTid == tname.globalTid
-        # JOIN
-        #     StringIds AS rname
-        #     ON ne.textId = rname.id
-        # JOIN
-        #     StringIds AS rname2
-        #     ON tname.nameId = rname2.id
-        # """],
         "nvtx": [
             """
         SELECT
