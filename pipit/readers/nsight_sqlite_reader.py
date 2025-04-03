@@ -2,7 +2,6 @@ import numpy as np
 import pandas as pd
 
 import pipit.trace
-from pipit.graph import Graph, Node
 import sqlite3
 
 """Need to read from the following tables:
