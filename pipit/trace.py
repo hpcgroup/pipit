@@ -14,11 +14,13 @@ class Trace:
     includes one or more dataframes and a calling context tree.
     """
 
-    def __init__(self, definitions, events, cct=None):
+    # TODO: default should be empty list for parallelism levels, we should update other readers
+    def __init__(self, definitions, events, cct=None, parallelism_levels=["Process"]):
         """Create a new Trace object."""
         self.definitions = definitions
         self.events = events
         self.cct = cct
+        self.parallelism_levels = parallelism_levels
 
         # list of numeric columns which we can calculate inc/exc metrics with
         self.numeric_cols = list(
@@ -65,6 +67,14 @@ class Trace:
         from .readers.nsight_reader import NsightReader
 
         return NsightReader(filename, create_cct).read()
+
+    @staticmethod
+    def from_nsight_sqlite(filename, create_cct=False, trace_types="all"):
+        """Read an Nsight trace into a new Trace object."""
+        # import this lazily to avoid circular dependencies
+        from .readers.nsight_sqlite_reader import NSightSQLiteReader
+
+        return NSightSQLiteReader(filename, create_cct, trace_types).read()
 
     @staticmethod
     def from_csv(filename):
@@ -447,6 +457,7 @@ class Trace:
         """Generates histogram of message frequency by size."""
 
         # Filter by send events
+        # TODO: replace with str.match
         messages = self.events[self.events["Name"].isin(["MpiSend", "MpiIsend"])]
 
         # Get message sizes
@@ -540,13 +551,13 @@ class Trace:
         if per_process:
             return (
                 self.events.loc[self.events["Event Type"] == "Enter"]
-                .groupby([groupby_column, "Process"], observed=True)[metrics]
+                .groupby([groupby_column] + self.parallelism_levels, observed=True)[metrics]
                 .sum()
             )
         else:
             return (
                 self.events.loc[self.events["Event Type"] == "Enter"]
-                .groupby([groupby_column, "Process"], observed=True)[metrics]
+                .groupby([groupby_column] + self.parallelism_levels, observed=True)[metrics]
                 .sum()
                 .groupby(groupby_column)
                 .mean()
@@ -561,7 +572,7 @@ class Trace:
 
         Returns:
         A Pandas DataFrame indexed by function name that will have two columns:
-        one containing the imabalance which (max / mean) time for all ranks
+        one containing the imbalance which (max / mean) time for all ranks
         and the other containing a list of num_processes ranks with the highest
         imbalances
         """
@@ -585,14 +596,10 @@ class Trace:
         for function in functions:
             curr_series = flat_profile.loc[function]
 
-            top_n = curr_series.sort_values(by=metric, ascending=False).iloc[
-                0:num_display
-            ]
+            top_n = curr_series.sort_values(ascending=False).iloc[0:num_display]
 
-            imbalance_dict[mean_metric].append(curr_series.mean().values[0])
-            imbalance_dict[imb_metric].append(
-                (top_n.values[0] / curr_series.mean()).values[0]
-            )
+            imbalance_dict[mean_metric].append(curr_series.mean())
+            imbalance_dict[imb_metric].append(top_n.values[0] / curr_series.mean())
             imbalance_dict[imb_ranks].append(list(top_n.index))
 
         imbalance_df = pd.DataFrame(imbalance_dict)
