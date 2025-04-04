@@ -24,8 +24,6 @@ class NSightSQLiteReader:
             ON StringIds.id = ne.textId
         """
         ],
-        # TODO: verify that the code for extracting process and
-        # thread id is correct
         "cuda_api": [
             """
         SELECT
@@ -162,7 +160,6 @@ class NSightSQLiteReader:
         self.table_names = set(pd.read_sql_query(get_tables_query, self.conn).squeeze())
         self.trace_queries = NSightSQLiteReader._trace_queries.copy()
         if trace_types == "all":
-            # TODO: Not sure this option makes that much sense anymore
             # Even nsight has separate analyses for CUDA API summary, etc.
             # We do need a way to compare multiple traces side by side, though
 
@@ -293,8 +290,6 @@ class NSightSQLiteReader:
         if self.trace_types == ["gpu_trace"]:
             parallelism_levels = ["gpuId", "streamId"]
         elif self.trace_types == ["cuda_api"]:
-            # All CUDA calls in the same process/context are sequential?
-            # TODO: this should also map thread
             parallelism_levels = ["Process"]
         else:
             parallelism_levels = ["Process", "gpuId", "streamId"]

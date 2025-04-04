@@ -14,14 +14,16 @@ class Trace:
     includes one or more dataframes and a calling context tree.
     """
 
-    # TODO: default should be empty list for parallelism levels,
-    # we should update other readers
-    def __init__(self, definitions, events, cct=None, parallelism_levels=["Process"]):
+    def __init__(self, definitions, events, cct=None, parallelism_levels=None):
         """Create a new Trace object."""
         self.definitions = definitions
         self.events = events
         self.cct = cct
-        self.parallelism_levels = parallelism_levels
+        if parallelism_levels is None:
+            self.parallelism_levels = ["Process"]
+        else:
+            assert isinstance(parallelism_levels, list)
+            self.parallelism_levels = parallelism_levels
 
         # list of numeric columns which we can calculate inc/exc metrics with
         self.numeric_cols = list(
