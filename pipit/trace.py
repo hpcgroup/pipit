@@ -67,6 +67,14 @@ class Trace:
         return NsightReader(filename, create_cct).read()
 
     @staticmethod
+    def from_pytorch(dir_name, num_processes=None, create_cct=False):
+        """Read an PyTorch trace (perfetto json format) into a new Trace object."""
+        # import this lazily to avoid circular dependencies
+        from .readers.pytorch_reader import PytorchReader
+
+        return PytorchReader(dir_name, num_processes, create_cct).read()
+
+    @staticmethod
     def from_csv(filename):
         events_dataframe = pd.read_csv(filename, skipinitialspace=True)
 
@@ -117,26 +125,25 @@ class Trace:
                 self.events["Event Type"].isin(["Enter", "Leave"])
             ]
 
-            # list of processes and/or threads to iterate over
-            if "Thread" in self.events.columns:
-                exec_locations = set(zip(self.events["Process"], self.events["Thread"]))
-                has_thread = True
-            else:
-                exec_locations = set(self.events["Process"])
-                has_thread = False
+            exec_location_names = [
+                loc_name
+                for loc_name in ["Process", "Rank", "Thread"]
+                if loc_name in self.events.columns
+            ]
+            exec_locations = set(
+                zip(
+                    *[
+                        self.events[exec_location_name]
+                        for exec_location_name in exec_location_names
+                    ]
+                )
+            )
 
             for curr_loc in exec_locations:
-                # only filter by thread if the trace has a thread column
-                if has_thread:
-                    curr_process, curr_thread = curr_loc
-                    filtered_df = enter_leave_df.loc[
-                        (enter_leave_df["Process"] == curr_process)
-                        & (enter_leave_df["Thread"] == curr_thread)
-                    ]
-                else:
-                    filtered_df = enter_leave_df.loc[
-                        (enter_leave_df["Process"] == curr_loc)
-                    ]
+                filter_mask = np.full(len(enter_leave_df), True)
+                for i in range(len(curr_loc)):
+                    filter_mask &= enter_leave_df[exec_location_names[i]] == curr_loc[i]
+                filtered_df = enter_leave_df[filter_mask]
 
                 stack = []
 
@@ -218,26 +225,25 @@ class Trace:
                 )
             ]
 
-            # list of processes and/or threads to iterate over
-            if "Thread" in self.events.columns:
-                exec_locations = set(zip(self.events["Process"], self.events["Thread"]))
-                has_thread = True
-            else:
-                exec_locations = set(self.events["Process"])
-                has_thread = False
+            exec_location_names = [
+                loc_name
+                for loc_name in ["Process", "Rank", "Thread"]
+                if loc_name in self.events.columns
+            ]
+            exec_locations = set(
+                zip(
+                    *[
+                        self.events[exec_location_name]
+                        for exec_location_name in exec_location_names
+                    ]
+                )
+            )
 
             for curr_loc in exec_locations:
-                # only filter by thread if the trace has a thread column
-                if has_thread:
-                    curr_process, curr_thread = curr_loc
-                    filtered_df = enter_leave_df.loc[
-                        (enter_leave_df["Process"] == curr_process)
-                        & (enter_leave_df["Thread"] == curr_thread)
-                    ]
-                else:
-                    filtered_df = enter_leave_df.loc[
-                        (enter_leave_df["Process"] == curr_loc)
-                    ]
+                filter_mask = np.full(len(enter_leave_df), True)
+                for i in range(len(curr_loc)):
+                    filter_mask &= enter_leave_df[exec_location_names[i]] == curr_loc[i]
+                filtered_df = enter_leave_df[filter_mask]
 
                 # Depth is the level in the
                 # Call Tree starting from 0
