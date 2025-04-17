@@ -22,6 +22,9 @@ class NSightSQLiteReader:
             NVTX_EVENTS as ne
         LEFT JOIN StringIds
             ON StringIds.id = ne.textId
+        WHERE
+            -- Filter to only include range start/end and push/pop events
+            ne.eventType in (59, 60)
         """
         ],
         "cuda_api": [
@@ -101,7 +104,7 @@ class NSightSQLiteReader:
         JOIN CUPTI_ACTIVITY_KIND_RUNTIME as cuda_api
             ON cuda_memset.correlationId = cuda_api.correlationId
         """,
-            """
+        """
         SELECT
             cuda_sync.start as Enter,
             cuda_sync.end as Leave,
