@@ -213,11 +213,6 @@ class Trace:
         """
 
         if "_children" not in self.events.columns:
-            children = [None] * len(self.events)
-            depth, parent = [float("nan")] * len(self.events), [float("nan")] * len(
-                self.events
-            )
-
             # match events so we can
             # ignore unmatched ones
             self._match_events()
@@ -252,18 +247,21 @@ class Trace:
                         (enter_leave_df["Process"] == curr_loc)
                     ]
 
+                children = np.array([None] * len(filtered_df))
+                depth, parent = [float("nan")] * len(filtered_df), [float("nan")] * len(
+                    filtered_df
+                )
+
                 # Depth is the level in the
                 # Call Tree starting from 0
                 curr_depth = 0
 
                 stack = []
-                df_indices, event_types = list(filtered_df.index), list(
-                    filtered_df["Event Type"]
-                )
+                event_types = list(filtered_df["Event Type"])
 
                 # loop through the events of the filtered dataframe
                 for i in range(len(filtered_df)):
-                    curr_df_index, evt_type = df_indices[i], event_types[i]
+                    evt_type = event_types[i]
 
                     if evt_type == "Enter":
                         if curr_depth > 0:  # if event is a child of some other event
@@ -273,17 +271,17 @@ class Trace:
                                 # create a new list of children for the
                                 # parent if the current event is the first
                                 # child being added
-                                children[parent_df_index] = [curr_df_index]
+                                children[parent_df_index] = [filtered_df.index[i]]
                             else:
-                                children[parent_df_index].append(curr_df_index)
+                                children[parent_df_index].append(filtered_df.index[i])
 
-                            parent[curr_df_index] = parent_df_index
+                            parent[i] = filtered_df.index[parent_df_index]
 
-                        depth[curr_df_index] = curr_depth
+                        depth[i] = curr_depth
                         curr_depth += 1
 
                         # add enter dataframe index to stack
-                        stack.append(curr_df_index)
+                        stack.append(i)
                     else:
                         # pop event off stack once matching leave found
                         # Note: parent, and children for a leave row
@@ -293,11 +291,26 @@ class Trace:
 
                         curr_depth -= 1
 
-            self.events["_depth"], self.events["_parent"], self.events["_children"] = (
-                depth,
-                parent,
-                children,
-            )
+                curr_process = curr_loc
+                thread_mask = 1
+                if has_thread:
+                    curr_process, curr_thread = curr_loc
+                    thread_mask = self.events["Thread"] == curr_thread
+                mask = (
+                    self.events["Event Type"].isin(["Enter", "Leave"])
+                    & (self.events["_matching_event"].notnull())
+                    & (self.events["Process"] == curr_process)
+                    & thread_mask
+                )
+                (
+                    self.events.loc[mask, "_depth"],
+                    self.events.loc[mask, "_parent"],
+                    self.events.loc[mask, "_children"],
+                ) = (
+                    depth,
+                    parent,
+                    children,
+                )
 
             self.events = self.events.astype({"_depth": "Int32", "_parent": "Int32"})
             self.events = self.events.astype(

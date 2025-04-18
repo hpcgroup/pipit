@@ -22,6 +22,9 @@ class NSightSQLiteReader:
             NVTX_EVENTS as ne
         LEFT JOIN StringIds
             ON StringIds.id = ne.textId
+        WHERE
+            -- Filter to only include range start/end and push/pop events
+            ne.eventType in (59, 60)
         """
         ],
         "cuda_api": [
