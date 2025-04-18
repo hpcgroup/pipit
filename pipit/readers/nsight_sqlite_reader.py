@@ -104,7 +104,7 @@ class NSightSQLiteReader:
         JOIN CUPTI_ACTIVITY_KIND_RUNTIME as cuda_api
             ON cuda_memset.correlationId = cuda_api.correlationId
         """,
-        """
+            """
         SELECT
             cuda_sync.start as Enter,
             cuda_sync.end as Leave,

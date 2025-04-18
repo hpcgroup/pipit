@@ -302,7 +302,11 @@ class Trace:
                     & (self.events["Process"] == curr_process)
                     & thread_mask
                 )
-                self.events.loc[mask, "_depth"], self.events.loc[mask, "_parent"], self.events.loc[mask, "_children"] = (
+                (
+                    self.events.loc[mask, "_depth"],
+                    self.events.loc[mask, "_parent"],
+                    self.events.loc[mask, "_children"],
+                ) = (
                     depth,
                     parent,
                     children,
