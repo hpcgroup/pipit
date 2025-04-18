@@ -6,6 +6,8 @@
 import numpy as np
 from pipit import Trace
 
+from numpy.testing import assert_allclose
+
 
 def test_comm_matrix(data_dir, ping_pong_otf2_trace):
     # bytes sent between pairs of processes
@@ -160,13 +162,13 @@ def test_time_profile(data_dir, ping_pong_otf2_trace):
     exp_bin_size = exp_duration / 62
     bin_sizes = time_profile["bin_end"] - time_profile["bin_start"]
 
-    assert np.isclose(bin_sizes, exp_bin_size).all()
+    assert_allclose(bin_sizes, exp_bin_size)
 
     # check that sum of function contributions per bin equals bin duration
     exp_bin_total_duration = exp_bin_size * 2
     time_profile.drop(columns=["bin_start", "bin_end"], inplace=True)
 
-    assert np.isclose(time_profile.sum(axis=1), exp_bin_total_duration).all()
+    assert_allclose(time_profile.sum(axis=1), exp_bin_total_duration)
 
     # check for each function that sum of exc time per bin equals total exc time
     total_exc_times = trace.events.groupby("Name")["time.exc"].sum()
@@ -175,7 +177,7 @@ def test_time_profile(data_dir, ping_pong_otf2_trace):
         if column == "idle_time":
             continue
 
-        assert np.isclose(time_profile[column].sum(), total_exc_times[column])
+        assert_allclose(time_profile[column].sum(), total_exc_times[column])
 
     # check normalization
     norm = trace.time_profile(num_bins=62, normalized=True)
@@ -185,34 +187,34 @@ def test_time_profile(data_dir, ping_pong_otf2_trace):
 
     # check against ground truth
     # generated using Vampir's Function Summary chart (step size=16)
-    assert np.isclose(norm.loc[0]["int main(int, char**)"], 0.00299437)
-    assert np.isclose(norm.loc[0]["MPI_Init"], 0.93999815)
-    assert np.isclose(norm.loc[0]["MPI_Comm_size"], 0.0)
-    assert np.isclose(norm.loc[0]["MPI_Comm_rank"], 0.0)
-    assert np.isclose(norm.loc[0]["MPI_Send"], 0.0)
-    assert np.isclose(norm.loc[0]["MPI_Recv"], 0.0)
-    assert np.isclose(norm.loc[0]["MPI_Finalize"], 0.0)
+    assert_allclose(norm.loc[0]["int main(int, char**)"], 0.00299437, rtol=1e-05)
+    assert_allclose(norm.loc[0]["MPI_Init"], 0.93999815)
+    assert_allclose(norm.loc[0]["MPI_Comm_size"], 0.0)
+    assert_allclose(norm.loc[0]["MPI_Comm_rank"], 0.0)
+    assert_allclose(norm.loc[0]["MPI_Send"], 0.0)
+    assert_allclose(norm.loc[0]["MPI_Recv"], 0.0)
+    assert_allclose(norm.loc[0]["MPI_Finalize"], 0.0)
 
-    assert np.isclose(norm.loc[1:59]["int main(int, char**)"], 0.0).all()
-    assert np.isclose(norm.loc[1:59]["MPI_Init"], 1.0).all()
-    assert np.isclose(norm.loc[1:59]["MPI_Comm_size"], 0.0).all()
-    assert np.isclose(norm.loc[1:59]["MPI_Comm_rank"], 0.0).all()
-    assert np.isclose(norm.loc[1:59]["MPI_Send"], 0.0).all()
-    assert np.isclose(norm.loc[1:59]["MPI_Recv"], 0.0).all()
-    assert np.isclose(norm.loc[1:59]["MPI_Finalize"], 0.0).all()
+    assert_allclose(norm.loc[1:59]["int main(int, char**)"], 0.0)
+    assert_allclose(norm.loc[1:59]["MPI_Init"], 1.0)
+    assert_allclose(norm.loc[1:59]["MPI_Comm_size"], 0.0)
+    assert_allclose(norm.loc[1:59]["MPI_Comm_rank"], 0.0)
+    assert_allclose(norm.loc[1:59]["MPI_Send"], 0.0)
+    assert_allclose(norm.loc[1:59]["MPI_Recv"], 0.0)
+    assert_allclose(norm.loc[1:59]["MPI_Finalize"], 0.0)
 
-    assert np.isclose(norm.loc[60]["int main(int, char**)"], 0.39464799)
-    assert np.isclose(norm.loc[60]["MPI_Init"], 0.14843661)
-    assert np.isclose(norm.loc[60]["MPI_Send"], 0.24594134)
-    assert np.isclose(norm.loc[60]["MPI_Recv"], 0.21017099)
-    assert np.isclose(norm.loc[60]["MPI_Comm_size"], 0.00046047)
-    assert np.isclose(norm.loc[60]["MPI_Comm_rank"], 0.00034261)
-    assert np.isclose(norm.loc[60]["MPI_Finalize"], 0.0)
+    assert_allclose(norm.loc[60]["int main(int, char**)"], 0.39464799)
+    assert_allclose(norm.loc[60]["MPI_Init"], 0.14843661)
+    assert_allclose(norm.loc[60]["MPI_Send"], 0.24594134)
+    assert_allclose(norm.loc[60]["MPI_Recv"], 0.21017099)
+    assert_allclose(norm.loc[60]["MPI_Comm_size"], 0.00046047, rtol=1e-05)
+    assert_allclose(norm.loc[60]["MPI_Comm_rank"], 0.00034261, rtol=1e-05)
+    assert_allclose(norm.loc[60]["MPI_Finalize"], 0.0)
 
-    assert np.isclose(norm.loc[61]["int main(int, char**)"], 0.43560727)
-    assert np.isclose(norm.loc[61]["MPI_Init"], 0.0)
-    assert np.isclose(norm.loc[61]["MPI_Send"], 0.29640222)
-    assert np.isclose(norm.loc[61]["MPI_Recv"], 0.24300865)
-    assert np.isclose(norm.loc[61]["MPI_Comm_size"], 0.0)
-    assert np.isclose(norm.loc[61]["MPI_Comm_rank"], 0.0)
-    assert np.isclose(norm.loc[61]["MPI_Finalize"], 0.01614835)
+    assert_allclose(norm.loc[61]["int main(int, char**)"], 0.43560727)
+    assert_allclose(norm.loc[61]["MPI_Init"], 0.0)
+    assert_allclose(norm.loc[61]["MPI_Send"], 0.29640222)
+    assert_allclose(norm.loc[61]["MPI_Recv"], 0.24300865)
+    assert_allclose(norm.loc[61]["MPI_Comm_size"], 0.0)
+    assert_allclose(norm.loc[61]["MPI_Comm_rank"], 0.0)
+    assert_allclose(norm.loc[61]["MPI_Finalize"], 0.01614835, rtol=1e-05)
