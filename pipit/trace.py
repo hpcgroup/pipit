@@ -269,7 +269,19 @@ class Trace:
                 new_df["_children"] = children
                 return new_df
 
-            self.events = self.events.groupby(self.parallelism_levels, group_keys=False, dropna=False).apply(
+            # only use enter and leave rows
+            # to determine calling relationships
+            enter_leave_mask = (
+                self.events["Event Type"].isin(["Enter", "Leave"])
+                & (self.events["_matching_event"].notnull())
+            )
+            enter_leave_df = self.events.loc[enter_leave_mask]
+
+            # add dummy values for depth/parent/children (otherwise loc won't insert the values)
+            self.events["_depth"] = 0
+            self.events["_parent"] = None
+            self.events["_children"] = None
+            self.events.loc[enter_leave_mask] = enter_leave_df.groupby(self.parallelism_levels, group_keys=False, dropna=False).apply(
                 _match_caller_callee_by_level
             )
 
