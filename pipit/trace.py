@@ -263,7 +263,7 @@ class Trace:
 
                         curr_depth -= 1
 
-                new_df = filtered_df.copy() # don't mutate in transform!
+                new_df = filtered_df.copy()  # don't mutate in transform!
                 new_df["_depth"] = depth
                 new_df["_parent"] = parent
                 new_df["_children"] = children
@@ -271,24 +271,22 @@ class Trace:
 
             # only use enter and leave rows
             # to determine calling relationships
-            enter_leave_mask = (
-                self.events["Event Type"].isin(["Enter", "Leave"])
-                & (self.events["_matching_event"].notnull())
+            enter_leave_mask = self.events["Event Type"].isin(["Enter", "Leave"]) & (
+                self.events["_matching_event"].notnull()
             )
             enter_leave_df = self.events.loc[enter_leave_mask]
 
-            # add dummy values for depth/parent/children (otherwise loc won't insert the values)
+            # add dummy values for depth/parent/children
+            # (otherwise loc won't insert the values)
             self.events["_depth"] = 0
             self.events["_parent"] = None
             self.events["_children"] = None
-            self.events.loc[enter_leave_mask] = enter_leave_df.groupby(self.parallelism_levels, group_keys=False, dropna=False).apply(
-                _match_caller_callee_by_level
-            )
+            self.events.loc[enter_leave_mask] = enter_leave_df.groupby(
+                self.parallelism_levels, group_keys=False, dropna=False
+            ).apply(_match_caller_callee_by_level)
 
         self.events = self.events.astype({"_depth": "Int32", "_parent": "Int32"})
-        self.events = self.events.astype(
-            {"_depth": "category", "_parent": "category"}
-        )
+        self.events = self.events.astype({"_depth": "category", "_parent": "category"})
 
     def calc_inc_metrics(self, columns=None):
         # if no columns are specified by the user, then we calculate
@@ -365,10 +363,16 @@ class Trace:
                         # relative to e.g. a kernel launch
                         inc_metric = inc_values[child_idx]
                         if col == "Timestamp (ns)":
-                            # calculate overlap between start of child event and end of parent
-                            # event
-                            end_time = min(self.events.loc[curr_parent_idx, "_matching_timestamp"], self.events.loc[child_idx, "_matching_timestamp"])
-                            inc_metric = max(end_time - self.events.loc[child_idx, "Timestamp (ns)"], 0)
+                            # calculate overlap between
+                            # start of child event and end of parent event
+                            end_time = min(
+                                self.events.loc[curr_parent_idx, "_matching_timestamp"],
+                                self.events.loc[child_idx, "_matching_timestamp"],
+                            )
+                            inc_metric = max(
+                                end_time - self.events.loc[child_idx, "Timestamp (ns)"],
+                                0,
+                            )
                         exc_values[curr_parent_idx] -= inc_metric
 
                 self.events[metric_col_name] = exc_values
@@ -633,9 +637,13 @@ class Trace:
             idle_time += events[events["Name"].isin(idle_functions)]["time.inc"].sum()
             return idle_time
 
-        return self.events.groupby(self.parallelism_levels, dropna=False).apply(
-            calc_idle_time,
-        ).rename("idle_time")
+        return (
+            self.events.groupby(self.parallelism_levels, dropna=False)
+            .apply(
+                calc_idle_time,
+            )
+            .rename("idle_time")
+        )
 
     def _calculate_idle_time_for_process(
         self, process, idle_functions=["Idle"], mpi_events=False
