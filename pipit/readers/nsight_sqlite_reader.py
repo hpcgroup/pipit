@@ -229,12 +229,11 @@ class NSightSQLiteReader:
             value_name="Timestamp (ns)",
         )
 
-        if "bytes" in trace_df.columns:
-            trace_df = trace_df.astype(
-                {
-                    "bytes": "Int64",
-                }
-            )
+        # Convert to the pandas nullable dtypes
+        # This will help preserve e.g. streamId as an
+        # integer column with nulls instead of casting to
+        # float64
+        trace_df = trace_df.convert_dtypes()
 
         # Cache mapping
         trace_df["_matching_event"] = np.concatenate(
@@ -249,9 +248,24 @@ class NSightSQLiteReader:
             trace_df["_matching_event"]
         ].to_numpy()
 
-        trace_df["_depth"] = 0
-        trace_df["_parent"] = None
-        trace_df["_children"] = None
+        # Cannot use ignore_index = True since that breaks the
+        # _matching_event col
+        trace_df = trace_df.sort_values(by="Timestamp (ns)")
+
+        if self.trace_types == ["gpu_trace"]:
+            parallelism_levels = ["gpuId", "streamId"]
+        elif self.trace_types == ["cuda_api"]:
+            parallelism_levels = ["Process"]
+        else:
+            parallelism_levels = ["Process", "gpuId", "streamId"]
+
+        trace = pipit.trace.Trace(None, trace_df, parallelism_levels=parallelism_levels)
+        if self.create_cct:
+            trace.create_cct()
+
+        # Call match caller callee to recreate hierarchical
+        # relationship between annotations
+        trace._match_caller_callee()
 
         # Associate CUDA API calls with memory operations or
         # kernel launches
@@ -281,23 +295,4 @@ class NSightSQLiteReader:
             calls_that_launch["index_x"].to_numpy()
         )
 
-        # Follow _match_caller_callee
-        # _match_caller_callee also converts to a categorical of Int32
-        trace_df = trace_df.astype({"_depth": "Int32", "_parent": "Int32"})
-        trace_df = trace_df.astype({"_depth": "category", "_parent": "category"})
-
-        # Cannot use ignore_index = True since that breaks the
-        # _matching_event col
-        trace_df = trace_df.sort_values(by="Timestamp (ns)")
-
-        if self.trace_types == ["gpu_trace"]:
-            parallelism_levels = ["gpuId", "streamId"]
-        elif self.trace_types == ["cuda_api"]:
-            parallelism_levels = ["Process"]
-        else:
-            parallelism_levels = ["Process", "gpuId", "streamId"]
-
-        trace = pipit.trace.Trace(None, trace_df, parallelism_levels=parallelism_levels)
-        if self.create_cct:
-            trace.create_cct()
         return trace
