@@ -294,5 +294,5 @@ class NSightSQLiteReader:
         trace_df.loc[calls_that_launch["index_y"].to_numpy(), "_parent"] = (
             calls_that_launch["index_x"].to_numpy()
         )
-
+        trace.events = trace_df
         return trace

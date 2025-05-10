@@ -5,6 +5,8 @@
 
 import numpy as np
 import pandas as pd
+
+import pipit
 from pipit.util.cct import create_cct
 
 
@@ -896,3 +898,77 @@ class Trace:
             patterns.append(match_original)
 
         return patterns
+
+    def time_breakdown(self):
+        # Time breakdown by annotation
+        # Counts time in annotation
+        # + time in launched kernels
+        ann_events = self.events[
+            (self.events["type"] == "annotation") &
+            (self.events["Event Type"] == "Enter")
+        ]
+
+        # TODO: provide breakdowns within annotation
+        # as well?
+
+        # Amount of time we spend in the label
+        # TODO: can break this down further into CUDA API/kernel launch
+        # time, and other events
+        cpu_time = ann_events.groupby("Name")["time.inc"].sum()
+
+        ann_kernel_times = pd.Series([0] * len(cpu_time), index=cpu_time.index, name="time.inc")
+
+        def _calc_kernel_time(row):
+            # locate the launch event for the kernel
+            # and binary search the start time of the launch
+            # event in annotation events in order to find the
+            # corresponding annotation
+            parent = row["_parent"]
+            # note: parent is always an enter event
+            launch_start = self.events.loc[parent, "Timestamp (ns)"]
+            # we don't use annotation df from above, since we need
+            # leave events also here
+            ann_df = self.events[self.events["type"] == "annotation"]
+            idx = np.searchsorted(ann_df["Timestamp (ns)"], launch_start)
+
+            ann_event = ann_df.iloc[idx]
+            ann_kernel_times.loc[ann_event["Name"]] += row["time.inc"]
+            # dummy return
+            # TODO: maybe there is a more efficient/cleaner way to do this
+            return 0
+
+        kernels = self.events[
+            (self.events["type"] == "kernel") &
+            (self.events["Event Type"] == "Enter")
+        ]
+        kernels.apply(
+            _calc_kernel_time,
+            axis=1,
+        )
+        return cpu_time + ann_kernel_times
+
+    def filter_by_label(self, label_name):
+        """
+        Filters trace to find kernels
+        that occurred during this time frame
+        and their associated launch events
+        """
+        # Find the annotations
+        events = self.events
+        annotation = events[
+            (events["Name"] == label_name) & (events["type"] == "annotation")
+            ]
+        assert (len(annotation) == 2)
+        # This is OK since we sorted by time
+        # TODO: we should do more error checking here though
+        start = annotation.iloc[0]["Timestamp (ns)"]
+        end = annotation.iloc[1]["Timestamp (ns)"]
+
+        # Filter events to find those with timestamp in range
+        return Trace(
+            None,
+            events[
+                (events["Timestamp (ns)"] >= start) & (events["Timestamp (ns)"] <= end)
+            ],
+            self.parallelism_levels
+        )
