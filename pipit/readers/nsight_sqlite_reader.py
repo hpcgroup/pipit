@@ -284,12 +284,9 @@ class NSightSQLiteReader:
                 how="inner",
             )
         )
-        # TODO: can get rid of the apply if we use an Arrow ListDtype for children
-        # globally
-        children = calls_that_launch["index_y"].apply(lambda x: [x])
         # Convert to numpy otherwise the index messes stuff up
-        trace_df.loc[calls_that_launch["index_x"].to_numpy(), "_children"] = (
-            children.to_numpy()
+        trace_df.loc[calls_that_launch["index_x"].to_numpy(), "_kernel_launch"] = (
+            calls_that_launch["index_y"].to_numpy()
         )
         trace_df.loc[calls_that_launch["index_y"].to_numpy(), "_parent"] = (
             calls_that_launch["index_x"].to_numpy()

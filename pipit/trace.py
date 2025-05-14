@@ -899,14 +899,47 @@ class Trace:
 
         return patterns
 
-    def time_breakdown(self):
-        # Time breakdown by annotation
-        # Counts time in annotation
-        # + time in launched kernels
+    def time_breakdown(self, filter_regex = None, depth = None):
+        """Time breakdown by annotation.
+        Counts time in annotation + time in launched kernels.
+
+        If filtering by depth or regex is specified, all events that
+        don't match the specified depth/regex will be counted in the "Other"
+        category.
+
+        Parameters
+        ----------
+        filter_regex: str, list, optional
+            A regex string or list of regexes to select specific annotations
+            to include in the breakdown.
+        depth: int, optional
+            Only events at specified depth will be included in the breakdown.
+            Default of None includes all events in breakdown.
+            Use -1 to filter to events with no children
+        """
         ann_events = self.events[
             (self.events["type"] == "annotation") &
             (self.events["Event Type"] == "Enter")
         ]
+
+        if filter_regex is not None:
+            if isinstance(filter_regex, list):
+                filter_regex = "|".join(filter_regex)
+            ann_events = ann_events[
+                ann_events["Name"].str.contains(filter_regex)
+            ]
+
+        if depth is not None:
+            if depth == -1:
+                children = ann_events["_children"].explode()
+                mask = children.groupby(children.index).apply(
+                    # If any child is an annotation, than
+                    # the current annotation is not at the lowest level
+                    lambda x: ~(x.isin(children.index).any())
+                )
+                ann_events = ann_events[mask]
+            else:
+                ann_events = ann_events[ann_events["_depth"] == depth]
 
         # TODO: provide breakdowns within annotation
         # as well?
@@ -915,6 +948,7 @@ class Trace:
         # TODO: can break this down further into CUDA API/kernel launch
         # time, and other events
         cpu_time = ann_events.groupby("Name")["time.inc"].sum()
+        print(cpu_time.index)
 
         ann_kernel_times = pd.Series([0] * len(cpu_time), index=cpu_time.index, name="time.inc")
 
@@ -931,21 +965,43 @@ class Trace:
             ann_df = self.events[self.events["type"] == "annotation"]
             idx = np.searchsorted(ann_df["Timestamp (ns)"], launch_start)
 
-            ann_event = ann_df.iloc[idx]
-            ann_kernel_times.loc[ann_event["Name"]] += row["time.inc"]
+            # update for annotation that launched us
+            # note: searchsorted gives us the leave event (we need the enter event)
+            leave_event = ann_df.iloc[idx]
+            ann_event = ann_df.loc[leave_event["_matching_event"]]
+            if ann_event["Name"] in ann_kernel_times.index:
+                ann_kernel_times.loc[ann_event["Name"]] += row["time.inc"]
+            idx = ann_event["_parent"]
+
+            # update parents of that annotation
+            while idx in ann_df.index and ann_df.loc[idx, "Name"] in ann_kernel_times.index:
+                ann_event = ann_df.loc[idx]
+                ann_kernel_times.loc[ann_event["Name"]] += row["time.inc"]
+                idx = ann_event["_parent"]
+
             # dummy return
             # TODO: maybe there is a more efficient/cleaner way to do this
             return 0
 
         kernels = self.events[
-            (self.events["type"] == "kernel") &
-            (self.events["Event Type"] == "Enter")
+            (self.events["Event Type"] == "Enter") &
+            self.events["type"].isin(["kernel", "comm"])
         ]
         kernels.apply(
             _calc_kernel_time,
             axis=1,
         )
-        return cpu_time + ann_kernel_times
+        ann_time = cpu_time + ann_kernel_times
+
+        # Calculate time in other events
+        # This is sum of exclusive time (total time) - time in
+        # annotations (and kernels launched by those annotations)
+        total_time = pd.concat([
+            ann_time,
+            pd.Series(self.events["time.exc"].sum() - ann_time.sum(), index=["Other"], name="time.inc")
+        ])
+
+        return total_time
 
     def filter_by_label(self, label_name):
         """
@@ -965,10 +1021,25 @@ class Trace:
         end = annotation.iloc[1]["Timestamp (ns)"]
 
         # Filter events to find those with timestamp in range
+        # and events whose parents are in that range
+        # (i.e. we want to include GPU kernels that were launched in the range
+        # even if they executed later)
+
+        host_events = events[
+            (events["Timestamp (ns)"] >= start) & (events["Timestamp (ns)"] <= end)
+        ]
+
+        # Use explode to expand every child in children list to a row
+        # This can include duplicates (e.g. for nested annotations) that we should drop
+        kernels = events.loc[host_events["_children"].dropna().explode().to_numpy()]
+
+        range_events = pd.concat([host_events, kernels])
+        range_events = range_events[
+            ~range_events.index.duplicated(keep="first")
+        ]
+
         return Trace(
             None,
-            events[
-                (events["Timestamp (ns)"] >= start) & (events["Timestamp (ns)"] <= end)
-            ],
+            range_events,
             self.parallelism_levels
         )
