@@ -529,12 +529,30 @@ class Trace:
         return pd.DataFrame({"Sent": sent, "Received": received}).rename_axis("Process")
 
     def flat_profile(
-        self, metrics="time.exc", groupby_column="Name", per_process=False
+        self,
+        metrics="time.exc",
+        groupby_column="Name",
+        mapper=None,
+        parallelism_level=None,
+        ascending=None,
+        idle_time=False
     ):
         """
         Arguments:
         metrics - a string or list of strings containing the metrics to be aggregated
         groupby_column - a string or list containing the columns to be grouped by
+        mapper - an optional dict that specifies which labels to group together.
+        Dict can either map from group -> str pattern, or group -> list or strings to match.
+        Labels should not belong to multiple groups.
+        e.g.
+        mapper = {
+            "matmul": ["ampere_matmul1", "ampere_matmul2", "ampere_matmul3"]
+        }
+        Unspecified labels will be grouped into other.
+        parallelism_level - a string or list specifying parallelism levels (e.g. process, thread, gpu, stream)
+        to group events by.
+        ascending - Boolean, whether to sort results in ascending order. Default None (no sorting)
+        idle_time - Whether to also include idle time as a category.
 
         Returns:
         A Pandas DataFrame that will have the aggregated metrics
@@ -554,24 +572,44 @@ class Trace:
         # This first groups by both the process and the specified groupby
         # column (like name). It then sums up the metrics for each combination
         # of the process and the groupby column.
-        if per_process:
-            return (
-                self.events.loc[self.events["Event Type"] == "Enter"]
-                .groupby([groupby_column] + self.parallelism_levels, observed=True)[
-                    metrics
-                ]
-                .sum()
-            )
-        else:
-            return (
-                self.events.loc[self.events["Event Type"] == "Enter"]
-                .groupby([groupby_column] + self.parallelism_levels, observed=True)[
-                    metrics
-                ]
-                .sum()
-                .groupby(groupby_column)
-                .mean()
-            )
+
+        if parallelism_level is None:
+            parallelism_level = self.parallelism_levels
+
+        res = (
+            self.events.loc[self.events["Event Type"] == "Enter"]
+            .groupby([groupby_column] + parallelism_level, observed=True, as_index=False)[
+                metrics
+            ]
+            .sum()
+        )
+        # Postprocessing using mapper
+        if mapper is not None:
+            # pandas expects label->group
+            labels = res["Name"]
+            pd_grouper = {label:"Other" for label in labels}
+            for group, pats in mapper.items():
+                if isinstance(pats, str):
+                    mask = labels.str.contains(pats)
+                else:
+                    mask = labels.isin(pats)
+                for label in labels[mask]:
+                    pd_grouper[label] = group
+            res = res.set_index("Name").groupby([pd_grouper] + parallelism_level)[["time.exc"]].sum()
+
+        if idle_time:
+            idle_times = pd.DataFrame(self.idle_time().groupby(parallelism_level).sum())
+            idle_times["Name"] = "Idle Time"
+            idle_times = idle_times.set_index("Name", append=True)
+            idle_times = idle_times.reorder_levels([groupby_column] + parallelism_level)
+            idle_times = idle_times.rename(columns={"idle_time": "time.exc"})
+
+            res = pd.concat([res, idle_times], axis=0)
+
+        if ascending is not None:
+            res = res.sort_values(by="time.exc", ascending=ascending)
+
+        return res
 
     def load_imbalance(self, metric="time.exc", num_processes=1):
         """
@@ -640,7 +678,7 @@ class Trace:
             return idle_time
 
         return (
-            self.events.groupby(self.parallelism_levels, dropna=False)
+            self.events.groupby(self.parallelism_levels)
             .apply(
                 calc_idle_time,
             )
@@ -916,6 +954,11 @@ class Trace:
             Only events at specified depth will be included in the breakdown.
             Default of None includes all events in breakdown.
             Use -1 to filter to events with no children
+
+        Returns
+        -------
+        Series
+            Series with annotation name as index and time as the values.
         """
         ann_events = self.events[
             (self.events["type"] == "annotation") &
@@ -1041,5 +1084,5 @@ class Trace:
         return Trace(
             None,
             range_events,
-            self.parallelism_levels
+            parallelism_levels=self.parallelism_levels
         )
