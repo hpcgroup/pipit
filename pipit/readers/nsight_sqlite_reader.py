@@ -68,63 +68,63 @@ class NSightSQLiteReader:
         JOIN CUPTI_ACTIVITY_KIND_RUNTIME as cuda_api
             ON cuda_gpu.correlationId = cuda_api.correlationId
         """,
-        # TODO: reading these events are disabled for now since
-        # nothing uses them ATM. Please remove if they have been
-        # commented out like this for a while.
-        #     """
-        # SELECT
-        #     cuda_memcpy.start as Enter,
-        #     cuda_memcpy.end as Leave,
-        #     cuda_memcpy.deviceId as gpuId,
-        #     memcpy_labels.name as Name,
-        #     cuda_memcpy.streamId,
-        #     'cuda_memcpy' as type,
-        #     bytes,
-        #     cuda_memcpy.correlationId as id,
-        #     (cuda_api.globalTid >> 24) & 0x00FFFFFF AS "Process",
-        #     null as meta
-        # FROM CUPTI_ACTIVITY_KIND_MEMCPY as cuda_memcpy
-        # JOIN ENUM_CUDA_MEMCPY_OPER as memcpy_labels
-        #     ON cuda_memcpy.copyKind = memcpy_labels.id
-        # JOIN CUPTI_ACTIVITY_KIND_RUNTIME as cuda_api
-        #     ON cuda_memcpy.correlationId = cuda_api.correlationId
-        # """,
-        #     """
-        # SELECT
-        #     cuda_memset.start as Enter,
-        #     cuda_memset.end as Leave,
-        #     cuda_memset.deviceId as gpuId,
-        #     memset_labels.name as Name,
-        #     streamId,
-        #     'cuda_memset' as type,
-        #     bytes,
-        #     cuda_memset.correlationId as id,
-        #     (cuda_api.globalTid >> 24) & 0x00FFFFFF AS "Process",
-        #     null as meta
-        # FROM CUPTI_ACTIVITY_KIND_MEMSET as cuda_memset
-        # JOIN ENUM_CUDA_MEM_KIND as memset_labels
-        #     ON cuda_memset.memKind = memset_labels.id
-        # JOIN CUPTI_ACTIVITY_KIND_RUNTIME as cuda_api
-        #     ON cuda_memset.correlationId = cuda_api.correlationId
-        # """,
-        #     """
-        # SELECT
-        #     cuda_sync.start as Enter,
-        #     cuda_sync.end as Leave,
-        #     cuda_sync.deviceId as gpuId,
-        #     sync_labels.name as Name,
-        #     cuda_sync.streamId,
-        #     'cuda_sync' as type,
-        #     null as bytes,
-        #     cuda_sync.correlationId as id,
-        #     (cuda_api.globalTid >> 24) & 0x00FFFFFF AS "Process",
-        #     null as meta
-        # FROM CUPTI_ACTIVITY_KIND_SYNCHRONIZATION as cuda_sync
-        # JOIN ENUM_CUPTI_SYNC_TYPE as sync_labels
-        #     ON cuda_sync.syncType = sync_labels.id
-        # JOIN CUPTI_ACTIVITY_KIND_RUNTIME as cuda_api
-        #     ON cuda_sync.correlationId = cuda_api.correlationId
-        # """,
+            # TODO: reading these events are disabled for now since
+            # nothing uses them ATM. Please remove if they have been
+            # commented out like this for a while.
+            #     """
+            # SELECT
+            #     cuda_memcpy.start as Enter,
+            #     cuda_memcpy.end as Leave,
+            #     cuda_memcpy.deviceId as gpuId,
+            #     memcpy_labels.name as Name,
+            #     cuda_memcpy.streamId,
+            #     'cuda_memcpy' as type,
+            #     bytes,
+            #     cuda_memcpy.correlationId as id,
+            #     (cuda_api.globalTid >> 24) & 0x00FFFFFF AS "Process",
+            #     null as meta
+            # FROM CUPTI_ACTIVITY_KIND_MEMCPY as cuda_memcpy
+            # JOIN ENUM_CUDA_MEMCPY_OPER as memcpy_labels
+            #     ON cuda_memcpy.copyKind = memcpy_labels.id
+            # JOIN CUPTI_ACTIVITY_KIND_RUNTIME as cuda_api
+            #     ON cuda_memcpy.correlationId = cuda_api.correlationId
+            # """,
+            #     """
+            # SELECT
+            #     cuda_memset.start as Enter,
+            #     cuda_memset.end as Leave,
+            #     cuda_memset.deviceId as gpuId,
+            #     memset_labels.name as Name,
+            #     streamId,
+            #     'cuda_memset' as type,
+            #     bytes,
+            #     cuda_memset.correlationId as id,
+            #     (cuda_api.globalTid >> 24) & 0x00FFFFFF AS "Process",
+            #     null as meta
+            # FROM CUPTI_ACTIVITY_KIND_MEMSET as cuda_memset
+            # JOIN ENUM_CUDA_MEM_KIND as memset_labels
+            #     ON cuda_memset.memKind = memset_labels.id
+            # JOIN CUPTI_ACTIVITY_KIND_RUNTIME as cuda_api
+            #     ON cuda_memset.correlationId = cuda_api.correlationId
+            # """,
+            #     """
+            # SELECT
+            #     cuda_sync.start as Enter,
+            #     cuda_sync.end as Leave,
+            #     cuda_sync.deviceId as gpuId,
+            #     sync_labels.name as Name,
+            #     cuda_sync.streamId,
+            #     'cuda_sync' as type,
+            #     null as bytes,
+            #     cuda_sync.correlationId as id,
+            #     (cuda_api.globalTid >> 24) & 0x00FFFFFF AS "Process",
+            #     null as meta
+            # FROM CUPTI_ACTIVITY_KIND_SYNCHRONIZATION as cuda_sync
+            # JOIN ENUM_CUPTI_SYNC_TYPE as sync_labels
+            #     ON cuda_sync.syncType = sync_labels.id
+            # JOIN CUPTI_ACTIVITY_KIND_RUNTIME as cuda_api
+            #     ON cuda_sync.correlationId = cuda_api.correlationId
+            # """,
             """
         SELECT
             cuda_graph.start as Enter,

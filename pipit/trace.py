@@ -535,7 +535,7 @@ class Trace:
         mapper=None,
         parallelism_level=None,
         ascending=None,
-        idle_time=False
+        idle_time=False,
     ):
         """
         Arguments:
@@ -578,16 +578,16 @@ class Trace:
 
         res = (
             self.events.loc[self.events["Event Type"] == "Enter"]
-            .groupby([groupby_column] + parallelism_level, observed=True, as_index=False)[
-                metrics
-            ]
+            .groupby(
+                [groupby_column] + parallelism_level, observed=True, as_index=False
+            )[metrics]
             .sum()
         )
         # Postprocessing using mapper
         if mapper is not None:
             # pandas expects label->group
             labels = res["Name"]
-            pd_grouper = {label:"Other" for label in labels}
+            pd_grouper = {label: "Other" for label in labels}
             for group, pats in mapper.items():
                 if isinstance(pats, str):
                     mask = labels.str.contains(pats)
@@ -595,7 +595,11 @@ class Trace:
                     mask = labels.isin(pats)
                 for label in labels[mask]:
                     pd_grouper[label] = group
-            res = res.set_index("Name").groupby([pd_grouper] + parallelism_level)[["time.exc"]].sum()
+            res = (
+                res.set_index("Name")
+                .groupby([pd_grouper] + parallelism_level)[["time.exc"]]
+                .sum()
+            )
 
         if idle_time:
             idle_times = pd.DataFrame(self.idle_time().groupby(parallelism_level).sum())
@@ -937,7 +941,7 @@ class Trace:
 
         return patterns
 
-    def time_breakdown(self, filter_regex = None, depth = None):
+    def time_breakdown(self, filter_regex=None, depth=None):
         """Time breakdown by annotation.
         Counts time in annotation + time in launched kernels.
 
@@ -961,16 +965,14 @@ class Trace:
             Series with annotation name as index and time as the values.
         """
         ann_events = self.events[
-            (self.events["type"] == "annotation") &
-            (self.events["Event Type"] == "Enter")
+            (self.events["type"] == "annotation")
+            & (self.events["Event Type"] == "Enter")
         ]
 
         if filter_regex is not None:
             if isinstance(filter_regex, list):
                 filter_regex = "|".join(filter_regex)
-            ann_events = ann_events[
-                ann_events["Name"].str.contains(filter_regex)
-            ]
+            ann_events = ann_events[ann_events["Name"].str.contains(filter_regex)]
 
         if depth is not None:
             if depth == -1:
@@ -993,7 +995,9 @@ class Trace:
         cpu_time = ann_events.groupby("Name")["time.inc"].sum()
         print(cpu_time.index)
 
-        ann_kernel_times = pd.Series([0] * len(cpu_time), index=cpu_time.index, name="time.inc")
+        ann_kernel_times = pd.Series(
+            [0] * len(cpu_time), index=cpu_time.index, name="time.inc"
+        )
 
         def _calc_kernel_time(row):
             # locate the launch event for the kernel
@@ -1017,7 +1021,10 @@ class Trace:
             idx = ann_event["_parent"]
 
             # update parents of that annotation
-            while idx in ann_df.index and ann_df.loc[idx, "Name"] in ann_kernel_times.index:
+            while (
+                idx in ann_df.index
+                and ann_df.loc[idx, "Name"] in ann_kernel_times.index
+            ):
                 ann_event = ann_df.loc[idx]
                 ann_kernel_times.loc[ann_event["Name"]] += row["time.inc"]
                 idx = ann_event["_parent"]
@@ -1027,8 +1034,8 @@ class Trace:
             return 0
 
         kernels = self.events[
-            (self.events["Event Type"] == "Enter") &
-            self.events["type"].isin(["kernel", "comm"])
+            (self.events["Event Type"] == "Enter")
+            & self.events["type"].isin(["kernel", "comm"])
         ]
         kernels.apply(
             _calc_kernel_time,
@@ -1039,10 +1046,16 @@ class Trace:
         # Calculate time in other events
         # This is sum of exclusive time (total time) - time in
         # annotations (and kernels launched by those annotations)
-        total_time = pd.concat([
-            ann_time,
-            pd.Series(self.events["time.exc"].sum() - ann_time.sum(), index=["Other"], name="time.inc")
-        ])
+        total_time = pd.concat(
+            [
+                ann_time,
+                pd.Series(
+                    self.events["time.exc"].sum() - ann_time.sum(),
+                    index=["Other"],
+                    name="time.inc",
+                ),
+            ]
+        )
 
         return total_time
 
@@ -1056,8 +1069,8 @@ class Trace:
         events = self.events
         annotation = events[
             (events["Name"] == label_name) & (events["type"] == "annotation")
-            ]
-        assert (len(annotation) == 2)
+        ]
+        assert len(annotation) == 2
         # This is OK since we sorted by time
         # TODO: we should do more error checking here though
         start = annotation.iloc[0]["Timestamp (ns)"]
@@ -1077,12 +1090,6 @@ class Trace:
         kernels = events.loc[host_events["_children"].dropna().explode().to_numpy()]
 
         range_events = pd.concat([host_events, kernels])
-        range_events = range_events[
-            ~range_events.index.duplicated(keep="first")
-        ]
+        range_events = range_events[~range_events.index.duplicated(keep="first")]
 
-        return Trace(
-            None,
-            range_events,
-            parallelism_levels=self.parallelism_levels
-        )
+        return Trace(None, range_events, parallelism_levels=self.parallelism_levels)
