@@ -6,7 +6,6 @@
 import numpy as np
 import pandas as pd
 
-import pipit
 from pipit.util.cct import create_cct
 
 
@@ -542,16 +541,17 @@ class Trace:
         metrics - a string or list of strings containing the metrics to be aggregated
         groupby_column - a string or list containing the columns to be grouped by
         mapper - an optional dict that specifies which labels to group together.
-        Dict can either map from group -> str pattern, or group -> list or strings to match.
-        Labels should not belong to multiple groups.
+        Dict can either map from group -> str pattern, or
+        group -> list or strings to match. Labels should not belong to multiple groups.
         e.g.
         mapper = {
             "matmul": ["ampere_matmul1", "ampere_matmul2", "ampere_matmul3"]
         }
         Unspecified labels will be grouped into other.
-        parallelism_level - a string or list specifying parallelism levels (e.g. process, thread, gpu, stream)
-        to group events by.
-        ascending - Boolean, whether to sort results in ascending order. Default None (no sorting)
+        parallelism_level - a string or list specifying parallelism levels
+        (e.g. process, thread, gpu, stream) to group events by.
+        ascending - Boolean, whether to sort results in ascending order.
+        Default None (no sorting)
         idle_time - Whether to also include idle time as a category.
 
         Returns:
