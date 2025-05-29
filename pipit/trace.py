@@ -941,7 +941,7 @@ class Trace:
 
         return patterns
 
-    def time_breakdown(self, filter_regex=None, depth=None):
+    def ann_time_breakdown(self, filter_regex=None):
         """Time breakdown by annotation.
         Counts time in annotation + time in launched kernels.
 
@@ -954,15 +954,11 @@ class Trace:
         filter_regex: str, list, optional
             A regex string or list of regexes to select specific annotations
             to include in the breakdown.
-        depth: int, optional
-            Only events at specified depth will be included in the breakdown.
-            Default of None includes all events in breakdown.
-            Use -1 to filter to events with no children
 
         Returns
         -------
-        Series
-            Series with annotation name as index and time as the values.
+        DataFrame
+            DataFrame with annotation name as index and CPU/GPU time as columns
         """
         # calculate inclusive metrics
         if "time.inc" not in self.events.columns:
@@ -982,18 +978,6 @@ class Trace:
                 filter_regex = "|".join(filter_regex)
             ann_events = ann_events[ann_events["Name"].str.contains(filter_regex)]
 
-        if depth is not None:
-            if depth == -1:
-                children = ann_events["_children"].explode()
-                mask = children.groupby(children.index).apply(
-                    # If any child is an annotation, then
-                    # the current annotation is not at the lowest level
-                    lambda x: ~(x.isin(children.index).any())
-                )
-                ann_events = ann_events[mask]
-            else:
-                ann_events = ann_events[ann_events["_depth"] == depth]
-
         # TODO: provide breakdowns within annotation
         # as well?
 
@@ -1006,6 +990,10 @@ class Trace:
             [0] * len(cpu_time), index=cpu_time.index, name="time.inc"
         )
 
+        # stores max/min timestamps of kernel events
+        # so that we can calculate GPU time afterwards
+        ann_gpu_exec_ranges = pd.DataFrame({"start": np.inf, "end": -np.inf}, index=cpu_time.index)
+
         def _calc_kernel_time(row):
             idx = row["_parent"]
             # update parent annotations
@@ -1013,6 +1001,14 @@ class Trace:
                 event = self.events.loc[idx]
                 if event["Name"] in ann_kernel_times.index:
                     ann_kernel_times.loc[event["Name"]] += row["time.inc"]
+                    # Check if we need to update the min/max times for annotation
+                    start = min(row["Timestamp (ns)"], row["_matching_timestamp"])
+                    end = max(row["Timestamp (ns)"], row["_matching_timestamp"])
+                    minmax_time = list(ann_gpu_exec_ranges.loc[event["Name"], ["start", "end"]])
+                    if start < minmax_time[0]:
+                        ann_gpu_exec_ranges.loc[event["Name"], "start"] = start
+                    if end > minmax_time[1]:
+                        ann_gpu_exec_ranges.loc[event["Name"], "end"] = end
                 idx = event["_parent"]
 
             # dummy return
@@ -1027,8 +1023,14 @@ class Trace:
             _calc_kernel_time,
             axis=1,
         )
-        #ann_time = cpu_time + ann_kernel_times
-        ann_time = ann_kernel_times
+
+        gpu_idle_time = ann_gpu_exec_ranges["end"] - ann_gpu_exec_ranges["start"] - ann_kernel_times
+
+        ann_time = pd.DataFrame({
+            "cpu_time": cpu_time,
+            "gpu_time": ann_kernel_times,
+            "gpu_idle_time": gpu_idle_time,
+        })
 
         # TODO: this currently gives a wrong result
         # Calculate time in other events
