@@ -964,6 +964,14 @@ class Trace:
         Series
             Series with annotation name as index and time as the values.
         """
+        # calculate inclusive metrics
+        if "time.inc" not in self.events.columns:
+            self.calc_inc_metrics(["Timestamp (ns)"])
+
+        # calculate exclusive time if needed
+        if "time.exc" not in self.events.columns:
+            self.calc_exc_metrics(["Timestamp (ns)"])
+
         ann_events = self.events[
             (self.events["type"] == "annotation")
             & (self.events["Event Type"] == "Enter")
@@ -978,7 +986,7 @@ class Trace:
             if depth == -1:
                 children = ann_events["_children"].explode()
                 mask = children.groupby(children.index).apply(
-                    # If any child is an annotation, than
+                    # If any child is an annotation, then
                     # the current annotation is not at the lowest level
                     lambda x: ~(x.isin(children.index).any())
                 )
@@ -993,41 +1001,19 @@ class Trace:
         # TODO: can break this down further into CUDA API/kernel launch
         # time, and other events
         cpu_time = ann_events.groupby("Name")["time.inc"].sum()
-        print(cpu_time.index)
 
         ann_kernel_times = pd.Series(
             [0] * len(cpu_time), index=cpu_time.index, name="time.inc"
         )
 
         def _calc_kernel_time(row):
-            # locate the launch event for the kernel
-            # and binary search the start time of the launch
-            # event in annotation events in order to find the
-            # corresponding annotation
-            parent = row["_parent"]
-            # note: parent is always an enter event
-            launch_start = self.events.loc[parent, "Timestamp (ns)"]
-            # we don't use annotation df from above, since we need
-            # leave events also here
-            ann_df = self.events[self.events["type"] == "annotation"]
-            idx = np.searchsorted(ann_df["Timestamp (ns)"], launch_start)
-
-            # update for annotation that launched us
-            # note: searchsorted gives us the leave event (we need the enter event)
-            leave_event = ann_df.iloc[idx]
-            ann_event = ann_df.loc[leave_event["_matching_event"]]
-            if ann_event["Name"] in ann_kernel_times.index:
-                ann_kernel_times.loc[ann_event["Name"]] += row["time.inc"]
-            idx = ann_event["_parent"]
-
-            # update parents of that annotation
-            while (
-                idx in ann_df.index
-                and ann_df.loc[idx, "Name"] in ann_kernel_times.index
-            ):
-                ann_event = ann_df.loc[idx]
-                ann_kernel_times.loc[ann_event["Name"]] += row["time.inc"]
-                idx = ann_event["_parent"]
+            idx = row["_parent"]
+            # update parent annotations
+            while idx != -1 and not np.isnan(idx):
+                event = self.events.loc[idx]
+                if event["Name"] in ann_kernel_times.index:
+                    ann_kernel_times.loc[event["Name"]] += row["time.inc"]
+                idx = event["_parent"]
 
             # dummy return
             # TODO: maybe there is a more efficient/cleaner way to do this
@@ -1041,53 +1027,80 @@ class Trace:
             _calc_kernel_time,
             axis=1,
         )
-        ann_time = cpu_time + ann_kernel_times
+        #ann_time = cpu_time + ann_kernel_times
+        ann_time = ann_kernel_times
 
+        # TODO: this currently gives a wrong result
         # Calculate time in other events
         # This is sum of exclusive time (total time) - time in
         # annotations (and kernels launched by those annotations)
-        total_time = pd.concat(
-            [
-                ann_time,
-                pd.Series(
-                    self.events["time.exc"].sum() - ann_time.sum(),
-                    index=["Other"],
-                    name="time.inc",
-                ),
-            ]
-        )
+        # total_time = pd.concat(
+        #     [
+        #         ann_time,
+        #         pd.Series(
+        #             self.events["time.exc"].sum() - ann_time.sum(),
+        #             index=["Other"],
+        #             name="time.inc",
+        #         ),
+        #     ]
+        # )
+        total_time = ann_time
 
         return total_time
 
-    def filter_by_label(self, label_name):
+    def filter_by_label(self, label_name, filter_range=None):
         """
-        Filters trace to find kernels
-        that occurred during this time frame
-        and their associated launch events
+        Filters trace to only include events
+        within the time range of the specified label.
+        (includes kernels that were launched in the range of the
+        label)
+
+        Parameters
+        ----------
+        label_name: str
+            The label name to filter by.
+        filter_range: tuple, optional
+            Used to specify a (start, stop) range to return a subset of
+            NVTX ranges matching the label.
+
+        Returns
+        -------
+        Trace
+            A trace where the events dataframe is filtered to only include events
+            occurring within and launched within a specified label.
         """
         # Find the annotations
         events = self.events
-        annotation = events[
-            (events["Name"] == label_name) & (events["type"] == "annotation")
+        annotations = events[
+            (events["Name"] == label_name)
+            & (events["type"] == "annotation")
+            & (events["Event Type"] == "Enter")
         ]
-        assert len(annotation) == 2
-        # This is OK since we sorted by time
-        # TODO: we should do more error checking here though
-        start = annotation.iloc[0]["Timestamp (ns)"]
-        end = annotation.iloc[1]["Timestamp (ns)"]
+        if filter_range is not None:
+            annotations = annotations.iloc[slice(*filter_range)]
+        mask = np.array([False] * len(events))
+        for _, ann_row in annotations.iterrows():
+            # This is OK since we sorted by time
+            start = ann_row["Timestamp (ns)"]
+            end = ann_row["_matching_timestamp"]
+
+            mask |= (events["Timestamp (ns)"].between(start, end) | events["_matching_timestamp"].between(start, end))
 
         # Filter events to find those with timestamp in range
         # and events whose parents are in that range
         # (i.e. we want to include GPU kernels that were launched in the range
         # even if they executed later)
-
-        host_events = events[
-            (events["Timestamp (ns)"] >= start) & (events["Timestamp (ns)"] <= end)
-        ]
+        host_events = events[mask]
 
         # Use explode to expand every child in children list to a row
         # This can include duplicates (e.g. for nested annotations) that we should drop
         kernels = events.loc[host_events["_children"].dropna().explode().to_numpy()]
+        # The children column only marks Enter events, let's concat the leave events
+        # for the enter events as well into the kernels df
+        kernels = pd.concat([kernels, events.loc[kernels["_matching_event"]]]).sort_values(
+            by="Timestamp (ns)",
+            ascending=False,
+        )
 
         range_events = pd.concat([host_events, kernels])
         range_events = range_events[~range_events.index.duplicated(keep="first")]
