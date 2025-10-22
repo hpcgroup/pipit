@@ -12,7 +12,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest]
-        python-version: ["3.6", "3.7", "3.8", "3.9", "3.10", "3.11"]
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
 
     steps:
       - uses: actions/checkout@v2
@@ -37,15 +37,38 @@ jobs:
           black --diff --check .
           flake8
 
+      - name: Update coverage
+        if: ${{ matrix.python-version == 3.12 }}
+        run: |
+          pip install --upgrade coverage
+
+      - name: Run coverage 
+        if: ${{ matrix.python-version == 3.12 }}
+        run: |
+          PYTHONPATH=. coverage run $(which pytest)
+
       - name: Basic test with pytest
         run: |
           PYTHONPATH=. $(which pytest)
+
+      - name: Upload coverage to Codecov
+        if: ${{ matrix.python-version == 3.12 }}
+        uses: codecov/codecov-action@v4
+        env:
+          CODECOV_TOKEN: ${{ secrets.PIPIT_CODECOV_TOKEN }}
+        with:
+          directory: ./coverage/reports
+          env_vars: OS,PYTHON
+          files: /home/runner/work/pipit/pipit/coverage.xml
+          flags: unittests
+          verbose: true
+          fail_ci_if_error: true
 
   macos:
     runs-on: macos-latest
     strategy:
       matrix:
-        python-version: ["3.10", "3.11"]
+        python-version: ["3.11", "3.12"]
 
     steps:
       - uses: actions/checkout@v2
@@ -61,4 +84,4 @@ jobs:
       - name: Basic test with pytest
         run: |
           PYTHONPATH=. $(which pytest)
-
+ 
