@@ -2,6 +2,7 @@
 
 [![Build Status](https://github.com/hpcgroup/pipit/actions/workflows/unit-tests.yaml/badge.svg)](https://github.com/hpcgroup/pipit/actions)
 [![docs](https://readthedocs.org/projects/pipit/badge/?version=latest)](https://pipit.readthedocs.io/en/latest/?badge=latest)
+[![codecov](https://codecov.io/gh/hpcgroup/pipit/graph/badge.svg?token=WR2ZK9CBDX)](https://codecov.io/gh/hpcgroup/pipit)
 [![Code Style: Black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
 A Python-based library for analyzing execution traces from parallel programs.
