@@ -5,6 +5,7 @@
 
 import numpy as np
 import pandas as pd
+
 from pipit.util.cct import create_cct
 
 
@@ -527,12 +528,31 @@ class Trace:
         return pd.DataFrame({"Sent": sent, "Received": received}).rename_axis("Process")
 
     def flat_profile(
-        self, metrics="time.exc", groupby_column="Name", per_process=False
+        self,
+        metrics="time.exc",
+        groupby_column="Name",
+        mapper=None,
+        parallelism_level=None,
+        ascending=None,
+        idle_time=False,
     ):
         """
         Arguments:
         metrics - a string or list of strings containing the metrics to be aggregated
         groupby_column - a string or list containing the columns to be grouped by
+        mapper - an optional dict that specifies which labels to group together.
+        Dict can either map from group -> str pattern, or
+        group -> list or strings to match. Labels should not belong to multiple groups.
+        e.g.
+        mapper = {
+            "matmul": ["ampere_matmul1", "ampere_matmul2", "ampere_matmul3"]
+        }
+        Unspecified labels will be grouped into other.
+        parallelism_level - a string or list specifying parallelism levels
+        (e.g. process, thread, gpu, stream) to group events by.
+        ascending - Boolean, whether to sort results in ascending order.
+        Default None (no sorting)
+        idle_time - Whether to also include idle time as a category.
 
         Returns:
         A Pandas DataFrame that will have the aggregated metrics
@@ -552,24 +572,48 @@ class Trace:
         # This first groups by both the process and the specified groupby
         # column (like name). It then sums up the metrics for each combination
         # of the process and the groupby column.
-        if per_process:
-            return (
-                self.events.loc[self.events["Event Type"] == "Enter"]
-                .groupby([groupby_column] + self.parallelism_levels, observed=True)[
-                    metrics
-                ]
+
+        if parallelism_level is None:
+            parallelism_level = self.parallelism_levels
+
+        res = (
+            self.events.loc[self.events["Event Type"] == "Enter"]
+            .groupby(
+                [groupby_column] + parallelism_level, observed=True, as_index=False
+            )[metrics]
+            .sum()
+        )
+        # Postprocessing using mapper
+        if mapper is not None:
+            # pandas expects label->group
+            labels = res["Name"]
+            pd_grouper = {label: "Other" for label in labels}
+            for group, pats in mapper.items():
+                if isinstance(pats, str):
+                    mask = labels.str.contains(pats)
+                else:
+                    mask = labels.isin(pats)
+                for label in labels[mask]:
+                    pd_grouper[label] = group
+            res = (
+                res.set_index("Name")
+                .groupby([pd_grouper] + parallelism_level)[["time.exc"]]
                 .sum()
             )
-        else:
-            return (
-                self.events.loc[self.events["Event Type"] == "Enter"]
-                .groupby([groupby_column] + self.parallelism_levels, observed=True)[
-                    metrics
-                ]
-                .sum()
-                .groupby(groupby_column)
-                .mean()
-            )
+
+        if idle_time:
+            idle_times = pd.DataFrame(self.idle_time().groupby(parallelism_level).sum())
+            idle_times["Name"] = "Idle Time"
+            idle_times = idle_times.set_index("Name", append=True)
+            idle_times = idle_times.reorder_levels([groupby_column] + parallelism_level)
+            idle_times = idle_times.rename(columns={"idle_time": "time.exc"})
+
+            res = pd.concat([res, idle_times], axis=0)
+
+        if ascending is not None:
+            res = res.sort_values(by="time.exc", ascending=ascending)
+
+        return res
 
     def load_imbalance(self, metric="time.exc", num_processes=1):
         """
@@ -638,7 +682,7 @@ class Trace:
             return idle_time
 
         return (
-            self.events.groupby(self.parallelism_levels, dropna=False)
+            self.events.groupby(self.parallelism_levels)
             .apply(
                 calc_idle_time,
             )
@@ -896,3 +940,183 @@ class Trace:
             patterns.append(match_original)
 
         return patterns
+
+    def ann_time_breakdown(self, filter_regex=None):
+        """Time breakdown by annotation.
+        Counts time in annotation + time in launched kernels.
+
+        If filtering by depth or regex is specified, all events that
+        don't match the specified depth/regex will be counted in the "Other"
+        category.
+
+        Parameters
+        ----------
+        filter_regex: str, list, optional
+            A regex string or list of regexes to select specific annotations
+            to include in the breakdown.
+
+        Returns
+        -------
+        DataFrame
+            DataFrame with annotation name as index and CPU/GPU time as columns
+        """
+        # calculate inclusive metrics
+        if "time.inc" not in self.events.columns:
+            self.calc_inc_metrics(["Timestamp (ns)"])
+
+        # calculate exclusive time if needed
+        if "time.exc" not in self.events.columns:
+            self.calc_exc_metrics(["Timestamp (ns)"])
+
+        ann_events = self.events[
+            (self.events["type"] == "annotation")
+            & (self.events["Event Type"] == "Enter")
+        ]
+
+        if filter_regex is not None:
+            if isinstance(filter_regex, list):
+                filter_regex = "|".join(filter_regex)
+            ann_events = ann_events[ann_events["Name"].str.contains(filter_regex)]
+
+        # TODO: provide breakdowns within annotation
+        # as well?
+
+        # Amount of time we spend in the label
+        # TODO: can break this down further into CUDA API/kernel launch
+        # time, and other events
+        cpu_time = ann_events.groupby("Name")["time.inc"].sum()
+
+        ann_kernel_times = pd.Series(
+            [0] * len(cpu_time), index=cpu_time.index, name="time.inc"
+        )
+
+        # stores max/min timestamps of kernel events
+        # so that we can calculate GPU time afterwards
+        ann_gpu_exec_ranges = pd.DataFrame(
+            {"start": np.inf, "end": -np.inf}, index=cpu_time.index
+        )
+
+        def _calc_kernel_time(row):
+            idx = row["_parent"]
+            # update parent annotations
+            while idx != -1 and not np.isnan(idx):
+                event = self.events.loc[idx]
+                if event["Name"] in ann_kernel_times.index:
+                    ann_kernel_times.loc[event["Name"]] += row["time.inc"]
+                    # Check if we need to update the min/max times for annotation
+                    start = min(row["Timestamp (ns)"], row["_matching_timestamp"])
+                    end = max(row["Timestamp (ns)"], row["_matching_timestamp"])
+                    minmax_time = list(
+                        ann_gpu_exec_ranges.loc[event["Name"], ["start", "end"]]
+                    )
+                    if start < minmax_time[0]:
+                        ann_gpu_exec_ranges.loc[event["Name"], "start"] = start
+                    if end > minmax_time[1]:
+                        ann_gpu_exec_ranges.loc[event["Name"], "end"] = end
+                idx = event["_parent"]
+
+            # dummy return
+            # TODO: maybe there is a more efficient/cleaner way to do this
+            return 0
+
+        kernels = self.events[
+            (self.events["Event Type"] == "Enter")
+            & self.events["type"].isin(["kernel", "comm"])
+        ]
+        kernels.apply(
+            _calc_kernel_time,
+            axis=1,
+        )
+
+        gpu_idle_time = (
+            ann_gpu_exec_ranges["end"] - ann_gpu_exec_ranges["start"] - ann_kernel_times
+        )
+
+        ann_time = pd.DataFrame(
+            {
+                "cpu_time": cpu_time,
+                "gpu_time": ann_kernel_times,
+                "gpu_idle_time": gpu_idle_time,
+            }
+        )
+
+        # TODO: this currently gives a wrong result
+        # Calculate time in other events
+        # This is sum of exclusive time (total time) - time in
+        # annotations (and kernels launched by those annotations)
+        # total_time = pd.concat(
+        #     [
+        #         ann_time,
+        #         pd.Series(
+        #             self.events["time.exc"].sum() - ann_time.sum(),
+        #             index=["Other"],
+        #             name="time.inc",
+        #         ),
+        #     ]
+        # )
+        total_time = ann_time
+
+        return total_time
+
+    def filter_by_label(self, label_name, filter_range=None):
+        """
+        Filters trace to only include events
+        within the time range of the specified label.
+        (includes kernels that were launched in the range of the
+        label)
+
+        Parameters
+        ----------
+        label_name: str
+            The label name to filter by.
+        filter_range: tuple, optional
+            Used to specify a (start, stop) range to return a subset of
+            NVTX ranges matching the label.
+
+        Returns
+        -------
+        Trace
+            A trace where the events dataframe is filtered to only include events
+            occurring within and launched within a specified label.
+        """
+        # Find the annotations
+        events = self.events
+        annotations = events[
+            (events["Name"] == label_name)
+            & (events["type"] == "annotation")
+            & (events["Event Type"] == "Enter")
+        ]
+        if filter_range is not None:
+            annotations = annotations.iloc[slice(*filter_range)]
+        mask = np.array([False] * len(events))
+        for _, ann_row in annotations.iterrows():
+            # This is OK since we sorted by time
+            start = ann_row["Timestamp (ns)"]
+            end = ann_row["_matching_timestamp"]
+
+            mask |= events["Timestamp (ns)"].between(start, end) | events[
+                "_matching_timestamp"
+            ].between(start, end)
+
+        # Filter events to find those with timestamp in range
+        # and events whose parents are in that range
+        # (i.e. we want to include GPU kernels that were launched in the range
+        # even if they executed later)
+        host_events = events[mask]
+
+        # Use explode to expand every child in children list to a row
+        # This can include duplicates (e.g. for nested annotations) that we should drop
+        kernels = events.loc[host_events["_children"].dropna().explode().to_numpy()]
+        # The children column only marks Enter events, let's concat the leave events
+        # for the enter events as well into the kernels df
+        kernels = pd.concat(
+            [kernels, events.loc[kernels["_matching_event"]]]
+        ).sort_values(
+            by="Timestamp (ns)",
+            ascending=False,
+        )
+
+        range_events = pd.concat([host_events, kernels])
+        range_events = range_events[~range_events.index.duplicated(keep="first")]
+
+        return Trace(None, range_events, parallelism_levels=self.parallelism_levels)
