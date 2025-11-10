@@ -1,6 +1,7 @@
 from typing import List, Dict
 
 import pandas
+import numpy as np
 from pipit.trace import Trace
 
 
@@ -102,9 +103,9 @@ class CoreTraceReader:
                 "Name": "category",
                 "Event Type": "category",
                 "Process": "category",
-                "_matching_event": "int32",
-                "_parent": "int32",
-                "_matching_timestamp": "int32",
+                "_matching_event": "Int32",
+                "_parent": "Int32",
+                "_matching_timestamp": "Int32",
             }
         )
         return trace_df
@@ -118,7 +119,7 @@ class CoreTraceReader:
         """
         if len(stack) == 0:
             # root event
-            event["_parent"] = -1
+            event["_parent"] = np.nan
         else:
             parent_event = event_list[stack[-1]]
             event["_parent"] = parent_event["unique_id"]
