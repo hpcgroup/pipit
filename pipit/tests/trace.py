@@ -70,6 +70,45 @@ def test_comm_by_process(data_dir, ping_pong_otf2_trace):
     assert counts.loc[1]["Received"] == 8
 
 
+def test_match_charm_messages(ping_pong_projections_trace):
+    trace = Trace.from_projections(str(ping_pong_projections_trace))
+    trace._match_charm_messages()
+
+    df = trace.events
+
+    receive_events = df[df["Attributes"].apply(
+        lambda x: False if not x else ("Entry Type" in x) and (x["Entry Type"] == "Processing")
+    )]
+
+    # Filter out unmatched receive events
+    receive_events = receive_events.loc[receive_events["_matching_message"].notnull()]
+
+    receive_indices = list(receive_events.index)
+    receive_matching_message = list(receive_events["_matching_message"])
+    receive_process = list(receive_events["Process"])
+    
+
+    for i in range(len(receive_matching_message)):
+        receive_index = receive_indices[i]
+        send_index = receive_matching_message[i]
+
+        if send_index != 200:
+            corresponding_send = df.iloc[send_index]
+
+            # Ensure that, for each receive event, the corresponding send event has
+            # that receive event index in its matching message column
+            #
+            # Testing if the distance between the two DataFrame indices is <= 17 accounts
+            # accounts for some weirdness in the trace where some message receives are divided into
+            # several enter events. Most distances will be 0 (equal indices).
+            assert abs(corresponding_send["_matching_message"] - receive_index) <= 17
+
+            # With a few exceptions, messages send and receive on opposite processes
+            exceptions = [541, 549, 553, 1120, 1124, 1305, 1306, 1320, 1882, 1893, 1894]
+            if receive_index >= 360 and receive_index not in exceptions:
+                assert receive_process[i] != corresponding_send["Process"]
+
+
 def test_match_events(data_dir, ping_pong_otf2_trace):
     trace = Trace.from_otf2(str(ping_pong_otf2_trace))
     trace._match_events()
