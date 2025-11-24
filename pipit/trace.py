@@ -532,7 +532,7 @@ class Trace:
                          drop_zero : bool = False,
                          ascending : bool = False) -> pd.DataFrame:
         """
-        TODO: comment describing function 
+        TODO: comment describing function
 
         Arguments:
         - metrics : str | list[str]
