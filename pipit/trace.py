@@ -518,13 +518,77 @@ class Trace:
             pd.DataFrame: DataFrame containing total communication volume or
             number of messags sent and received by each process.
         """
-        comm_matrix = self.comm_matrix(output=output)
+        comm_matrix = self.comm_mtrix(output=output)
 
         # Get total sent and received for each process
         sent = comm_matrix.sum(axis=1)
         received = comm_matrix.sum(axis=0)
 
         return pd.DataFrame({"Sent": sent, "Received": received}).rename_axis("Process")
+
+    def flat_profile_new(self, metrics: str | list[str] = "time.exc",
+                         groupby_cols: str | list[str] = "Name",
+                         parallelism_level : bool = False,
+                         drop_zero : bool = False,
+                         ascending : bool = False) -> pd.DataFrame:
+        """
+        TODO: comment describing function 
+
+        Arguments:
+        - metrics : str | list[str]
+            A string or list of strings containing the metrics to be aggregated.
+            Defaults to exclusive time
+        - groupby_cols : str | list[str]
+            A string or list of strings containing the columns to be grouped by
+            Defaults to function name
+        - parallelism_level : bool
+            A boolean determining whether or not to perform the grouping by parallelism
+            level as well (e.g. process, thread, gpu). Defaults to False
+        - drop_zeros : bool
+            A boolean determining whether or not to drop rows where exclusive time spent
+            is zero or NA. Defaults to False
+        - ascending : bool
+            Determines whether or not to sort the resulting DataFrame by exclusive time.
+            Defaults to False (sorting in descending order)
+
+        Returns:
+        - pd.DataFrame
+            A Pandas DataFrame that contains aggregated metrics for the grouped columns
+        """
+
+        metrics = [metrics] if not isinstance(metrics, list) else metrics
+        groupby_cols = [groupby_cols] if not isinstance(groupby_cols, list) \
+            else groupby_cols
+
+        # calculate inclusive time if needed
+        if "time.inc" in metrics:
+            self.calc_inc_metrics(["Timestamp (ns)"])
+
+        # calculate exclusive time if needed
+        if "time.exc" in metrics:
+            self.calc_exc_metrics(["Timestamp (ns)"])
+
+        parallelism_level = self.parallelism_levels if parallelism_level else []
+
+        # calculate per-function summary statistics
+        res = (
+            self.events.loc[self.events["Event Type"] == "Enter"]
+            .groupby(groupby_cols + parallelism_level, observed=True, as_index=False)
+            .agg(**{
+                "Calls": ("Event Type", "count"),
+                "Total (ns)": ("time.exc", "sum"),
+                "Avg (ns)": ("time.exc", "mean"),
+                "Min (ns)": ("time.exc", "min"),
+                "Max (ns)": ("time.exc", "max")
+            })
+        ).sort_values(by="Total (ns)", ascending=ascending)
+        res["Time (%)"] = res["Total (ns)"] / res["Total (ns)"].sum()
+
+        # drop zero and NA columns if specified
+        if drop_zero:
+            res = res.loc[(res["Total (ns)"] > 0) & (res["Total (ns)"] is not None)]
+
+        return res
 
     def flat_profile(
         self, metrics="time.exc", groupby_column="Name", per_process=False
