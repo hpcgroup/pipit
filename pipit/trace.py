@@ -619,8 +619,9 @@ class Trace:
         if drop_zeros:
             df = df.loc[df["Time (%)"] > 0]
 
-        # sort by group means
+        # sort
         if per_process:
+            # by average time for each process in multi-index grouping
             df = df.sort_values(
                 "Time (ns)",
                 key=lambda _: df.groupby(level=groupby_cols, observed=True)["Time (ns)"]
@@ -628,6 +629,7 @@ class Trace:
                 ascending=ascending
             )
         else:
+            # by total grouped average
             df = df.sort_values(
                 by=["Avg Time (ns)"], ascending=ascending
             ).reset_index(drop=True)
