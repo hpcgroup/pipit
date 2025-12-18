@@ -526,114 +526,108 @@ class Trace:
 
         return pd.DataFrame({"Sent": sent, "Received": received}).rename_axis("Process")
 
-    def flat_profile_new(self, metrics: str | list[str] = "time.exc",
-                         groupby_cols: str | list[str] = "Name",
-                         parallelism_level : bool = False,
-                         drop_zero : bool = False,
-                         ascending : bool = False) -> pd.DataFrame:
+    def flat_profile(self,
+                     metrics: str | list[str] = "time.exc",
+                     groupby_cols: str | list[str] = "Name",
+                     per_process : bool = False,
+                     drop_zeros : bool = False,
+                     ascending : bool = False) -> pd.DataFrame:
         """
-        TODO: comment describing function
+        Generates flat profile of aggregate performance data
 
         Arguments:
-        - metrics : str | list[str]
-            A string or list of strings containing the metrics to be aggregated.
-            Defaults to exclusive time
-        - groupby_cols : str | list[str]
-            A string or list of strings containing the columns to be grouped by
-            Defaults to function name
-        - parallelism_level : bool
-            A boolean determining whether or not to perform the grouping by parallelism
-            level as well (e.g. process, thread, gpu). Defaults to False
-        - drop_zeros : bool
-            A boolean determining whether or not to drop rows where exclusive time spent
-            is zero or NA. Defaults to False
-        - ascending : bool
-            Determines whether or not to sort the resulting DataFrame by exclusive time.
-            Defaults to False (sorting in descending order)
+        - metrics : str | list[str] = "time.exc"
+            Metrics to aggregate over. Exclusive time is always used
+        - groupby_cols : str | list[str] = "Name"
+            Contains columns to perform the grouping by
+        - per_process : bool = False
+            Determines whether or not to perform the grouping by parallelism level
+            as well (e.g. process, thread, gpu)
+        - drop_zeros : bool = False
+            Determines whether or not to drop rows where exlusive time is zero or NA
+        - ascending : bool = False
+            Determines how result is sorted. Sorting is performed by exclusive time
 
         Returns:
         - pd.DataFrame
             A Pandas DataFrame that contains aggregated metrics for the grouped columns
         """
 
+        # ensure arg validity
         metrics = [metrics] if not isinstance(metrics, list) else metrics
         groupby_cols = [groupby_cols] if not isinstance(groupby_cols, list) \
             else groupby_cols
+        parallelism_level = self.parallelism_levels
 
         # calculate inclusive time if needed
         if "time.inc" in metrics:
             self.calc_inc_metrics(["Timestamp (ns)"])
 
-        # calculate exclusive time if needed
+        # calculate exclusive time always
+        self.calc_exc_metrics(["Timestamp (ns)"])
         if "time.exc" in metrics:
-            self.calc_exc_metrics(["Timestamp (ns)"])
+            metrics = metrics.copy()  # remove modifies in-place
+            metrics.remove("time.exc")
 
-        parallelism_level = self.parallelism_levels if parallelism_level else []
+        enter = self.events.loc[self.events["Event Type"] == "Enter"].copy()
 
-        # calculate per-function summary statistics
-        res = (
-            self.events.loc[self.events["Event Type"] == "Enter"]
-            .groupby(groupby_cols + parallelism_level, observed=True, as_index=False)
-            .agg(**{
-                "Calls": ("Event Type", "count"),
-                "Total (ns)": ("time.exc", "sum"),
-                "Avg (ns)": ("time.exc", "mean"),
-                "Min (ns)": ("time.exc", "min"),
-                "Max (ns)": ("time.exc", "max")
-            })
-        ).sort_values(by="Total (ns)", ascending=ascending)
-        res["Time (%)"] = res["Total (ns)"] / res["Total (ns)"].sum()
+        # always calculate process-level flat profile since it is used regardless
+        process = (
+            enter.groupby(groupby_cols + parallelism_level, observed=True,
+                          as_index=False).agg(**({
+                                  "Time (ns)": ("time.exc", "sum"),
+                                  "Calls": ("Event Type", "size")
+                              } | {
+                                  f"{metric} (avg)": (f"{metric}", "mean") for metric
+                                  in metrics
+                              }))
+        ).set_index(groupby_cols + parallelism_level)
+        process.insert(0, 'Time (%)', round(
+            100 * (process['Time (ns)'] / process.groupby(
+                level=groupby_cols, observed=True)['Time (ns)'].sum()), 2
+        ))
 
-        # drop zero and NA columns if specified
-        if drop_zero:
-            res = res.loc[(res["Total (ns)"] > 0) & (res["Total (ns)"] is not None)]
+        if not per_process:
+            whole = (
+                process.reset_index()
+                .groupby(groupby_cols, observed=True, as_index=False)
+                .agg(
+                    **({
+                        "Avg Time (ns)": ("Time (ns)", "mean"),
+                        "Avg Calls": ("Calls", "mean"),
+                        "Min (ns)": ("Time (ns)", "min"),
+                        "Max (ns)": ("Time (ns)", "max")
+                    } | {
+                        f"{metric} (avg)": (f"{metric} (avg)", "mean") for metric
+                        in metrics
+                    })
+                )
+            )
+            whole.insert(1, "Time (%)", round(
+                100 * whole["Avg Time (ns)"] / whole["Avg Time (ns)"].sum(), 2
+            ))
 
-        return res
+        # select correct return df per user-args
+        df = process if per_process else whole
 
-    def flat_profile(
-        self, metrics="time.exc", groupby_column="Name", per_process=False
-    ):
-        """
-        Arguments:
-        metrics - a string or list of strings containing the metrics to be aggregated
-        groupby_column - a string or list containing the columns to be grouped by
+        # drop zero and NA values if specified
+        if drop_zeros:
+            df = df.loc[df["Time (%)"] > 0]
 
-        Returns:
-        A Pandas DataFrame that will have the aggregated metrics
-        for the grouped by columns.
-        """
-
-        metrics = [metrics] if not isinstance(metrics, list) else metrics
-
-        # calculate inclusive time if needed
-        if "time.inc" in metrics:
-            self.calc_inc_metrics(["Timestamp (ns)"])
-
-        # calculate exclusive time if needed
-        if "time.exc" in metrics:
-            self.calc_exc_metrics(["Timestamp (ns)"])
-
-        # This first groups by both the process and the specified groupby
-        # column (like name). It then sums up the metrics for each combination
-        # of the process and the groupby column.
+        # sort by group means
         if per_process:
-            return (
-                self.events.loc[self.events["Event Type"] == "Enter"]
-                .groupby([groupby_column] + self.parallelism_levels, observed=True)[
-                    metrics
-                ]
-                .sum()
+            df = df.sort_values(
+                "Time (ns)",
+                key=lambda _: df.groupby(level=groupby_cols, observed=True)["Time (ns)"]
+                .transform("mean"),
+                ascending=ascending
             )
         else:
-            return (
-                self.events.loc[self.events["Event Type"] == "Enter"]
-                .groupby([groupby_column] + self.parallelism_levels, observed=True)[
-                    metrics
-                ]
-                .sum()
-                .groupby(groupby_column)
-                .mean()
-            )
+            df = df.sort_values(
+                by=["Avg Time (ns)"], ascending=ascending
+            ).reset_index(drop=True)
+
+        return df
 
     def load_imbalance(self, metric="time.exc", num_processes=1):
         """
