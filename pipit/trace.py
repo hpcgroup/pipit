@@ -518,7 +518,7 @@ class Trace:
             pd.DataFrame: DataFrame containing total communication volume or
             number of messags sent and received by each process.
         """
-        comm_matrix = self.comm_mtrix(output=output)
+        comm_matrix = self.comm_matrix(output=output)
 
         # Get total sent and received for each process
         sent = comm_matrix.sum(axis=1)
@@ -529,18 +529,19 @@ class Trace:
     def flat_profile(self,
                      metrics: str | list[str] = "time.exc",
                      groupby_cols: str | list[str] = "Name",
-                     per_process : bool = False,
+                     include_parallelism : bool = False,
                      drop_zeros : bool = False,
                      ascending : bool = False) -> pd.DataFrame:
         """
-        Generates flat profile of aggregate performance data
+        Generates a flat profile DataFrame containing aggregated statistics (min,
+        max, mean, etc.) of the trace across user-specified metrics and groupings
 
         Arguments:
         - metrics : str | list[str] = "time.exc"
-            Metrics to aggregate over. Exclusive time is always used
+            Metric columns to aggregate over. Exclusive time ("time.exc") is always used
         - groupby_cols : str | list[str] = "Name"
-            Contains columns to perform the grouping by
-        - per_process : bool = False
+            Columns to perform the grouping by. Defaults to function name ("Name")
+        - include_parallelism : bool = False
             Determines whether or not to perform the grouping by parallelism level
             as well (e.g. process, thread, gpu)
         - drop_zeros : bool = False
@@ -563,15 +564,16 @@ class Trace:
         if "time.inc" in metrics:
             self.calc_inc_metrics(["Timestamp (ns)"])
 
-        # calculate exclusive time always
+        # always calculate exclusive time
         self.calc_exc_metrics(["Timestamp (ns)"])
         if "time.exc" in metrics:
-            metrics = metrics.copy()  # remove modifies in-place
+            # copy b/c remove modifies in-place
+            metrics = metrics.copy()
             metrics.remove("time.exc")
 
         enter = self.events.loc[self.events["Event Type"] == "Enter"].copy()
 
-        # always calculate process-level flat profile since it is used regardless
+        # always calculate parallel-level flat profile since it is used regardless
         process = (
             enter.groupby(groupby_cols + parallelism_level, observed=True,
                           as_index=False).agg(**({
@@ -581,13 +583,14 @@ class Trace:
                                   f"{metric} (avg)": (f"{metric}", "mean") for metric
                                   in metrics
                               }))
-        ).set_index(groupby_cols + parallelism_level)
+        ).set_index(groupby_cols + parallelism_level).sort_index()
         process.insert(0, 'Time (%)', round(
             100 * (process['Time (ns)'] / process.groupby(
                 level=groupby_cols, observed=True)['Time (ns)'].sum()), 2
         ))
 
-        if not per_process:
+        # calculate flat profile with non-parallel groupings
+        if not include_parallelism:
             whole = (
                 process.reset_index()
                 .groupby(groupby_cols, observed=True, as_index=False)
@@ -607,16 +610,16 @@ class Trace:
                 100 * whole["Avg Time (ns)"] / whole["Avg Time (ns)"].sum(), 2
             ))
 
-        # select correct return df per user-args
-        df = process if per_process else whole
+        # select correct return dataframe
+        df = process if include_parallelism else whole
 
         # drop zero and NA values if specified
         if drop_zeros:
             df = df.loc[df["Time (%)"] > 0]
 
-        # sort
-        if per_process:
-            # by average time for each process in multi-index grouping
+        # sort by average exclusive time per each grouping
+        # if include_parallelism=True, we must sort the multi-index
+        if include_parallelism:
             df = df.sort_values(
                 "Time (ns)",
                 key=lambda _: df.groupby(level=groupby_cols, observed=True)["Time (ns)"]
@@ -624,7 +627,6 @@ class Trace:
                 ascending=ascending
             )
         else:
-            # by total grouped average
             df = df.sort_values(
                 by=["Avg Time (ns)"], ascending=ascending
             ).reset_index(drop=True)
@@ -648,7 +650,7 @@ class Trace:
         num_ranks = len(set(self.events["Process"]))
         num_display = num_ranks if num_processes > num_ranks else num_processes
 
-        flat_profile = self.flat_profile(metrics=metric, per_process=True)
+        flat_profile = self.flat_profile(metrics=metric, include_parallelism=True)
 
         imbalance_dict = dict()
 
