@@ -6,6 +6,7 @@
 import numpy as np
 import pandas as pd
 from pipit.util.cct import create_cct
+from typing import Literal
 
 
 class Trace:
@@ -529,25 +530,34 @@ class Trace:
     def flat_profile(self,
                      metrics: str | list[str] = "time.exc",
                      groupby_cols: str | list[str] = "Name",
-                     include_parallelism : bool = False,
-                     drop_zeros : bool = False,
-                     ascending : bool = False) -> pd.DataFrame:
+                     include_parallelism: bool = False,
+                     drop_zeros: bool = False,
+                     ascending: bool = False,
+                     *,
+                     order_by: Literal["grouping", "parallelism"] | None = None) \
+            -> pd.DataFrame:
         """
         Generates a flat profile DataFrame containing aggregated statistics (min,
         max, mean, etc.) of the trace across user-specified metrics and groupings
 
         Arguments:
-        - metrics : str | list[str] = "time.exc"
+        - metrics: str | list[str] = "time.exc"
             Metric columns to aggregate over. Exclusive time ("time.exc") is always used
-        - groupby_cols : str | list[str] = "Name"
+        - groupby_cols: str | list[str] = "Name"
             Columns to perform the grouping by. Defaults to function name ("Name")
-        - include_parallelism : bool = False
+        - include_parallelism: bool = False
             Determines whether or not to perform the grouping by parallelism level
             as well (e.g. process, thread, gpu)
-        - drop_zeros : bool = False
+        - drop_zeros: bool = False
             Determines whether or not to drop rows where exlusive time is zero or NA
-        - ascending : bool = False
+        - ascending: bool = False
             Determines how result is sorted. Sorting is performed by exclusive time
+        - order_by: "grouping" | "parallelism" | None = None
+            Determines how output DataFrame is ordered when include_parallelism=True
+            - "grouping": Multi-indexed ordering by groupby_cols. Outputs metrics
+            for all processes for each grouping. Default behavior.
+            - "parallelism": Orders by parallelism level. I.e., outputs all groupings in
+            Process 0, then Process 1, etc.
 
         Returns:
         - pd.DataFrame
@@ -559,6 +569,14 @@ class Trace:
         groupby_cols = [groupby_cols] if not isinstance(groupby_cols, list) \
             else groupby_cols
         parallelism_level = self.parallelism_levels
+
+        if not order_by and include_parallelism:
+            order_by = "grouping"
+        elif order_by and not include_parallelism:
+            raise ValueError("Specifying order_by is only allowed when"
+                             " include_parallelism=True")
+        elif order_by and order_by not in ["grouping", "parallelism"]:
+            raise ValueError("order_by must be either 'grouping' or 'parallelism'")
 
         # calculate inclusive time if needed
         if "time.inc" in metrics:
@@ -578,7 +596,7 @@ class Trace:
             enter.groupby(groupby_cols + parallelism_level, observed=True,
                           as_index=False).agg(**({
                                   "Time (ns)": ("time.exc", "sum"),
-                                  "Calls": ("Event Type", "size")
+                                  "Count": ("Event Type", "size")
                               } | {
                                   f"{metric} (avg)": (f"{metric}", "mean") for metric
                                   in metrics
@@ -586,7 +604,7 @@ class Trace:
         ).set_index(groupby_cols + parallelism_level).sort_index()
         process.insert(0, 'Time (%)', round(
             100 * (process['Time (ns)'] / process.groupby(
-                level=groupby_cols, observed=True)['Time (ns)'].sum()), 2
+                level=parallelism_level, observed=True)['Time (ns)'].sum()), 2
         ))
 
         # calculate flat profile with non-parallel groupings
@@ -597,9 +615,9 @@ class Trace:
                 .agg(
                     **({
                         "Avg Time (ns)": ("Time (ns)", "mean"),
-                        "Avg Calls": ("Calls", "mean"),
-                        "Min (ns)": ("Time (ns)", "min"),
-                        "Max (ns)": ("Time (ns)", "max")
+                        "Avg Count": ("Count", "mean"),
+                        "Min Time (ns)": ("Time (ns)", "min"),
+                        "Max Time (ns)": ("Time (ns)", "max")
                     } | {
                         f"{metric} (avg)": (f"{metric} (avg)", "mean") for metric
                         in metrics
@@ -618,14 +636,25 @@ class Trace:
             df = df.loc[df["Time (%)"] > 0]
 
         # sort by average exclusive time per each grouping
-        # if include_parallelism=True, we must sort the multi-index
+        # if include_parallelism=True, we must sort the multi-index and maintain
+        # internal parallel level ordering
         if include_parallelism:
-            df = df.sort_values(
-                "Time (ns)",
-                key=lambda _: df.groupby(level=groupby_cols, observed=True)["Time (ns)"]
-                .transform("mean"),
-                ascending=ascending
-            )
+            if order_by == "grouping":
+                df = df.sort_index(level=parallelism_level)
+                df = df.sort_values(
+                    "Time (ns)",
+                    key=lambda _:
+                    df.groupby(level=groupby_cols, observed=True)["Time (ns)"]
+                    .transform("mean"),
+                    ascending=ascending,
+                    kind="stable"
+                )
+            else:
+                # handle multiple levels of parallelism
+                # parallel levels are always increasing (e.g., GPU0, GPU1, GPU2...)
+                asc = [True] * len(parallelism_level) + [ascending]
+                df = df.reset_index().sort_values(by=parallelism_level + ["Time (ns)"],
+                                                  ascending=asc)
         else:
             df = df.sort_values(
                 by=["Avg Time (ns)"], ascending=ascending
