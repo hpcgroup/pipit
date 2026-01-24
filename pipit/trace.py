@@ -601,7 +601,7 @@ class Trace:
                                   f"{metric} (avg)": (f"{metric}", "mean") for metric
                                   in metrics
                               }))
-        ).set_index(groupby_cols + parallelism_level).sort_index()
+        ).set_index(groupby_cols + parallelism_level)
         process.insert(0, 'Time (%)', round(
             100 * (process['Time (ns)'] / process.groupby(
                 level=parallelism_level, observed=True)['Time (ns)'].sum()), 2
@@ -640,7 +640,7 @@ class Trace:
         # internal parallel level ordering
         if include_parallelism:
             if order_by == "grouping":
-                df = df.sort_index(level=parallelism_level)
+                df = df.sort_index(level=groupby_cols + parallelism_level)
                 df = df.sort_values(
                     "Time (ns)",
                     key=lambda _:
@@ -654,7 +654,7 @@ class Trace:
                 # parallel levels are always increasing (e.g., GPU0, GPU1, GPU2...)
                 asc = [True] * len(parallelism_level) + [ascending]
                 df = df.reset_index().sort_values(by=parallelism_level + ["Time (ns)"],
-                                                  ascending=asc)
+                                                  ascending=asc).reset_index(drop=True)
         else:
             df = df.sort_values(
                 by=["Avg Time (ns)"], ascending=ascending
