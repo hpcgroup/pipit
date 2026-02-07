@@ -2,7 +2,6 @@
 
 import pipit as pp
 
-
 if __name__ == "__main__":
     # Path to Nsight traces
     filename = "../../pipit/tests/data/nbody-nvtx/trace.csv"

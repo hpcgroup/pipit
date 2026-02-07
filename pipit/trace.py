@@ -513,7 +513,7 @@ class Trace:
                 self.events["Timestamp (ns)"].min(),
                 self.events["Timestamp (ns)"].max(),
             ],
-            **kwargs
+            **kwargs,
         )
 
     def comm_by_process(self, output="size"):
@@ -532,15 +532,16 @@ class Trace:
 
         return pd.DataFrame({"Sent": sent, "Received": received}).rename_axis("Process")
 
-    def flat_profile(self,
-                     metrics: str | list[str] = "time.exc",
-                     groupby_cols: str | list[str] = "Name",
-                     include_parallelism: bool = False,
-                     drop_zeros: bool = False,
-                     ascending: bool = False,
-                     *,
-                     order_by: Literal["grouping", "parallelism"] | None = None) \
-            -> pd.DataFrame:
+    def flat_profile(
+        self,
+        metrics: str | list[str] = "time.exc",
+        groupby_cols: str | list[str] = "Name",
+        include_parallelism: bool = False,
+        drop_zeros: bool = False,
+        ascending: bool = False,
+        *,
+        order_by: Literal["grouping", "parallelism"] | None = None,
+    ) -> pd.DataFrame:
         """
         Generates a flat profile DataFrame containing aggregated statistics (min,
         max, mean, etc.) of the trace across user-specified metrics and groupings
@@ -571,15 +572,17 @@ class Trace:
 
         # ensure arg validity
         metrics = [metrics] if not isinstance(metrics, list) else metrics
-        groupby_cols = [groupby_cols] if not isinstance(groupby_cols, list) \
-            else groupby_cols
+        groupby_cols = (
+            [groupby_cols] if not isinstance(groupby_cols, list) else groupby_cols
+        )
         parallelism_level = self.parallelism_levels
 
         if not order_by and include_parallelism:
             order_by = "grouping"
         elif order_by and not include_parallelism:
-            raise ValueError("Specifying order_by is only allowed when"
-                             " include_parallelism=True")
+            raise ValueError(
+                "Specifying order_by is only allowed when" " include_parallelism=True"
+            )
         elif order_by and order_by not in ["grouping", "parallelism"]:
             raise ValueError("order_by must be either 'grouping' or 'parallelism'")
 
@@ -598,19 +601,29 @@ class Trace:
 
         # always calculate parallel-level flat profile since it is used regardless
         process = (
-            enter.groupby(groupby_cols + parallelism_level, observed=True,
-                          as_index=False).agg(**({
-                                  "Time (ns)": ("time.exc", "sum"),
-                                  "Count": ("Event Type", "size")
-                              } | {
-                                  f"{metric} (avg)": (f"{metric}", "mean") for metric
-                                  in metrics
-                              }))
+            enter.groupby(
+                groupby_cols + parallelism_level, observed=True, as_index=False
+            ).agg(
+                **(
+                    {"Time (ns)": ("time.exc", "sum"), "Count": ("Event Type", "size")}
+                    | {f"{metric} (avg)": (f"{metric}", "mean") for metric in metrics}
+                )
+            )
         ).set_index(groupby_cols + parallelism_level)
-        process.insert(0, 'Time (%)', round(
-            100 * (process['Time (ns)'] / process.groupby(
-                level=parallelism_level, observed=True)['Time (ns)'].sum()), 2
-        ))
+        process.insert(
+            0,
+            "Time (%)",
+            round(
+                100
+                * (
+                    process["Time (ns)"]
+                    / process.groupby(level=parallelism_level, observed=True)[
+                        "Time (ns)"
+                    ].sum()
+                ),
+                2,
+            ),
+        )
 
         # calculate flat profile with non-parallel groupings
         if not include_parallelism:
@@ -618,20 +631,25 @@ class Trace:
                 process.reset_index()
                 .groupby(groupby_cols, observed=True, as_index=False)
                 .agg(
-                    **({
-                        "Avg Time (ns)": ("Time (ns)", "mean"),
-                        "Avg Count": ("Count", "mean"),
-                        "Min Time (ns)": ("Time (ns)", "min"),
-                        "Max Time (ns)": ("Time (ns)", "max")
-                    } | {
-                        f"{metric} (avg)": (f"{metric} (avg)", "mean") for metric
-                        in metrics
-                    })
+                    **(
+                        {
+                            "Avg Time (ns)": ("Time (ns)", "mean"),
+                            "Avg Count": ("Count", "mean"),
+                            "Min Time (ns)": ("Time (ns)", "min"),
+                            "Max Time (ns)": ("Time (ns)", "max"),
+                        }
+                        | {
+                            f"{metric} (avg)": (f"{metric} (avg)", "mean")
+                            for metric in metrics
+                        }
+                    )
                 )
             )
-            whole.insert(1, "Time (%)", round(
-                100 * whole["Avg Time (ns)"] / whole["Avg Time (ns)"].sum(), 2
-            ))
+            whole.insert(
+                1,
+                "Time (%)",
+                round(100 * whole["Avg Time (ns)"] / whole["Avg Time (ns)"].sum(), 2),
+            )
 
         # select correct return dataframe
         df = process if include_parallelism else whole
@@ -648,22 +666,25 @@ class Trace:
                 df = df.sort_index(level=groupby_cols + parallelism_level)
                 df = df.sort_values(
                     "Time (ns)",
-                    key=lambda _:
-                    df.groupby(level=groupby_cols, observed=True)["Time (ns)"]
-                    .transform("mean"),
+                    key=lambda _: df.groupby(level=groupby_cols, observed=True)[
+                        "Time (ns)"
+                    ].transform("mean"),
                     ascending=ascending,
-                    kind="stable"
+                    kind="stable",
                 )
             else:
                 # handle multiple levels of parallelism
                 # parallel levels are always increasing (e.g., GPU0, GPU1, GPU2...)
                 asc = [True] * len(parallelism_level) + [ascending]
-                df = df.reset_index().sort_values(by=parallelism_level + ["Time (ns)"],
-                                                  ascending=asc).reset_index(drop=True)
+                df = (
+                    df.reset_index()
+                    .sort_values(by=parallelism_level + ["Time (ns)"], ascending=asc)
+                    .reset_index(drop=True)
+                )
         else:
-            df = df.sort_values(
-                by=["Avg Time (ns)"], ascending=ascending
-            ).reset_index(drop=True)
+            df = df.sort_values(by=["Avg Time (ns)"], ascending=ascending).reset_index(
+                drop=True
+            )
 
         return df
 

@@ -229,41 +229,45 @@ def test_flat_profile(data_dir, ping_pong_otf2_trace):
     # check min/max per total time in process, time percentage
     flat_profile = trace.flat_profile()
 
-    minmax = df[["Name", "Process", "time.exc"]].groupby(by=["Name", "Process"]) \
-        .sum().groupby(by="Name")
-    minimum = minmax.min()[minmax.min()["time.exc"] > 0].rename(columns={
-        "time.exc": "Min Time (ns)"
-    })
-    maximum = minmax.max()[minmax.max()["time.exc"] > 0].rename(columns={
-        "time.exc": "Max Time (ns)"
-    })
+    minmax = (
+        df[["Name", "Process", "time.exc"]]
+        .groupby(by=["Name", "Process"])
+        .sum()
+        .groupby(by="Name")
+    )
+    minimum = minmax.min()[minmax.min()["time.exc"] > 0].rename(
+        columns={"time.exc": "Min Time (ns)"}
+    )
+    maximum = minmax.max()[minmax.max()["time.exc"] > 0].rename(
+        columns={"time.exc": "Max Time (ns)"}
+    )
 
-    assert (
-        minimum.sort_values(["Name", "Min Time (ns)"]).reset_index()
-    ).equals(
+    assert (minimum.sort_values(["Name", "Min Time (ns)"]).reset_index()).equals(
         flat_profile[["Name", "Min Time (ns)"]]
         .sort_values(["Name", "Min Time (ns)"])
         .reset_index(drop=True)
     )
-    assert (
-        maximum.sort_values(["Name", "Max Time (ns)"]).reset_index()
-    ).equals(
+    assert (maximum.sort_values(["Name", "Max Time (ns)"]).reset_index()).equals(
         flat_profile[["Name", "Max Time (ns)"]]
         .sort_values(["Name", "Max Time (ns)"])
-        .reset_index(drop=True))
+        .reset_index(drop=True)
+    )
     assert_allclose(flat_profile["Time (%)"].sum(), 100.0, rtol=0.01)
 
-    mpi_send_exc_avg = (
-        flat_profile.loc[flat_profile["Name"] == "MPI_Send"]["Avg Time (ns)"])
+    mpi_send_exc_avg = flat_profile.loc[flat_profile["Name"] == "MPI_Send"][
+        "Avg Time (ns)"
+    ]
 
     # test with include_parallelism=True; use parallelism ordering for easier indexing
     # check time percentage, function invocation counts, and exclusive time calcs
     flat_profile = trace.flat_profile(include_parallelism=True, order_by="parallelism")
 
-    assert_allclose(flat_profile.groupby(by="Process")["Time (%)"].sum()[0], 100.0,
-                    rtol=0.01)
-    assert_allclose(flat_profile.groupby(by="Process")["Time (%)"].sum()[1], 100.0,
-                    rtol=0.01)
+    assert_allclose(
+        flat_profile.groupby(by="Process")["Time (%)"].sum()[0], 100.0, rtol=0.01
+    )
+    assert_allclose(
+        flat_profile.groupby(by="Process")["Time (%)"].sum()[1], 100.0, rtol=0.01
+    )
 
     df["Count"] = df.groupby(by=["Name", "Process"])["Event Type"].transform("size")
     assert (
@@ -278,17 +282,21 @@ def test_flat_profile(data_dir, ping_pong_otf2_trace):
     )
 
     # MPI_Send for P0, P1
-    mpi_send_p0 = (
-        df.loc[(df["Name"] == "MPI_Send") & (df["Process"] == 0)]["time.exc"].sum())
-    mpi_send_p1 = (
-        df.loc[(df["Name"] == "MPI_Send") & (df["Process"] == 1)]["time.exc"].sum())
+    mpi_send_p0 = df.loc[(df["Name"] == "MPI_Send") & (df["Process"] == 0)][
+        "time.exc"
+    ].sum()
+    mpi_send_p1 = df.loc[(df["Name"] == "MPI_Send") & (df["Process"] == 1)][
+        "time.exc"
+    ].sum()
     assert (
-        flat_profile.loc[(flat_profile["Name"] == "MPI_Send") &
-                         (flat_profile["Process"] == 0)]["Time (ns)"].iloc[0]
+        flat_profile.loc[
+            (flat_profile["Name"] == "MPI_Send") & (flat_profile["Process"] == 0)
+        ]["Time (ns)"].iloc[0]
     ) == mpi_send_p0
     assert (
-        flat_profile.loc[(flat_profile["Name"] == "MPI_Send") &
-                         (flat_profile["Process"] == 1)]["Time (ns)"].iloc[0]
+        flat_profile.loc[
+            (flat_profile["Name"] == "MPI_Send") & (flat_profile["Process"] == 1)
+        ]["Time (ns)"].iloc[0]
     ) == mpi_send_p1
 
     # avg of MPI_Send for include_parallelism=False
