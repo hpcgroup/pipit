@@ -581,7 +581,7 @@ class Trace:
             order_by = "grouping"
         elif order_by and not include_parallelism:
             raise ValueError(
-                "Specifying order_by is only allowed when" " include_parallelism=True"
+                "Specifying order_by is only allowed when include_parallelism=True"
             )
         elif order_by and order_by not in ["grouping", "parallelism"]:
             raise ValueError("order_by must be either 'grouping' or 'parallelism'")
