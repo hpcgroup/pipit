@@ -6,6 +6,7 @@
 import numpy as np
 import pandas as pd
 from pipit.util.cct import create_cct
+from typing import Literal
 
 
 class Trace:
@@ -277,13 +278,18 @@ class Trace:
             enter_leave_df = self.events.loc[enter_leave_mask]
 
             # add dummy values for depth/parent/children
-            # (otherwise loc won't insert the values)
             self.events["_depth"] = 0
             self.events["_parent"] = None
             self.events["_children"] = None
-            self.events.loc[enter_leave_mask] = enter_leave_df.groupby(
-                self.parallelism_levels, group_keys=False, dropna=False
+
+            dummy = enter_leave_df.groupby(
+                self.parallelism_levels, group_keys=False, dropna=False, observed=False
             ).apply(_match_caller_callee_by_level)
+
+            # ensure proper indexing alignment on insert
+            self.events.loc[enter_leave_mask, "_depth"] = dummy["_depth"]
+            self.events.loc[enter_leave_mask, "_parent"] = dummy["_parent"]
+            self.events.loc[enter_leave_mask, "_children"] = dummy["_children"]
 
         self.events = self.events.astype({"_depth": "Int32", "_parent": "Int32"})
         self.events = self.events.astype({"_depth": "category", "_parent": "category"})
@@ -507,7 +513,7 @@ class Trace:
                 self.events["Timestamp (ns)"].min(),
                 self.events["Timestamp (ns)"].max(),
             ],
-            **kwargs
+            **kwargs,
         )
 
     def comm_by_process(self, output="size"):
@@ -527,49 +533,160 @@ class Trace:
         return pd.DataFrame({"Sent": sent, "Received": received}).rename_axis("Process")
 
     def flat_profile(
-        self, metrics="time.exc", groupby_column="Name", per_process=False
-    ):
+        self,
+        metrics: str | list[str] = "time.exc",
+        groupby_cols: str | list[str] = "Name",
+        include_parallelism: bool = False,
+        drop_zeros: bool = False,
+        ascending: bool = False,
+        *,
+        order_by: Literal["grouping", "parallelism"] | None = None,
+    ) -> pd.DataFrame:
         """
+        Generates a flat profile DataFrame containing aggregated statistics (min,
+        max, mean, etc.) of the trace across user-specified metrics and groupings
+
         Arguments:
-        metrics - a string or list of strings containing the metrics to be aggregated
-        groupby_column - a string or list containing the columns to be grouped by
+        - metrics: str | list[str] = "time.exc"
+            Metric columns to aggregate over. Exclusive time ("time.exc") is always used
+        - groupby_cols: str | list[str] = "Name"
+            Columns to perform the grouping by. Defaults to function name ("Name")
+        - include_parallelism: bool = False
+            Determines whether or not to perform the grouping by parallelism level
+            as well (e.g. process, thread, gpu)
+        - drop_zeros: bool = False
+            Determines whether or not to drop rows where exlusive time is zero or NA
+        - ascending: bool = False
+            Determines how result is sorted. Sorting is performed by exclusive time
+        - order_by: "grouping" | "parallelism" | None = None
+            Determines how output DataFrame is ordered when include_parallelism=True
+            - "grouping": Multi-indexed ordering by groupby_cols. Outputs metrics
+            for all processes for each grouping. Default behavior.
+            - "parallelism": Orders by parallelism level. I.e., outputs all groupings in
+            Process 0, then Process 1, etc.
 
         Returns:
-        A Pandas DataFrame that will have the aggregated metrics
-        for the grouped by columns.
+        - pd.DataFrame
+            A Pandas DataFrame that contains aggregated metrics for the grouped columns
         """
 
+        # ensure arg validity
         metrics = [metrics] if not isinstance(metrics, list) else metrics
+        groupby_cols = (
+            [groupby_cols] if not isinstance(groupby_cols, list) else groupby_cols
+        )
+        parallelism_level = self.parallelism_levels
+
+        if not order_by and include_parallelism:
+            order_by = "grouping"
+        elif order_by and not include_parallelism:
+            raise ValueError(
+                "Specifying order_by is only allowed when include_parallelism=True"
+            )
+        elif order_by and order_by not in ["grouping", "parallelism"]:
+            raise ValueError("order_by must be either 'grouping' or 'parallelism'")
 
         # calculate inclusive time if needed
         if "time.inc" in metrics:
             self.calc_inc_metrics(["Timestamp (ns)"])
 
-        # calculate exclusive time if needed
+        # always calculate exclusive time
+        self.calc_exc_metrics(["Timestamp (ns)"])
         if "time.exc" in metrics:
-            self.calc_exc_metrics(["Timestamp (ns)"])
+            # copy b/c remove modifies in-place
+            metrics = metrics.copy()
+            metrics.remove("time.exc")
 
-        # This first groups by both the process and the specified groupby
-        # column (like name). It then sums up the metrics for each combination
-        # of the process and the groupby column.
-        if per_process:
-            return (
-                self.events.loc[self.events["Event Type"] == "Enter"]
-                .groupby([groupby_column] + self.parallelism_levels, observed=True)[
-                    metrics
-                ]
-                .sum()
+        enter = self.events.loc[self.events["Event Type"] == "Enter"].copy()
+
+        # always calculate parallel-level flat profile since it is used regardless
+        process = (
+            enter.groupby(
+                groupby_cols + parallelism_level, observed=True, as_index=False
+            ).agg(
+                **(
+                    {"Time (ns)": ("time.exc", "sum"), "Count": ("Event Type", "size")}
+                    | {f"{metric} (avg)": (f"{metric}", "mean") for metric in metrics}
+                )
             )
+        ).set_index(groupby_cols + parallelism_level)
+        process.insert(
+            0,
+            "Time (%)",
+            round(
+                100
+                * (
+                    process["Time (ns)"]
+                    / process.groupby(level=parallelism_level, observed=True)[
+                        "Time (ns)"
+                    ].sum()
+                ),
+                2,
+            ),
+        )
+
+        # calculate flat profile with non-parallel groupings
+        if not include_parallelism:
+            whole = (
+                process.reset_index()
+                .groupby(groupby_cols, observed=True, as_index=False)
+                .agg(
+                    **(
+                        {
+                            "Avg Time (ns)": ("Time (ns)", "mean"),
+                            "Avg Count": ("Count", "mean"),
+                            "Min Time (ns)": ("Time (ns)", "min"),
+                            "Max Time (ns)": ("Time (ns)", "max"),
+                        }
+                        | {
+                            f"{metric} (avg)": (f"{metric} (avg)", "mean")
+                            for metric in metrics
+                        }
+                    )
+                )
+            )
+            whole.insert(
+                1,
+                "Time (%)",
+                round(100 * whole["Avg Time (ns)"] / whole["Avg Time (ns)"].sum(), 2),
+            )
+
+        # select correct return dataframe
+        df = process if include_parallelism else whole
+
+        # drop zero and NA values if specified
+        if drop_zeros:
+            df = df.loc[df["Time (%)"] > 0]
+
+        # sort by average exclusive time per each grouping
+        # if include_parallelism=True, we must sort the multi-index and maintain
+        # internal parallel level ordering
+        if include_parallelism:
+            if order_by == "grouping":
+                df = df.sort_index(level=groupby_cols + parallelism_level)
+                df = df.sort_values(
+                    "Time (ns)",
+                    key=lambda _: df.groupby(level=groupby_cols, observed=True)[
+                        "Time (ns)"
+                    ].transform("mean"),
+                    ascending=ascending,
+                    kind="stable",
+                )
+            else:
+                # handle multiple levels of parallelism
+                # parallel levels are always increasing (e.g., GPU0, GPU1, GPU2...)
+                asc = [True] * len(parallelism_level) + [ascending]
+                df = (
+                    df.reset_index()
+                    .sort_values(by=parallelism_level + ["Time (ns)"], ascending=asc)
+                    .reset_index(drop=True)
+                )
         else:
-            return (
-                self.events.loc[self.events["Event Type"] == "Enter"]
-                .groupby([groupby_column] + self.parallelism_levels, observed=True)[
-                    metrics
-                ]
-                .sum()
-                .groupby(groupby_column)
-                .mean()
+            df = df.sort_values(by=["Avg Time (ns)"], ascending=ascending).reset_index(
+                drop=True
             )
+
+        return df
 
     def load_imbalance(self, metric="time.exc", num_processes=1):
         """
@@ -588,7 +705,7 @@ class Trace:
         num_ranks = len(set(self.events["Process"]))
         num_display = num_ranks if num_processes > num_ranks else num_processes
 
-        flat_profile = self.flat_profile(metrics=metric, per_process=True)
+        flat_profile = self.flat_profile(metrics=metric, include_parallelism=True)
 
         imbalance_dict = dict()
 
@@ -638,7 +755,7 @@ class Trace:
             return idle_time
 
         return (
-            self.events.groupby(self.parallelism_levels, dropna=False)
+            self.events.groupby(self.parallelism_levels, dropna=False, observed=False)
             .apply(
                 calc_idle_time,
             )
@@ -683,7 +800,7 @@ class Trace:
         self.calc_inc_metrics(["Timestamp (ns)"])
 
         # Filter by Enter rows
-        events = self.events[self.events["Event Type"] == "Enter"].copy(deep=False)
+        events = self.events[self.events["Event Type"] == "Enter"]
         names = events["Name"].unique().tolist()
 
         # Create equal-sized bins
@@ -706,7 +823,7 @@ class Trace:
             }
 
             # start out with exc times being a copy of inc times
-            exc_times = list(events["inc_time_in_bin"].copy(deep=False))
+            exc_times = list(events["inc_time_in_bin"])
 
             # filter to events that have children
             filtered_df = events.loc[events["_children"].notnull()]
@@ -741,7 +858,7 @@ class Trace:
             in_bin = events[
                 (events["_matching_timestamp"] > start)
                 & (events["Timestamp (ns)"] < end)
-            ].copy(deep=False)
+            ]
 
             # Calculate inc_time_in_bin for each function
             # Case 1 - Function starts in bin
@@ -776,7 +893,7 @@ class Trace:
             calc_exc_time_in_bin(in_bin)
 
             # Sum across all processes
-            agg = in_bin.groupby("Name")["exc_time_in_bin"].sum()
+            agg = in_bin.groupby("Name", observed=False)["exc_time_in_bin"].sum()
             profile.append(agg.to_dict())
 
         # Convert to DataFrame
