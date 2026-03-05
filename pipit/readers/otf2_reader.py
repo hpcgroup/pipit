@@ -371,7 +371,7 @@ class OTF2Reader:
             # only definition type that is not a registry
             if key == "clock_properties":
                 # clock properties doesn't have an ID
-                def_id.append(float("NaN"))
+                def_id.append(-1)
                 def_name.append(str(type(def_attribute))[25:-2])
                 attributes.append(self.fields_to_dict(def_attribute))
 
@@ -408,8 +408,7 @@ class OTF2Reader:
                         # only add ids for those definitions that have it
                         def_id.append(def_object._ref)
                     else:
-                        # ID column is of float64 dtype
-                        def_id.append(float("NaN"))
+                        def_id.append(-1)
 
                     # name of the definition
                     def_name.append(str(type(def_object))[25:-2])
@@ -426,7 +425,7 @@ class OTF2Reader:
 
         # Definition column is of categorical dtype
         definitions_dataframe = definitions_dataframe.astype(
-            {"Definition Type": "category"}
+            {"Definition Type": "category", "ID": "int"}
         )
 
         return definitions_dataframe
