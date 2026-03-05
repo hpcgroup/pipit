@@ -303,26 +303,25 @@ class OTF2Reader:
 
                         # only add attributes for non-leave rows so that
                         # there aren't duplicate attributes for a single event
-                        if event_type != "Leave":
-                            attributes_dict = {}
-
-                            # iterates through the event's attributes
-                            # (ex: region, bytes sent, etc)
-                            for key, value in vars(event).items():
-                                # only adds non-empty attributes
-                                # and ignores time so there isn't a duplicate time
-                                if value is not None and key != "time":
-                                    # uses field_to_val to convert all data types
-                                    # and ensure that there are no pickling errors
-                                    attributes_dict[self.field_to_val(key)] = (
-                                        self.handle_data(value)
-                                    )
-                            event_attributes.append(attributes_dict)
-                        else:
-                            # nan attributes for leave rows
-                            # attributes column is of object dtype
-                            event_attributes.append(None)
-
+                        #   ↑
+                        # This is genuinely baffling ????
+                        # Like
+                        # Why would you not want this information in the case of a Leave Event
+                        # You need to know what you just left ????
+                        # Anyways I removed the "if event_type != "Leave"
+                        attributes_dict = {}
+                        # iterates through the event's attributes
+                        # (ex: region, bytes sent, etc)
+                        for key, value in vars(event).items():
+                            # only adds non-empty attributes
+                            # and ignores time so there isn't a duplicate time
+                            if value is not None and key != "time":
+                                # uses field_to_val to convert all data types
+                                # and ensure that there are no pickling errors
+                                attributes_dict[self.field_to_val(key)] = (
+                                    self.handle_data(value)
+                                )
+                        event_attributes.append(attributes_dict)
             trace.close()  # close event files
 
         # returns dataframe with all events and their fields
