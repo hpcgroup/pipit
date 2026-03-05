@@ -56,12 +56,10 @@ class OTF2Reader:
         if "otf2.definitions" in field_type:
             """
             Example: An event can have an attribute called region which corresponds
-            to a definition. We strip the string and extract only the relevant
-            information, which is the type of definition such as Region and also
-            append its id (like Region 6) so that this definition can be accessed
-            in the Definitions DataFrame
+            to a definition. This region has an ID, and can be retrieved in the 
+            Definitions DataFrame.
             """
-            return field_type[25:-2] + " " + str(getattr(field, "_ref"))
+            return int(getattr(field, "_ref"))
         elif "_otf2" in field_type or "otf2" in field_type:
             """
             Example: A measurement event has an attribute called measurement mode
