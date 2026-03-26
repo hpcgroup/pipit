@@ -5,6 +5,8 @@
 
 import numpy as np
 import pandas as pd
+import copy
+import re
 from pipit.util.cct import create_cct
 
 
@@ -901,3 +903,169 @@ class Trace:
             patterns.append(match_original)
 
         return patterns
+
+    def ann_time_breakdown(
+        self,
+        filter_regex: str | list = None,
+        mapper: dict = None,
+    ):
+        """
+        Time breakdown by NVTX-annotation, using the `_children` pointers. Supports
+        repeated annotation names by indexing results with each annotation's row-index
+
+        Arguments:
+        - filter_regex: str, list, optional
+            A string regex or list of regexes to select specific annotations to
+            include in the breakdown
+        - mapper: dict, optional = None
+            A dictionary mapping kernel names to their corresponding groups
+
+        Returns:
+        - pd.DataFrame
+            Contains per-annotation CPU and GPU time breakdowns and the following:
+                index = annotation row-index (ann_idx)
+                columns: ["Name", "gpu_time", "gpu_idle_time"]
+        """
+
+        # calculate inclusive metrics
+        if "time.inc" not in self.events.columns:
+            self.calc_inc_metrics(["Timestamp (ns)"])
+
+        # calculate exclusive time if needed
+        if "time.exc" not in self.events.columns:
+            self.calc_exc_metrics(["Timestamp (ns)"])
+
+        # 1) Select all "Enter" events of type "annotation"
+        ann_events = self.events[
+            (self.events["type"] == "annotation")
+            & (self.events["Event Type"] == "Enter")
+        ]
+
+        # 2) Optionally filter by regex on the annotation Name
+        if filter_regex is not None:
+            if isinstance(filter_regex, list):
+                filter_pattern = "|".join(filter_regex)
+            else:
+                filter_pattern = filter_regex
+            ann_events = ann_events[
+                ann_events["Name"].str.contains(filter_pattern, regex=True)
+            ]
+
+        breakdown_columns = {
+            "gpu_time": 0,
+            "gpu_idle_time": 0,
+        }
+
+        # Based on the mapper, get the different time columns we need to compute
+        if mapper is not None:
+            for key, value in mapper.items():
+                if value not in breakdown_columns:
+                    breakdown_columns[value] = 0
+
+        # Prepare a list for per-annotation records
+        records = []
+
+        # 3) For each annotation row (by index), walk its descendants
+        for ann_idx, ann_row in ann_events.iterrows():
+            ann_name = ann_row["Name"]
+            raw_children = ann_row["_children"]
+            cpu_time = ann_row["time.inc"]
+
+            # If _children is NaN, record zeros immediately
+            is_list_like = isinstance(raw_children, (list, tuple, np.ndarray))
+            if (not is_list_like) and pd.isna(raw_children):
+                records.append(
+                    {
+                        "ann_idx": ann_idx,
+                        "Name": ann_name,
+                        "cpu_time": cpu_time,
+                        **breakdown_columns,
+                    }
+                )
+                continue
+
+            # Normalize raw_children into a list of ints
+            if isinstance(raw_children, (int, np.integer)):
+                child_stack = [int(raw_children)]
+            else:
+                # Assume it's already a Python list of ints
+                child_stack = list(raw_children)
+
+            visited = set()
+            all_timestamps = []
+            all_matching = []
+            active_gpu_time = 0
+            breakdown = copy.deepcopy(breakdown_columns)
+
+            # Depth‐first traversal of all descendants
+            while child_stack:
+                cid = child_stack.pop()
+                if cid in visited:
+                    continue
+                if cid not in self.events.index:
+                    # Skip invalid indices
+                    continue
+
+                visited.add(cid)
+                child_row = self.events.loc[cid]
+                child_type = child_row["type"]
+
+                # Record this row's timestamps (if present)
+                ts = child_row["Timestamp (ns)"]
+                mts = child_row["_matching_timestamp"]
+
+                if not pd.isna(child_type) and child_type in ("kernel", "comm"):
+                    if not pd.isna(ts):
+                        all_timestamps.append(ts)
+                    if not pd.isna(mts):
+                        all_matching.append(mts)
+
+                # If this row has its own children, push them too
+                child_children = child_row["_children"]
+                if isinstance(
+                    child_children, (list, tuple, np.ndarray, int, np.integer)
+                ):
+                    if isinstance(child_children, (int, np.integer)):
+                        child_stack.append(int(child_children))
+                    else:
+                        child_stack.extend(list(child_children))
+
+                # If this row is a kernel or comm, accumulate its active GPU time
+                if not pd.isna(child_row["type"]):
+                    if child_row["type"] in ("kernel", "comm"):
+                        if (not pd.isna(ts)) and (not pd.isna(mts)):
+                            breakdown["gpu_time"] += abs(mts - ts)
+                            active_gpu_time += abs(mts - ts)
+
+                            if mapper is not None:
+                                # Match the name with the mapper key regex
+                                for key, value in mapper.items():
+                                    label = child_row["Name"]
+                                    if re.search(key, label):
+                                        breakdown[value] += abs(mts - ts)
+                                        break
+
+            # 4) Compute overall [min, max] window, then idle time
+            if all_timestamps or all_matching:
+                overall_min = min(all_timestamps + all_matching)
+                overall_max = max(all_timestamps + all_matching)
+                idle_gpu_time = (overall_max - overall_min) - active_gpu_time
+                idle_gpu_time = max(idle_gpu_time, 0)  # clamp ≥ 0
+                breakdown["gpu_idle_time"] += idle_gpu_time
+            else:
+                idle_gpu_time = 0
+
+            records.append(
+                {
+                    "ann_idx": ann_idx,
+                    "Name": ann_name,
+                    "cpu_time": cpu_time,
+                    **breakdown,
+                }
+            )
+
+        # 5) Build DataFrame, indexed by ann_idx (annotation row-index)
+        result_df = pd.DataFrame(records).set_index("ann_idx")[
+            ["Name", "cpu_time"] + list(breakdown_columns.keys())
+        ]
+        return result_df
