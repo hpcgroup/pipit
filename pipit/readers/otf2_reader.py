@@ -8,14 +8,14 @@ import numpy as np
 import pandas as pd
 import multiprocessing as mp
 import pipit.trace
-
+import glob
 
 class OTF2Reader:
     """Reader for OTF2 trace files"""
 
     def __init__(self, dir_name, num_processes=None, create_cct=False):
         self.dir_name = dir_name  # directory of otf2 file being read
-        self.file_name = self.dir_name + "/traces.otf2"
+        self.file_name = glob.glob(self.dir_name + "/*.otf2")[0]
         self.create_cct = create_cct
 
         num_cpus = mp.cpu_count()
@@ -56,12 +56,10 @@ class OTF2Reader:
         if "otf2.definitions" in field_type:
             """
             Example: An event can have an attribute called region which corresponds
-            to a definition. We strip the string and extract only the relevant
-            information, which is the type of definition such as Region and also
-            append its id (like Region 6) so that this definition can be accessed
-            in the Definitions DataFrame
+            to a definition. This region has an ID, and can be retrieved in the 
+            Definitions DataFrame.
             """
-            return field_type[25:-2] + " " + str(getattr(field, "_ref"))
+            return int(getattr(field, "_ref"))
         elif "_otf2" in field_type or "otf2" in field_type:
             """
             Example: A measurement event has an attribute called measurement mode
@@ -305,26 +303,25 @@ class OTF2Reader:
 
                         # only add attributes for non-leave rows so that
                         # there aren't duplicate attributes for a single event
-                        if event_type != "Leave":
-                            attributes_dict = {}
-
-                            # iterates through the event's attributes
-                            # (ex: region, bytes sent, etc)
-                            for key, value in vars(event).items():
-                                # only adds non-empty attributes
-                                # and ignores time so there isn't a duplicate time
-                                if value is not None and key != "time":
-                                    # uses field_to_val to convert all data types
-                                    # and ensure that there are no pickling errors
-                                    attributes_dict[self.field_to_val(key)] = (
-                                        self.handle_data(value)
-                                    )
-                            event_attributes.append(attributes_dict)
-                        else:
-                            # nan attributes for leave rows
-                            # attributes column is of object dtype
-                            event_attributes.append(None)
-
+                        #   ↑
+                        # This is genuinely baffling ????
+                        # Like
+                        # Why would you not want this information in the case of a Leave Event
+                        # You need to know what you just left ????
+                        # Anyways I removed the "if event_type != "Leave"
+                        attributes_dict = {}
+                        # iterates through the event's attributes
+                        # (ex: region, bytes sent, etc)
+                        for key, value in vars(event).items():
+                            # only adds non-empty attributes
+                            # and ignores time so there isn't a duplicate time
+                            if value is not None and key != "time":
+                                # uses field_to_val to convert all data types
+                                # and ensure that there are no pickling errors
+                                attributes_dict[self.field_to_val(key)] = (
+                                    self.handle_data(value)
+                                )
+                        event_attributes.append(attributes_dict)
             trace.close()  # close event files
 
         # returns dataframe with all events and their fields
@@ -373,7 +370,7 @@ class OTF2Reader:
             # only definition type that is not a registry
             if key == "clock_properties":
                 # clock properties doesn't have an ID
-                def_id.append(float("NaN"))
+                def_id.append(-1)
                 def_name.append(str(type(def_attribute))[25:-2])
                 attributes.append(self.fields_to_dict(def_attribute))
 
@@ -410,8 +407,7 @@ class OTF2Reader:
                         # only add ids for those definitions that have it
                         def_id.append(def_object._ref)
                     else:
-                        # ID column is of float64 dtype
-                        def_id.append(float("NaN"))
+                        def_id.append(-1)
 
                     # name of the definition
                     def_name.append(str(type(def_object))[25:-2])
@@ -428,7 +424,7 @@ class OTF2Reader:
 
         # Definition column is of categorical dtype
         definitions_dataframe = definitions_dataframe.astype(
-            {"Definition Type": "category"}
+            {"Definition Type": "category", "ID": "int"}
         )
 
         return definitions_dataframe

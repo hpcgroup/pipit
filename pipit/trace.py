@@ -2,6 +2,7 @@
 # Maryland. See the top-level LICENSE file for details.
 #
 # SPDX-License-Identifier: MIT
+import sys
 
 import numpy as np
 import pandas as pd
@@ -325,6 +326,8 @@ class Trace:
 
     def calc_exc_metrics(self, columns=None):
         # calculate exc metrics for all numeric columns if not specified
+        # Fixme This function doesn't work properly.
+        print("Warning: using calc_exc_metrics but the function doesn't work properly.", file=sys.stderr)
         columns = self.numeric_cols if columns is None else columns
 
         # match caller and callee rows
@@ -616,10 +619,15 @@ class Trace:
 
         return imbalance_df
 
-    def idle_time(self, idle_functions=["Idle"], mpi_events=False):
+    def idle_time(self, idle_functions=None, mpi_events=False, include_blank_spaces=False):
         # calculate inclusive metrics
+        if idle_functions is None:
+            idle_functions = ["Idle"]
         if "time.inc" not in self.events.columns:
             self.calc_inc_metrics()
+
+        if "time.exc" not in self.events.columns and include_blank_spaces:
+            self.calc_exc_metrics()
 
         if mpi_events:
             idle_functions += ["MPI_Wait", "MPI_Waitall", "MPI_Recv"]
@@ -627,14 +635,15 @@ class Trace:
         def calc_idle_time(events):
             # assumes events is sorted by time
 
-            # Calculate idle time due to gaps in between events
-            # This is the total time minus exclusive time spent in functions
-            total_time = events["Timestamp (ns)"].max() - events["Timestamp (ns)"].min()
-
-            idle_time = total_time - events["time.exc"].sum()
-
             # Calculate idle time due to idle_functions
-            idle_time += events[events["Name"].isin(idle_functions)]["time.inc"].sum()
+            idle_time = events[events["Name"].isin(idle_functions)]["time.inc"].sum()
+            if include_blank_spaces:
+                # Calculate idle time due to gaps in between events
+                # This is the total time minus exclusive time spent in functions
+                total_time = events["Timestamp (ns)"].max() - events["Timestamp (ns)"].min()
+
+                idle_time = total_time - events["time.exc"].sum()
+
             return idle_time
 
         return (
