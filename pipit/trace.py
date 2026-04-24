@@ -621,6 +621,9 @@ class Trace:
         if "time.inc" not in self.events.columns:
             self.calc_inc_metrics()
 
+        if "time.exc" not in self.events.columns:
+            self.calc_exc_metrics()
+
         if mpi_events:
             idle_functions += ["MPI_Wait", "MPI_Waitall", "MPI_Recv"]
 
