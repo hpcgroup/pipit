@@ -2,6 +2,7 @@
 # Maryland. See the top-level LICENSE file for details.
 #
 # SPDX-License-Identifier: MIT
+import sys
 
 import numpy as np
 import pandas as pd
@@ -325,6 +326,8 @@ class Trace:
 
     def calc_exc_metrics(self, columns=None):
         # calculate exc metrics for all numeric columns if not specified
+        # Fixme This function doesn't work properly.
+        print("Warning: using calc_exc_metrics but the function doesn't work properly.", file=sys.stderr)
         columns = self.numeric_cols if columns is None else columns
 
         # match caller and callee rows
@@ -623,7 +626,7 @@ class Trace:
         if "time.inc" not in self.events.columns:
             self.calc_inc_metrics()
 
-        if "time.exc" not in self.events.columns:
+        if "time.exc" not in self.events.columns and include_blank_spaces:
             self.calc_exc_metrics()
 
         if mpi_events:
