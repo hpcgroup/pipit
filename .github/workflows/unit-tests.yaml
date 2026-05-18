@@ -12,7 +12,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest]
-        python-version: ["3.9", "3.10", "3.11", "3.12"]
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
 
     steps:
       - uses: actions/checkout@v2
@@ -31,19 +31,19 @@ jobs:
           pip install --upgrade numpy pandas pytest otf2
 
       - name: Lint and format check with flake8 and black
-        if: ${{ matrix.python-version == 3.9 }}
+        if: ${{ matrix.python-version == 3.14 }}
         run: |
           pip install --upgrade black flake8
           black --diff --check .
           flake8
 
       - name: Update coverage
-        if: ${{ matrix.python-version == 3.12 }}
+        if: ${{ matrix.python-version == 3.14 }}
         run: |
           pip install --upgrade coverage
 
       - name: Run coverage 
-        if: ${{ matrix.python-version == 3.12 }}
+        if: ${{ matrix.python-version == 3.14 }}
         run: |
           PYTHONPATH=. coverage run $(which pytest)
 
@@ -52,7 +52,7 @@ jobs:
           PYTHONPATH=. $(which pytest)
 
       - name: Upload coverage to Codecov
-        if: ${{ matrix.python-version == 3.12 }}
+        if: ${{ matrix.python-version == 3.14 }}
         uses: codecov/codecov-action@v4
         env:
           CODECOV_TOKEN: ${{ secrets.PIPIT_CODECOV_TOKEN }}
@@ -68,7 +68,7 @@ jobs:
     runs-on: macos-latest
     strategy:
       matrix:
-        python-version: ["3.11", "3.12"]
+        python-version: ["3.13", "3.14"]
 
     steps:
       - uses: actions/checkout@v2
