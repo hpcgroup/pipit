@@ -2,7 +2,6 @@
 
 import pipit as pp
 
-
 if __name__ == "__main__":
     # Use pipit's ``from_csv`` API to read in traces in CSV format.
     # The result is stored into pipit's Trace data structure.

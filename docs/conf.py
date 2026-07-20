@@ -26,7 +26,6 @@ from pygments.token import Generic
 
 import pkg_resources
 
-
 # -- Project information -----------------------------------------------------
 
 project = "pipit"
