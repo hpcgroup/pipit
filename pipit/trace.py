@@ -1014,7 +1014,7 @@ class Trace:
                 ts = child_row["Timestamp (ns)"]
                 mts = child_row["_matching_timestamp"]
 
-                if not pd.isna(child_type) and child_type in ("kernel", "comm"):
+                if not pd.isna(child_type) and child_type in ("kernel", "cuda_memcpy"):
                     if not pd.isna(ts):
                         all_timestamps.append(ts)
                     if not pd.isna(mts):
