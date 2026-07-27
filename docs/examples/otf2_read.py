@@ -2,7 +2,6 @@
 
 import pipit as pp
 
-
 if __name__ == "__main__":
     # Path to OTF2 traces
     dirname = "../../pipit/tests/data/ping-pong-otf2"

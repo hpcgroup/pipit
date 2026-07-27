@@ -277,13 +277,18 @@ class Trace:
             enter_leave_df = self.events.loc[enter_leave_mask]
 
             # add dummy values for depth/parent/children
-            # (otherwise loc won't insert the values)
             self.events["_depth"] = 0
             self.events["_parent"] = None
             self.events["_children"] = None
-            self.events.loc[enter_leave_mask] = enter_leave_df.groupby(
-                self.parallelism_levels, group_keys=False, dropna=False
+
+            dummy = enter_leave_df.groupby(
+                self.parallelism_levels, group_keys=False, dropna=False, observed=False
             ).apply(_match_caller_callee_by_level)
+
+            # ensure proper indexing alignment on insert
+            self.events.loc[enter_leave_mask, "_depth"] = dummy["_depth"]
+            self.events.loc[enter_leave_mask, "_parent"] = dummy["_parent"]
+            self.events.loc[enter_leave_mask, "_children"] = dummy["_children"]
 
         self.events = self.events.astype({"_depth": "Int32", "_parent": "Int32"})
         self.events = self.events.astype({"_depth": "category", "_parent": "category"})
@@ -638,7 +643,7 @@ class Trace:
             return idle_time
 
         return (
-            self.events.groupby(self.parallelism_levels, dropna=False)
+            self.events.groupby(self.parallelism_levels, dropna=False, observed=False)
             .apply(
                 calc_idle_time,
             )
@@ -683,7 +688,7 @@ class Trace:
         self.calc_inc_metrics(["Timestamp (ns)"])
 
         # Filter by Enter rows
-        events = self.events[self.events["Event Type"] == "Enter"].copy(deep=False)
+        events = self.events[self.events["Event Type"] == "Enter"]
         names = events["Name"].unique().tolist()
 
         # Create equal-sized bins
@@ -706,7 +711,7 @@ class Trace:
             }
 
             # start out with exc times being a copy of inc times
-            exc_times = list(events["inc_time_in_bin"].copy(deep=False))
+            exc_times = list(events["inc_time_in_bin"])
 
             # filter to events that have children
             filtered_df = events.loc[events["_children"].notnull()]
@@ -741,7 +746,7 @@ class Trace:
             in_bin = events[
                 (events["_matching_timestamp"] > start)
                 & (events["Timestamp (ns)"] < end)
-            ].copy(deep=False)
+            ]
 
             # Calculate inc_time_in_bin for each function
             # Case 1 - Function starts in bin
@@ -776,7 +781,7 @@ class Trace:
             calc_exc_time_in_bin(in_bin)
 
             # Sum across all processes
-            agg = in_bin.groupby("Name")["exc_time_in_bin"].sum()
+            agg = in_bin.groupby("Name", observed=False)["exc_time_in_bin"].sum()
             profile.append(agg.to_dict())
 
         # Convert to DataFrame
